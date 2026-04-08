@@ -1,8 +1,8 @@
-import { generateText } from "ai";
 import { getOpenRouter, TITLE_MODEL, MEMORY_MODEL } from "./openrouter";
 import { db } from "./db";
 import { conversations, messages } from "./db/schema";
 import { eq, desc } from "drizzle-orm";
+import { trackedGenerateText } from "./usage-logger";
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 2000;
@@ -51,7 +51,8 @@ async function getConversationDigest(conversationId: string): Promise<string> {
 export async function generateConversationTitle(
   conversationId: string,
   userMessage: string,
-  assistantMessage: string
+  assistantMessage: string,
+  userId?: string
 ): Promise<string> {
   const conv = await db.query.conversations.findFirst({
     where: eq(conversations.id, conversationId),
@@ -72,22 +73,24 @@ export async function generateConversationTitle(
   // Get conversation digest for context
   const digest = await getConversationDigest(conversationId);
 
-  return generateTitle(conversationId, digest, placeholder);
+  return generateTitle(conversationId, digest, placeholder, userId);
 }
 
 /** Regenerate title from scratch using full conversation context */
 export async function regenerateConversationTitle(
-  conversationId: string
+  conversationId: string,
+  userId?: string
 ): Promise<string> {
   const digest = await getConversationDigest(conversationId);
   if (!digest) return "New conversation";
-  return generateTitle(conversationId, digest, null);
+  return generateTitle(conversationId, digest, null, userId);
 }
 
 async function generateTitle(
   conversationId: string,
   digest: string,
-  fallback: string | null
+  fallback: string | null,
+  userId?: string
 ): Promise<string> {
   const modelsToTry = [TITLE_MODEL, MEMORY_MODEL];
 
@@ -97,7 +100,7 @@ async function generateTitle(
         const openrouter = getOpenRouter();
         console.log(`[title-gen] model=${model}, attempt=${attempt + 1}/${MAX_RETRIES + 1}`);
 
-        const { text } = await generateText({
+        const { text } = await trackedGenerateText({
           model: openrouter(model),
           system:
             "Generate a very short title (2-5 words) that captures the overall topic of this conversation. Be specific. Return ONLY the title. No quotes, no thinking, no tags.",
@@ -106,6 +109,11 @@ async function generateTitle(
           ],
           maxOutputTokens: 50,
           temperature: 0.3,
+        }, {
+          userId: userId || "system",
+          conversationId,
+          type: "title",
+          model,
         });
 
         const title = cleanTitle(text);

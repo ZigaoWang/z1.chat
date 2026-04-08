@@ -1,6 +1,6 @@
-import { streamText, UIMessage, convertToModelMessages, stepCountIs } from "ai";
+import { UIMessage, convertToModelMessages, stepCountIs } from "ai";
 import { db } from "@/lib/db";
-import { conversations, messages } from "@/lib/db/schema";
+import { conversations, messages, users } from "@/lib/db/schema";
 import { getCurrentUserId } from "@/lib/auth";
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { getOpenRouter } from "@/lib/openrouter";
@@ -9,7 +9,8 @@ import { generateConversationTitle } from "@/lib/title-generator";
 import { extractMemories, updateConversationSummary, extractImmediateMemory } from "@/lib/memory";
 import { checkAndCompactConversation } from "@/lib/context-manager";
 import { getTools } from "@/lib/tools";
-import { eq } from "drizzle-orm";
+import { trackedStreamText, logSearchUsage } from "@/lib/usage-logger";
+import { eq, and } from "drizzle-orm";
 
 export const maxDuration = 120;
 
@@ -43,7 +44,21 @@ export async function POST(req: Request) {
       return Response.json({ error: "Messages are required" }, { status: 400 });
     }
 
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
+
+    // Credit check: block non-admin users with no credits
+    const [currentUser] = await db
+      .select({ role: users.role, creditBalance: users.creditBalance })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (currentUser && currentUser.role !== "admin" && currentUser.creditBalance <= 0) {
+      return Response.json(
+        { error: "You've run out of credits. Contact an admin to add more." },
+        { status: 402 }
+      );
+    }
+
     const selectedModel = modelId || DEFAULT_MODEL;
     console.log(`[chat] Request: model=${selectedModel}, messages=${chatMessages.length}, convId=${conversationId || "new"}, regenerate=${!!regenerate}`);
 
@@ -64,6 +79,15 @@ export async function POST(req: Request) {
         .returning();
       convId = conv.id;
     } else {
+      // Verify conversation belongs to user
+      const [existingConv] = await db
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(and(eq(conversations.id, convId!), eq(conversations.userId, userId)))
+        .limit(1);
+      if (!existingConv) {
+        return Response.json({ error: "Conversation not found" }, { status: 404 });
+      }
       await db
         .update(conversations)
         .set({ updatedAt: new Date(), model: selectedModel })
@@ -101,7 +125,7 @@ export async function POST(req: Request) {
     const systemPrompt = await buildSystemPrompt(userId, convId!, userContent);
 
     // Check if conversation needs compaction (summarize old messages)
-    await checkAndCompactConversation(convId!).catch(console.error);
+    await checkAndCompactConversation(convId!, userId).catch(console.error);
 
     // Get available tools
     const tools = getTools();
@@ -110,7 +134,7 @@ export async function POST(req: Request) {
     // Convert UI messages to model messages
     const modelMessages = await convertToModelMessages(chatMessages);
 
-    const result = streamText({
+    const result = trackedStreamText({
       model: openrouter(selectedModel),
       system: systemPrompt,
       messages: modelMessages,
@@ -127,10 +151,12 @@ export async function POST(req: Request) {
         // Collect tool invocations from all steps for persistence
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const toolInvocations: Array<Record<string, any>> = [];
+        let searchCallCount = 0;
         if (steps) {
           for (const step of steps) {
             if (step.toolCalls) {
               for (const tc of step.toolCalls) {
+                if (tc.toolName === "web_search") searchCallCount++;
                 const result = step.toolResults?.find(
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (tr: any) => tr.toolCallId === tc.toolCallId
@@ -145,6 +171,13 @@ export async function POST(req: Request) {
                 });
               }
             }
+          }
+        }
+
+        // Log search tool usage
+        if (searchCallCount > 0) {
+          for (let i = 0; i < searchCallCount; i++) {
+            logSearchUsage(userId, convId!).catch(console.error);
           }
         }
 
@@ -163,13 +196,13 @@ export async function POST(req: Request) {
 
         // Background: Generate/update title on every exchange
         if (text && userContent) {
-          generateConversationTitle(convId!, userContent, text).catch(
+          generateConversationTitle(convId!, userContent, text, userId).catch(
             console.error
           );
         }
 
         // Background: Update conversation summary (Layer 1)
-        updateConversationSummary(convId!).catch(console.error);
+        updateConversationSummary(convId!, userId).catch(console.error);
 
         // Background: Extract user memories (Layer 2)
         if (text && userContent) {
@@ -178,7 +211,7 @@ export async function POST(req: Request) {
           );
         }
       },
-    });
+    }, { userId, conversationId: convId!, type: "chat", model: selectedModel });
 
     return result.toUIMessageStreamResponse({
       headers: {

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 // GET /api/settings — get user preferences
 export async function GET() {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
 
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -21,6 +21,7 @@ export async function GET() {
       email: user.email,
       avatarUrl: user.avatarUrl,
       preferences: user.preferences,
+      creditBalance: user.creditBalance,
     });
   } catch (error) {
     console.error("Get settings error:", error);
@@ -31,7 +32,7 @@ export async function GET() {
 // PATCH /api/settings — update user preferences
 export async function PATCH(req: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
 
     const updates: Partial<{

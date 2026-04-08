@@ -29,6 +29,27 @@
       "when": 1775484252388,
       "tag": "0003_luxuriant_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775620475827,
+      "tag": "0004_dear_tombstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775626513485,
+      "tag": "0005_slimy_azazel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775629101750,
+      "tag": "0006_invite_tokens",
+      "breakpoints": true
     }
   ]
 }

@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, User, Shield } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
+import { useAuth } from "@/hooks/use-auth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "./theme-toggle";
 import { APP_NAME } from "@/lib/constants";
@@ -97,6 +98,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     conversations, activeId, setActiveId, createConversation,
     deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery,
   } = useConversations();
+  const { user, signOut } = useAuth();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -326,11 +328,34 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <div className="shrink-0 border-t border-sidebar-border/40 px-1.5 py-1 space-y-px">
+          {user && (
+            <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/70">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <User className="h-3 w-3" />
+              </div>
+              <span className="flex-1 truncate">{user.name || user.email}</span>
+              <Tooltip>
+                <TooltipTrigger
+                  onClick={signOut}
+                  className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <LogOut className="h-3 w-3" />
+                </TooltipTrigger>
+                <TooltipContent side="top">Sign out</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
           <ThemeToggle />
           <Link href="/settings"
             className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
             <Settings className="h-3.5 w-3.5" /> Settings
           </Link>
+          {user?.role === "admin" && (
+            <Link href="/admin"
+              className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+              <Shield className="h-3.5 w-3.5" /> Admin
+            </Link>
+          )}
         </div>
 
         {/* Resize handle */}

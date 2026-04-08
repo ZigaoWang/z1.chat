@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
 
     // Verify the conversation belongs to the user
     const conv = await db.query.conversations.findFirst({

@@ -6,7 +6,7 @@ import { eq, and, desc } from "drizzle-orm";
 // GET /api/memories — list user's memories with source conversation info
 export async function GET() {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
 
     const result = await db
       .select({
@@ -39,7 +39,7 @@ export async function GET() {
 // DELETE /api/memories — delete a specific memory or clear all
 export async function DELETE(req: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
     const { id, clearAll } = body as { id?: string; clearAll?: boolean };
 
@@ -71,7 +71,7 @@ export async function DELETE(req: Request) {
 // PATCH /api/memories — update a memory's content
 export async function PATCH(req: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const { id, content } = await req.json();
 
     if (!id || !content) {

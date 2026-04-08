@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   name: text("name"),
   avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash"),
+  role: text("role").notNull().default("user"), // "user" | "admin"
+  creditBalance: real("credit_balance").notNull().default(0),
   preferences: jsonb("preferences").$type<UserPreferences>().default({
     theme: "system",
     defaultModel: null,
@@ -156,6 +158,91 @@ export const creditTransactions = pgTable(
   ]
 );
 
+// Sessions
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("sessions_user_id_idx").on(table.userId)]
+);
+
+// Password Reset Tokens
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    used: boolean("used").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)]
+);
+
+// Usage Logs
+export const usageLogs = pgTable(
+  "usage_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id").references(
+      () => conversations.id,
+      { onDelete: "set null" }
+    ),
+    type: text("type").notNull(), // 'chat', 'title', 'summary', 'memory_extraction', 'memory_dedup', 'consolidation', 'immediate_memory', 'compaction', 'suggestions', 'search'
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costUsd: real("cost_usd").notNull().default(0),
+    userCostUsd: real("user_cost_usd").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("usage_logs_user_id_idx").on(table.userId),
+    index("usage_logs_created_at_idx").on(table.createdAt),
+    index("usage_logs_type_idx").on(table.type),
+  ]
+);
+
+// Invite Tokens
+export const inviteTokens = pgTable(
+  "invite_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    token: text("token").notNull().unique(),
+    creditAmount: real("credit_amount").notNull(),
+    used: boolean("used").notNull().default(false),
+    usedByUserId: uuid("used_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("invite_tokens_token_idx").on(table.token)]
+);
+
 // API Keys (BYOK)
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -179,6 +266,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   memories: many(memories),
   creditTransactions: many(creditTransactions),
   apiKeys: many(apiKeys),
+  sessions: many(sessions),
+  usageLogs: many(usageLogs),
 }));
 
 export const conversationsRelations = relations(
@@ -224,6 +313,35 @@ export const creditTransactionsRelations = relations(
   })
 );
 
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const inviteTokensRelations = relations(inviteTokens, ({ one }) => ({
+  usedByUser: one(users, {
+    fields: [inviteTokens.usedByUserId],
+    references: [users.id],
+  }),
+  creator: one(users, {
+    fields: [inviteTokens.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [usageLogs.userId],
+    references: [users.id],
+  }),
+  conversation: one(conversations, {
+    fields: [usageLogs.conversationId],
+    references: [conversations.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -234,6 +352,9 @@ export type NewMessage = typeof messages.$inferInsert;
 export type Memory = typeof memories.$inferSelect;
 export type NewMemory = typeof memories.$inferInsert;
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
+export type UsageLog = typeof usageLogs.$inferSelect;
+export type InviteToken = typeof inviteTokens.$inferSelect;
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";

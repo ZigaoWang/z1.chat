@@ -1,9 +1,9 @@
-import { generateText } from "ai";
 import { getOpenRouter, MEMORY_MODEL } from "./openrouter";
 import { db } from "./db";
 import { memories, conversations, messages, users } from "./db/schema";
 import { eq, desc, and, count, lt, sql } from "drizzle-orm";
 import { MAX_CONTEXT_MEMORIES, SUMMARY_UPDATE_INTERVAL } from "./constants";
+import { trackedGenerateText } from "./usage-logger";
 
 // How many conversations between automatic memory consolidation runs
 const CONSOLIDATION_INTERVAL = 10;
@@ -21,7 +21,8 @@ async function sleep(ms: number) {
  * every SUMMARY_UPDATE_INTERVAL messages to keep costs low.
  */
 export async function updateConversationSummary(
-  conversationId: string
+  conversationId: string,
+  userId?: string
 ): Promise<void> {
   try {
     const conv = await db.query.conversations.findFirst({
@@ -58,7 +59,7 @@ export async function updateConversationSummary(
     const existingSummary = conv.summary || "No summary yet.";
 
     const openrouter = getOpenRouter();
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
       system: `Update the conversation summary based on the recent messages. The summary should capture:
 - What the user is working on or asking about
@@ -75,6 +76,11 @@ Keep it under 300 words. Be specific and info-dense. No filler. Update the exist
       ],
       maxOutputTokens: 500,
       temperature: 0.1,
+    }, {
+      userId: userId || conv.userId,
+      conversationId,
+      type: "summary",
+      model: MEMORY_MODEL,
     });
 
     const summary = text.trim();
@@ -125,7 +131,7 @@ export async function extractMemories(
         console.log(`[memory] Retry attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
       }
 
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
       system: `You are a memory extraction system. Analyze this conversation and extract specific, concrete, durable facts that would be useful in FUTURE conversations.
 
@@ -173,6 +179,11 @@ Return valid JSON array only. No markdown, no explanation, no thinking.`,
       ],
       maxOutputTokens: 500,
       temperature: 0.1,
+    }, {
+      userId,
+      conversationId,
+      type: "memory_extraction",
+      model: MEMORY_MODEL,
     });
 
     const cleaned = text
@@ -203,7 +214,9 @@ Return valid JSON array only. No markdown, no explanation, no thinking.`,
       const action = await deduplicateMemory(
         mem,
         existingMemories,
-        openrouter
+        openrouter,
+        userId,
+        conversationId
       );
 
       switch (action.action) {
@@ -258,7 +271,9 @@ async function deduplicateMemory(
   newMem: ExtractedMemory,
   existing: { id: string; category: string; content: string }[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  openrouter: any
+  openrouter: any,
+  userId?: string,
+  conversationId?: string
 ): Promise<DeduplicationAction> {
   if (existing.length === 0) {
     return { action: "insert", newContent: newMem.content, category: newMem.category };
@@ -284,7 +299,7 @@ async function deduplicateMemory(
     .join("\n");
 
   try {
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
       system: `You are a memory deduplication system. Compare the new memory against existing memories and decide the action.
 
@@ -303,6 +318,11 @@ Be conservative. When in doubt, insert rather than skip.`,
       ],
       maxOutputTokens: 200,
       temperature: 0,
+    }, {
+      userId: userId || "system",
+      conversationId,
+      type: "memory_dedup",
+      model: MEMORY_MODEL,
     });
 
     const result = JSON.parse(
@@ -449,7 +469,7 @@ export async function consolidateMemories(userId: string): Promise<void> {
       .join("\n");
 
     const openrouter = getOpenRouter();
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
       system: `You are a memory consolidation system, like a human brain organizing memories during sleep. Review all memories and return a list of actions to keep them clean, useful, and well-organized.
 
@@ -482,6 +502,10 @@ Return valid JSON array only. No markdown.`,
       ],
       maxOutputTokens: 800,
       temperature: 0.1,
+    }, {
+      userId,
+      type: "consolidation",
+      model: MEMORY_MODEL,
     });
 
     const cleaned = text
@@ -604,6 +628,7 @@ export async function getRelevantMemories(userId: string): Promise<string> {
             sql`${memories.id} = ANY(${usedIds})`
           )
         )
+        .execute()
         .catch(console.error);
     }
 
@@ -687,7 +712,7 @@ export async function extractImmediateMemory(
   try {
     const openrouter = getOpenRouter();
 
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
       system: `The user has explicitly asked you to remember something. Extract exactly what they want remembered as a memory.
 
@@ -701,6 +726,11 @@ Return valid JSON only, no markdown.`,
       ],
       maxOutputTokens: 200,
       temperature: 0,
+    }, {
+      userId,
+      conversationId,
+      type: "immediate_memory",
+      model: MEMORY_MODEL,
     });
 
     const cleaned = text

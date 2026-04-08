@@ -17,7 +17,7 @@ import {
   MessageSquare,
   Sparkles,
   CreditCard,
-  Key,
+  Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -36,6 +36,7 @@ interface Memory {
 interface UserSettings {
   name: string | null;
   email: string | null;
+  creditBalance: number;
   preferences: {
     theme: "light" | "dark" | "system";
     defaultModel: string | null;
@@ -43,6 +44,29 @@ interface UserSettings {
     language: string | null;
     customInstructions: string | null;
   };
+}
+
+interface UsageBreakdown {
+  type: string;
+  count: number;
+  totalCost: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+interface UsageData {
+  totalCost: number;
+  monthCost: number;
+  breakdown: UsageBreakdown[];
+  recent: Array<{
+    id: string;
+    type: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    createdAt: string;
+  }>;
 }
 
 const categoryLabel: Record<string, string> = {
@@ -71,6 +95,7 @@ export default function SettingsPage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [customInstructions, setCustomInstructions] = useState("");
   const [instructionsSaved, setInstructionsSaved] = useState(true);
+  const [usage, setUsage] = useState<UsageData | null>(null);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -88,6 +113,13 @@ export default function SettingsPage() {
         if (Array.isArray(data)) setMemories(data);
       })
       .catch(() => toast.error("Failed to load memories"));
+
+    fetch("/api/usage")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) setUsage(data);
+      })
+      .catch(() => {});
   }, []);
 
   const updatePreference = useCallback(
@@ -504,24 +536,101 @@ export default function SettingsPage() {
           )}
         </section>
 
-        {/* Coming Soon sections */}
+        {/* Usage */}
         <section className="mb-8">
-          <SectionHeader icon={CreditCard} title="Credits & Usage" />
-          <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
-            <CreditCard className="mx-auto h-8 w-8 text-muted-foreground/15" />
-            <p className="mt-2 text-xs text-muted-foreground/40">
-              Credit system coming soon
-            </p>
-          </div>
+          <SectionHeader icon={Activity} title="Usage" />
+          {usage ? (
+            <div className="space-y-3">
+              {/* Cost cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
+                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">This Month</p>
+                  <p className="text-lg font-semibold mt-1">${usage.monthCost.toFixed(4)}</p>
+                </div>
+                <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
+                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">All Time</p>
+                  <p className="text-lg font-semibold mt-1">${usage.totalCost.toFixed(4)}</p>
+                </div>
+              </div>
+
+              {/* Breakdown table */}
+              {usage.breakdown.length > 0 && (
+                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border/30 text-muted-foreground/50">
+                        <th className="text-left px-4 py-2 font-medium">Type</th>
+                        <th className="text-right px-4 py-2 font-medium">Calls</th>
+                        <th className="text-right px-4 py-2 font-medium">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                      {usage.breakdown.map((b) => (
+                        <tr key={b.type}>
+                          <td className="px-4 py-2 capitalize">{b.type.replace(/_/g, " ")}</td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">{b.count}</td>
+                          <td className="px-4 py-2 text-right">${b.totalCost.toFixed(4)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Recent usage */}
+              {usage.recent.length > 0 && (
+                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
+                  <div className="px-4 py-2 border-b border-border/30">
+                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+                      Recent Activity
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border/20 max-h-64 overflow-y-auto">
+                    {usage.recent.slice(0, 20).map((log) => (
+                      <div key={log.id} className="flex items-center justify-between px-4 py-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="capitalize text-muted-foreground">{log.type.replace(/_/g, " ")}</span>
+                          <span className="text-muted-foreground/30">{log.model.split("/").pop()}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium">${log.costUsd.toFixed(5)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
+              <Activity className="mx-auto h-8 w-8 text-muted-foreground/15" />
+              <p className="mt-2 text-xs text-muted-foreground/40">
+                No usage data yet. Start chatting to see costs here.
+              </p>
+            </div>
+          )}
         </section>
 
+        {/* Credits */}
         <section className="mb-8">
-          <SectionHeader icon={Key} title="API Keys" />
-          <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
-            <Key className="mx-auto h-8 w-8 text-muted-foreground/15" />
-            <p className="mt-2 text-xs text-muted-foreground/40">
-              Bring your own API key — coming soon
-            </p>
+          <SectionHeader icon={CreditCard} title="Credits" />
+          <div className="rounded-xl border border-border/40 bg-card shadow-sm">
+            <div className="flex items-center justify-between px-4 py-4">
+              <div>
+                <p className="text-xs text-muted-foreground/50">Current Balance</p>
+                <p className="text-2xl font-semibold mt-0.5">
+                  ${(settings?.creditBalance ?? 0).toFixed(2)}
+                </p>
+              </div>
+              <CreditCard className="h-8 w-8 text-muted-foreground/15" />
+            </div>
+            {(settings?.creditBalance ?? 0) <= 0 && (
+              <div className="border-t border-border/30 px-4 py-3">
+                <p className="text-[11px] text-muted-foreground/40">
+                  No credits remaining. Contact an admin to add credits.
+                </p>
+              </div>
+            )}
           </div>
         </section>
       </div>

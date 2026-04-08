@@ -1,72 +1,16 @@
-import { OPENROUTER_MODELS_URL, MODELS_CACHE_TTL } from "@/lib/constants";
-
-interface OpenRouterModel {
-  id: string;
-  name: string;
-  description?: string;
-  pricing: {
-    prompt: string;
-    completion: string;
-  };
-  context_length: number;
-  top_provider?: {
-    max_completion_tokens?: number;
-  };
-  architecture?: {
-    modality: string;
-    tokenizer: string;
-    instruct_type: string;
-  };
-}
-
-interface CachedModels {
-  data: OpenRouterModel[];
-  fetchedAt: number;
-}
-
-let modelsCache: CachedModels | null = null;
+import { getCachedModels, type OpenRouterModel } from "@/lib/models-cache";
 
 export async function GET() {
   try {
-    // Return cached if fresh
-    if (modelsCache && Date.now() - modelsCache.fetchedAt < MODELS_CACHE_TTL) {
-      return Response.json(formatModels(modelsCache.data));
-    }
-
-    const res = await fetch(OPENROUTER_MODELS_URL, {
-      headers: {
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`OpenRouter API returned ${res.status}`);
-    }
-
-    const { data } = await res.json();
-
-    // Filter to chat models only and sort
-    const chatModels = (data as OpenRouterModel[]).filter(
-      (m) => m.architecture?.instruct_type || m.name
-    );
-
-    modelsCache = { data: chatModels, fetchedAt: Date.now() };
-
+    const chatModels = await getCachedModels();
     return Response.json(formatModels(chatModels));
   } catch (error) {
     console.error("Fetch models error:", error);
-
-    // Return cache even if stale on error
-    if (modelsCache) {
-      return Response.json(formatModels(modelsCache.data));
-    }
-
     return Response.json({ error: "Failed to fetch models" }, { status: 500 });
   }
 }
 
 function formatModels(models: OpenRouterModel[]) {
-  // Group by provider
   const grouped: Record<string, Array<{
     id: string;
     name: string;
@@ -100,7 +44,6 @@ function formatModels(models: OpenRouterModel[]) {
     });
   }
 
-  // Sort providers: popular ones first
   const popularProviders = ["Anthropic", "Openai", "Google", "Meta", "Mistral", "Deepseek"];
   const sortedProviders = Object.keys(grouped).sort((a, b) => {
     const aIdx = popularProviders.indexOf(a);

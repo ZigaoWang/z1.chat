@@ -6,7 +6,7 @@ import { eq, desc, and, ilike, or, sql, inArray } from "drizzle-orm";
 // GET /api/conversations — list all conversations with full-text search
 export async function GET(req: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const limit = parseInt(searchParams.get("limit") || "50");
@@ -119,7 +119,7 @@ export async function GET(req: Request) {
 // POST /api/conversations — create a new conversation
 export async function POST(req: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json().catch(() => ({}));
 
     const [conv] = await db

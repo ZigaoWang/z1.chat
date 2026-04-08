@@ -1,18 +1,18 @@
-import { generateText } from "ai";
 import { getOpenRouter, TITLE_MODEL } from "@/lib/openrouter";
 import { getRelevantMemories } from "@/lib/memory";
 import { getCurrentUserId } from "@/lib/auth";
+import { trackedGenerateText } from "@/lib/usage-logger";
 
 export async function GET() {
   try {
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const memories = await getRelevantMemories(userId);
     const openrouter = getOpenRouter();
 
     const hour = new Date().getHours();
     const timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
 
-    const { text } = await generateText({
+    const { text } = await trackedGenerateText({
       model: openrouter(TITLE_MODEL),
       system: `Generate a welcome screen for an AI chat app. Return JSON only, no markdown.
 
@@ -33,6 +33,10 @@ It is ${timeOfDay}. Be fresh and original — never repeat yourself. No thinking
       ],
       maxOutputTokens: 300,
       temperature: 1.0,
+    }, {
+      userId,
+      type: "suggestions",
+      model: TITLE_MODEL,
     });
 
     const cleaned = text

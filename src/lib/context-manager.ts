@@ -1,9 +1,9 @@
-import { generateText } from "ai";
 import { getOpenRouter, CONTEXT_MODEL } from "./openrouter";
 import { db } from "./db";
 import { conversations, messages } from "./db/schema";
 import { eq, desc, and, lt } from "drizzle-orm";
 import { MAX_CONTEXT_TOKENS, COMPACTION_KEEP_RECENT } from "./constants";
+import { trackedGenerateText } from "./usage-logger";
 
 /**
  * Estimate token count using simple heuristic: 4 chars ��� 1 token.
@@ -18,7 +18,8 @@ function estimateTokens(text: string): number {
  * by deleting them and storing a summary.
  */
 export async function checkAndCompactConversation(
-  conversationId: string
+  conversationId: string,
+  userId?: string
 ): Promise<boolean> {
   try {
     const allDbMessages = await db
@@ -63,7 +64,7 @@ export async function checkAndCompactConversation(
       .join("\n\n");
 
     const openrouter = getOpenRouter();
-    const { text: summary } = await generateText({
+    const { text: summary } = await trackedGenerateText({
       model: openrouter(CONTEXT_MODEL),
       system: `Create a detailed summary of this conversation so far. Summarize thoroughly so an AI reading only your summary plus recent messages can fully understand the context.
 
@@ -78,6 +79,11 @@ Be specific and detailed. Keep it under 800 words.`,
       messages: [{ role: "user", content: oldContent }],
       maxOutputTokens: 1500,
       temperature: 0.2,
+    }, {
+      userId: userId || "system",
+      conversationId,
+      type: "compaction",
+      model: CONTEXT_MODEL,
     });
 
     const summaryText = summary.trim();

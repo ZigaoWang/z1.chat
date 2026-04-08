@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
 
     const conv = await db.query.conversations.findFirst({
       where: and(eq(conversations.id, id), eq(conversations.userId, userId)),
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
 
     // Verify ownership
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = getCurrentUserId();
+    const userId = await getCurrentUserId();
 
     const [deleted] = await db
       .delete(conversations)
