@@ -3,14 +3,13 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, MessageSquare, AlertCircle, RotateCcw } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw, Lightbulb, Code, PenLine, Globe } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
 import ArtifactPreview, { extractArtifacts, isArtifact } from "./artifact-preview";
@@ -28,16 +27,46 @@ interface MessageAttachments {
   files: { name: string; type: string; url: string; size?: number }[];
 }
 
-const SUGGESTIONS = [
-  "Explain quantum computing simply",
-  "Write a Python script to rename files",
-  "Compare React vs Vue for a new project",
-  "Help me draft a professional email",
+const FALLBACK_SUGGESTIONS = [
+  "What are some underrated travel destinations?",
+  "Write a short sci-fi story in 100 words",
+  "Compare the pros and cons of remote work",
+  "Help me plan a productive morning routine",
 ];
+const FALLBACK_GREETING = "What's on your mind?";
+
+const ICONS = [Lightbulb, Code, PenLine, Globe];
+const COLORS = ["text-amber-500", "text-blue-500", "text-violet-500", "text-emerald-500"];
+
+function useWelcomeScreen() {
+  const [greeting, setGreeting] = useState<string>(FALLBACK_GREETING);
+  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
+  const [ready, setReady] = useState(false);
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+    fetch("/api/suggestions")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.greeting) setGreeting(data.greeting);
+        if (data && Array.isArray(data.suggestions) && data.suggestions.length >= 2) {
+          setSuggestions(data.suggestions);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setReady(true));
+  }, []);
+
+  return { greeting, suggestions, ready };
+}
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel } = useModels();
+  const { greeting, suggestions: aiSuggestions, ready: welcomeReady } = useWelcomeScreen();
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -583,6 +612,16 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     document.addEventListener("mouseup", handleUp);
   }, []);
 
+  // Auto-focus input on mount and when returning to empty state
+  useEffect(() => {
+    if (messages.length === 0) {
+      setTimeout(() => {
+        const ta = document.querySelector("textarea[placeholder]") as HTMLTextAreaElement;
+        ta?.focus();
+      }, 100);
+    }
+  }, [messages.length, activeId]);
+
   const dragCounter = useRef(0);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -679,23 +718,30 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
       {/* Messages or Empty State */}
       {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-20">
-          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/40">
-            <MessageSquare className="h-5 w-5 text-muted-foreground/30" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
-          <p className="mt-1 text-sm text-muted-foreground/50">{APP_TAGLINE}</p>
+        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-16">
+          <div className="w-full max-w-lg text-center">
+            <p className={`text-lg text-muted-foreground/80 font-medium transition-opacity duration-500 ${welcomeReady ? "opacity-100" : "opacity-0"}`}>
+              {greeting}
+            </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 w-full max-w-md">
-            {SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => handleSendMessage(suggestion)}
-                className="rounded-lg border border-border/40 px-3 py-2.5 text-left text-sm leading-snug text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-foreground"
-              >
-                {suggestion}
-              </button>
-            ))}
+            <div className={`mt-8 grid grid-cols-2 gap-2 transition-opacity duration-500 delay-100 ${welcomeReady ? "opacity-100" : "opacity-0"}`}>
+              {aiSuggestions.map((text, i) => {
+                const Icon = ICONS[i % ICONS.length];
+                const color = COLORS[i % COLORS.length];
+                return (
+                  <button
+                    key={text}
+                    onClick={() => handleSendMessage(text)}
+                    className="group flex items-start gap-2.5 rounded-xl border border-border/30 bg-card/50 px-3.5 py-3 text-left transition-all hover:bg-muted/50 hover:border-border/60"
+                  >
+                    <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color} opacity-50 group-hover:opacity-100 transition-opacity`} />
+                    <span className="text-[13px] leading-snug text-muted-foreground/60 group-hover:text-foreground transition-colors">
+                      {text}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : (
