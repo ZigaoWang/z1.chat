@@ -11,7 +11,8 @@ export async function POST(req: Request) {
   try {
     const { creditAmount } = await req.json();
 
-    if (!creditAmount || typeof creditAmount !== "number" || creditAmount <= 0) {
+    const parsed = Number(creditAmount);
+    if (!creditAmount || isNaN(parsed) || parsed <= 0) {
       return Response.json(
         { error: "creditAmount must be a positive number" },
         { status: 400 }
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       .insert(inviteTokens)
       .values({
         token,
-        creditAmount,
+        creditAmount: String(creditAmount),
         createdBy: adminOrRes.id,
         expiresAt,
       })

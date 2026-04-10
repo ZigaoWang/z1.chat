@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.2",
     "highlight.js": "^11.11.1",
     "jose": "^6.2.2",

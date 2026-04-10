@@ -5,6 +5,7 @@ import {
   uuid,
   integer,
   real,
+  numeric,
   jsonb,
   index,
   boolean,
@@ -36,7 +37,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash"),
   role: text("role").notNull().default("user"), // "user" | "admin"
-  creditBalance: real("credit_balance").notNull().default(0),
+  creditBalance: numeric("credit_balance", { precision: 20, scale: 10 }).notNull().default("0"),
   preferences: jsonb("preferences").$type<UserPreferences>().default({
     theme: "system",
     defaultModel: null,
@@ -91,7 +92,7 @@ export const messages = pgTable(
     model: text("model"),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
-    cost: real("cost"),
+    cost: numeric("cost", { precision: 20, scale: 10 }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -141,8 +142,8 @@ export const creditTransactions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    amount: real("amount").notNull(), // positive = credit, negative = debit
-    balance: real("balance").notNull(), // balance after transaction
+    amount: numeric("amount", { precision: 20, scale: 10 }).notNull(), // positive = credit, negative = debit
+    balance: numeric("balance", { precision: 20, scale: 10 }).notNull(), // balance after transaction
     type: text("type").notNull(), // 'purchase', 'usage', 'refund'
     description: text("description"),
     messageId: uuid("message_id").references(() => messages.id, {
@@ -208,8 +209,8 @@ export const usageLogs = pgTable(
     model: text("model").notNull(),
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
-    costUsd: real("cost_usd").notNull().default(0),
-    userCostUsd: real("user_cost_usd").notNull().default(0),
+    costUsd: numeric("cost_usd", { precision: 20, scale: 10 }).notNull().default("0"),
+    userCostUsd: numeric("user_cost_usd", { precision: 20, scale: 10 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -227,7 +228,7 @@ export const inviteTokens = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     token: text("token").notNull().unique(),
-    creditAmount: real("credit_amount").notNull(),
+    creditAmount: numeric("credit_amount", { precision: 20, scale: 10 }).notNull(),
     used: boolean("used").notNull().default(false),
     usedByUserId: uuid("used_by_user_id").references(() => users.id, {
       onDelete: "set null",

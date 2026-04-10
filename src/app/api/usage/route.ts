@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
     // Total cost (all time)
     const [totalResult] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
       .from(usageLogs)
       .where(eq(usageLogs.userId, userId));
 
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     startOfMonth.setHours(0, 0, 0, 0);
 
     const [monthResult] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
       .from(usageLogs)
       .where(
         and(
@@ -35,10 +35,10 @@ export async function GET(req: Request) {
     const breakdown = await db
       .select({
         type: usageLogs.type,
-        count: sql<number>`COUNT(*)`,
-        totalCost: sql<number>`COALESCE(SUM(${usageLogs.costUsd}), 0)`,
-        totalInputTokens: sql<number>`COALESCE(SUM(${usageLogs.inputTokens}), 0)`,
-        totalOutputTokens: sql<number>`COALESCE(SUM(${usageLogs.outputTokens}), 0)`,
+        count: sql<string>`COUNT(*)`,
+        totalCost: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)`,
+        totalInputTokens: sql<string>`COALESCE(SUM(${usageLogs.inputTokens}), 0)`,
+        totalOutputTokens: sql<string>`COALESCE(SUM(${usageLogs.outputTokens}), 0)`,
       })
       .from(usageLogs)
       .where(eq(usageLogs.userId, userId))
@@ -72,7 +72,10 @@ export async function GET(req: Request) {
         totalInputTokens: Number(b.totalInputTokens),
         totalOutputTokens: Number(b.totalOutputTokens),
       })),
-      recent,
+      recent: recent.map((r) => ({
+        ...r,
+        costUsd: Number(r.costUsd),
+      })),
     });
   } catch (error) {
     console.error("Usage API error:", error);

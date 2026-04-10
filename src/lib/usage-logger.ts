@@ -3,6 +3,7 @@ import { db } from "./db";
 import { usageLogs, users } from "./db/schema";
 import { calculateCost, calculateUserCost, getSearchCost } from "./cost-calculator";
 import { sql, eq } from "drizzle-orm";
+import { Decimal } from "decimal.js";
 
 type UsageType =
   | "chat"
@@ -44,7 +45,7 @@ export async function logUsage(
     });
 
     // Deduct from credit balance for billable types (skip for admins)
-    if (userCostUsd > 0) {
+    if (new Decimal(userCostUsd).greaterThan(0)) {
       const [user] = await db
         .select({ role: users.role })
         .from(users)
@@ -53,7 +54,7 @@ export async function logUsage(
       if (user?.role !== "admin") {
         await db
           .update(users)
-          .set({ creditBalance: sql`GREATEST(0, ${users.creditBalance} - ${userCostUsd})` })
+          .set({ creditBalance: sql`GREATEST(0, ${users.creditBalance} - ${userCostUsd}::numeric)` })
           .where(sql`${users.id} = ${meta.userId}`);
       }
     }
@@ -82,7 +83,7 @@ export async function logSearchUsage(
     });
 
     // Deduct from credit balance (skip for admins)
-    if (userCostUsd > 0) {
+    if (new Decimal(userCostUsd).greaterThan(0)) {
       const [user] = await db
         .select({ role: users.role })
         .from(users)
@@ -91,7 +92,7 @@ export async function logSearchUsage(
       if (user?.role !== "admin") {
         await db
           .update(users)
-          .set({ creditBalance: sql`GREATEST(0, ${users.creditBalance} - ${userCostUsd})` })
+          .set({ creditBalance: sql`GREATEST(0, ${users.creditBalance} - ${userCostUsd}::numeric)` })
           .where(sql`${users.id} = ${userId}`);
       }
     }

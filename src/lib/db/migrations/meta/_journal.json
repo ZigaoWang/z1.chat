@@ -50,6 +50,13 @@
       "when": 1775629101750,
       "tag": "0006_invite_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775733811471,
+      "tag": "0007_superb_machine_man",
+      "breakpoints": true
     }
   ]
 }

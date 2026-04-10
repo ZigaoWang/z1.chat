@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    if (currentUser && currentUser.role !== "admin" && currentUser.creditBalance <= 0) {
+    if (currentUser && currentUser.role !== "admin" && Number(currentUser.creditBalance) <= 0) {
       return Response.json(
         { error: "You've run out of credits. Contact an admin to add more." },
         { status: 402 }

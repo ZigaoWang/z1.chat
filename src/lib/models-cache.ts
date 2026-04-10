@@ -58,11 +58,11 @@ export async function getCachedModels(): Promise<OpenRouterModel[]> {
 export function getModelPricing(
   models: OpenRouterModel[],
   modelId: string
-): { promptPrice: number; completionPrice: number } | null {
+): { promptPrice: string; completionPrice: string } | null {
   const model = models.find((m) => m.id === modelId);
   if (!model) return null;
   return {
-    promptPrice: parseFloat(model.pricing.prompt) || 0,
-    completionPrice: parseFloat(model.pricing.completion) || 0,
+    promptPrice: model.pricing.prompt || "0",
+    completionPrice: model.pricing.completion || "0",
   };
 }

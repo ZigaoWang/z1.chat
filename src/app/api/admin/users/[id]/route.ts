@@ -48,7 +48,7 @@ export async function PATCH(
       if (isNaN(balance)) {
         return Response.json({ error: "Invalid credit balance" }, { status: 400 });
       }
-      updates.creditBalance = balance;
+      updates.creditBalance = String(balance);
     }
 
     if (Object.keys(updates).length === 0) {
