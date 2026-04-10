@@ -4,20 +4,22 @@ import { conversations, messages } from "./db/schema";
 import { eq, desc } from "drizzle-orm";
 import { trackedGenerateText } from "./usage-logger";
 
-const MAX_RETRIES = 2;
-const RETRY_DELAY = 2000;
-
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function cleanTitle(raw: string): string {
-  return raw
+  // Strip think blocks (closed and unclosed)
+  let cleaned = raw
     .replace(/<think>[\s\S]*?<\/think>/g, "")
-    .replace(/<think>[\s\S]*/g, "")
+    .replace(/<think>[\s\S]*/g, "");
+
+  // Take the first non-empty line (model may prefix with newlines after think block)
+  const firstLine = cleaned
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0) || "";
+
+  // Strip surrounding quotes, markdown, and common prefixes
+  return firstLine
     .replace(/^["'`*#]+|["'`*#]+$/g, "")
     .replace(/^(title|##?\s*title):?\s*/i, "")
-    .replace(/\n.*/g, "")
     .trim()
     .slice(0, 100);
 }
@@ -52,7 +54,7 @@ export async function generateConversationTitle(
   conversationId: string,
   userMessage: string,
   assistantMessage: string,
-  userId?: string
+  userId: string
 ): Promise<string> {
   const conv = await db.query.conversations.findFirst({
     where: eq(conversations.id, conversationId),
@@ -79,7 +81,7 @@ export async function generateConversationTitle(
 /** Regenerate title from scratch using full conversation context */
 export async function regenerateConversationTitle(
   conversationId: string,
-  userId?: string
+  userId: string
 ): Promise<string> {
   const digest = await getConversationDigest(conversationId);
   if (!digest) return "New conversation";
@@ -90,53 +92,50 @@ async function generateTitle(
   conversationId: string,
   digest: string,
   fallback: string | null,
-  userId?: string
+  userId: string
 ): Promise<string> {
   const modelsToTry = [TITLE_MODEL, MEMORY_MODEL];
 
   for (const model of modelsToTry) {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const openrouter = getOpenRouter();
-        console.log(`[title-gen] model=${model}, attempt=${attempt + 1}/${MAX_RETRIES + 1}`);
+    try {
+      const openrouter = getOpenRouter();
+      console.log(`[title-gen] model=${model}`);
 
-        const { text } = await trackedGenerateText({
-          model: openrouter(model),
-          system:
-            "Generate a very short title (2-5 words) that captures the overall topic of this conversation. Be specific. Return ONLY the title. No quotes, no thinking, no tags.",
-          messages: [
-            { role: "user", content: `Conversation:\n${digest}` },
-          ],
-          maxOutputTokens: 50,
-          temperature: 0.3,
-        }, {
-          userId: userId || "system",
-          conversationId,
-          type: "title",
-          model,
-        });
+      const { text } = await trackedGenerateText({
+        model: openrouter(model, {
+          reasoning: { effort: "low", exclude: true },
+        }),
+        system:
+          "Generate a very short title (2-5 words) for this conversation. Be specific. Return ONLY the title text, nothing else. No quotes, no markdown, no explanation.",
+        messages: [
+          { role: "user", content: `Conversation:\n${digest}` },
+        ],
+        maxOutputTokens: 100,
+        temperature: 0.3,
+      }, {
+        userId,
+        conversationId,
+        type: "title" as const,
+        model,
+      });
 
-        const title = cleanTitle(text);
+      const title = cleanTitle(text);
 
-        if (!title || title.length < 2) {
-          console.warn(`[title-gen] Empty result: "${text.slice(0, 100)}"`);
-          if (attempt < MAX_RETRIES) { await sleep(RETRY_DELAY); continue; }
-          break;
-        }
-
-        await db
-          .update(conversations)
-          .set({ title })
-          .where(eq(conversations.id, conversationId));
-
-        console.log(`[title-gen] OK: "${title}"`);
-        return title;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[title-gen] Failed (${model}, #${attempt + 1}): ${msg}`);
-        if (msg.includes("rate-limit") || msg.includes("429")) break;
-        if (attempt < MAX_RETRIES) await sleep(RETRY_DELAY);
+      if (!title || title.length < 2) {
+        console.warn(`[title-gen] Empty after cleaning (${model}): raw="${text.slice(0, 200)}"`);
+        continue;
       }
+
+      await db
+        .update(conversations)
+        .set({ title })
+        .where(eq(conversations.id, conversationId));
+
+      console.log(`[title-gen] OK: "${title}"`);
+      return title;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[title-gen] Failed (${model}): ${msg}`);
     }
   }
 

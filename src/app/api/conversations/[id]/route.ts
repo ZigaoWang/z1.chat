@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Regenerate title with AI
     if (body.generateTitle) {
-      const title = await regenerateConversationTitle(id);
+      const title = await regenerateConversationTitle(id, userId);
       return Response.json({ ...conv, title });
     }
 
