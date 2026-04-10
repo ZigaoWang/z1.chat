@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || "http://localhost:3000";
     const inviteUrl = `${baseUrl}/invite?token=${token}`;
 
-    return Response.json({ invite, url: inviteUrl });
+    return Response.json({ invite: { ...invite, creditAmount: Number(invite.creditAmount) }, url: inviteUrl });
   } catch (error) {
     console.error("[admin/invites] Failed to create invite:", error);
     return Response.json({ error: "Failed to create invite" }, { status: 500 });
@@ -65,6 +65,7 @@ export async function GET() {
     const sanitized = invites.map((inv) => ({
       ...inv,
       token: inv.token.slice(0, 8) + "...",
+      creditAmount: Number(inv.creditAmount),
     }));
 
     return Response.json(sanitized);

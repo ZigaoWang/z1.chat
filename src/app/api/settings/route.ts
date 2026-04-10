@@ -21,7 +21,7 @@ export async function GET() {
       email: user.email,
       avatarUrl: user.avatarUrl,
       preferences: user.preferences,
-      creditBalance: user.creditBalance,
+      creditBalance: Number(user.creditBalance),
     });
   } catch (error) {
     console.error("Get settings error:", error);

@@ -71,7 +71,7 @@ export async function PATCH(
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    return Response.json(updated);
+    return Response.json({ ...updated, creditBalance: Number(updated.creditBalance) });
   } catch (error) {
     console.error("Admin user update error:", error);
     return Response.json({ error: "Failed to update user" }, { status: 500 });

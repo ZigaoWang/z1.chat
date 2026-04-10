@@ -15,12 +15,12 @@ export async function GET() {
 
     // Total raw cost (what we pay)
     const [rawCost] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
       .from(usageLogs);
 
     // Total revenue (what users are charged)
     const [revenue] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${usageLogs.userCostUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.userCostUsd}), 0)` })
       .from(usageLogs);
 
     // Active users (last 30 days)
