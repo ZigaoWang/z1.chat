@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, AlertCircle, RotateCcw, Lightbulb, Code, PenLine, Globe } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
@@ -27,45 +27,17 @@ interface MessageAttachments {
   files: { name: string; type: string; url: string; size?: number }[];
 }
 
-const FALLBACK_SUGGESTIONS = [
-  "What are some underrated travel destinations?",
-  "Write a short sci-fi story in 100 words",
-  "Compare the pros and cons of remote work",
-  "Help me plan a productive morning routine",
-];
-const FALLBACK_GREETING = "What's on your mind?";
-
-const ICONS = [Lightbulb, Code, PenLine, Globe];
-const COLORS = ["text-amber-500", "text-blue-500", "text-violet-500", "text-emerald-500"];
-
-function useWelcomeScreen() {
-  const [greeting, setGreeting] = useState<string>(FALLBACK_GREETING);
-  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
-  const [ready, setReady] = useState(false);
-  const fetched = useRef(false);
-
-  useEffect(() => {
-    if (fetched.current) return;
-    fetched.current = true;
-    fetch("/api/suggestions")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && data.greeting) setGreeting(data.greeting);
-        if (data && Array.isArray(data.suggestions) && data.suggestions.length >= 2) {
-          setSuggestions(data.suggestions);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setReady(true));
-  }, []);
-
-  return { greeting, suggestions, ready };
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel } = useModels();
-  const { greeting, suggestions: aiSuggestions, ready: welcomeReady } = useWelcomeScreen();
+  const greeting = getGreeting();
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -720,28 +692,12 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       {messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-4 pb-16">
           <div className="w-full max-w-lg text-center">
-            <p className={`text-lg text-muted-foreground/80 font-medium transition-opacity duration-500 ${welcomeReady ? "opacity-100" : "opacity-0"}`}>
+            <p className="text-2xl font-semibold text-foreground/90">
               {greeting}
             </p>
-
-            <div className={`mt-8 grid grid-cols-2 gap-2 transition-opacity duration-500 delay-100 ${welcomeReady ? "opacity-100" : "opacity-0"}`}>
-              {aiSuggestions.map((text, i) => {
-                const Icon = ICONS[i % ICONS.length];
-                const color = COLORS[i % COLORS.length];
-                return (
-                  <button
-                    key={text}
-                    onClick={() => handleSendMessage(text)}
-                    className="group flex items-start gap-2.5 rounded-xl border border-border/30 bg-card/50 px-3.5 py-3 text-left transition-all hover:bg-muted/50 hover:border-border/60"
-                  >
-                    <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color} opacity-50 group-hover:opacity-100 transition-opacity`} />
-                    <span className="text-[13px] leading-snug text-muted-foreground/60 group-hover:text-foreground transition-colors">
-                      {text}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <p className="mt-2 text-sm text-muted-foreground/60">
+              How can I help you today?
+            </p>
           </div>
         </div>
       ) : (
