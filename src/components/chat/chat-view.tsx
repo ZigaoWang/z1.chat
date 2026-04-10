@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, AlertCircle, RotateCcw } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw, X } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
@@ -639,7 +639,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     <div ref={outerRef} className="flex h-full flex-1 relative">
     <div
       style={artifactPanel ? { width: `${100 - artifactWidth}%` } : undefined}
-      className={`relative flex h-full flex-col bg-background ${artifactPanel ? "" : "flex-1"}`}
+      className={`relative flex h-full flex-col bg-background ${artifactPanel ? "max-lg:flex-1" : "flex-1"}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -786,26 +786,51 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     {/* Artifact Preview Panel */}
     {artifactPanel && (
       <>
-        {/* Drag overlay — covers iframes so mouse events aren't swallowed */}
-        {isDraggingArtifact && (
-          <div className="fixed inset-0 z-50 cursor-col-resize" />
-        )}
-        {/* Drag handle */}
-        <div
-          onMouseDown={handleArtifactDragStart}
-          className="w-1.5 h-full shrink-0 cursor-col-resize group/handle relative"
-        >
-          <div className="absolute inset-y-0 -left-1 -right-1" />
-          <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/30" : "hover:bg-primary/20"}`} />
+        {/* Mobile: full-screen overlay */}
+        <div className="fixed inset-0 z-50 flex flex-col bg-background lg:hidden">
+          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3">
+            <span className="text-xs font-medium truncate">{artifactPanel.title || "Preview"}</span>
+            <button
+              onClick={handleCloseArtifact}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <ArtifactPreview
+              code={artifactPanel.code}
+              language={artifactPanel.language}
+              title={artifactPanel.title}
+              streaming={artifactPanel.streaming}
+              onClose={handleCloseArtifact}
+            />
+          </div>
         </div>
-        <div style={{ width: `${artifactWidth}%` }} className="h-full shrink-0">
-          <ArtifactPreview
-            code={artifactPanel.code}
-            language={artifactPanel.language}
-            title={artifactPanel.title}
-            streaming={artifactPanel.streaming}
-            onClose={handleCloseArtifact}
-          />
+
+        {/* Desktop: side-by-side split */}
+        <div className="hidden lg:contents">
+          {/* Drag overlay — covers iframes so mouse events aren't swallowed */}
+          {isDraggingArtifact && (
+            <div className="fixed inset-0 z-50 cursor-col-resize" />
+          )}
+          {/* Drag handle */}
+          <div
+            onMouseDown={handleArtifactDragStart}
+            className="w-1.5 h-full shrink-0 cursor-col-resize group/handle relative"
+          >
+            <div className="absolute inset-y-0 -left-1 -right-1" />
+            <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/30" : "hover:bg-primary/20"}`} />
+          </div>
+          <div style={{ width: `${artifactWidth}%` }} className="h-full shrink-0">
+            <ArtifactPreview
+              code={artifactPanel.code}
+              language={artifactPanel.language}
+              title={artifactPanel.title}
+              streaming={artifactPanel.streaming}
+              onClose={handleCloseArtifact}
+            />
+          </div>
         </div>
       </>
     )}

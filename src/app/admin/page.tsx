@@ -235,7 +235,7 @@ export default function AdminPage() {
 
           <div className="rounded-xl border border-border/40 bg-card shadow-sm p-4 space-y-4">
             {/* Generate form */}
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
               <div className="flex-1">
                 <label className="text-[11px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
                   Credit Amount ($)
@@ -325,7 +325,7 @@ export default function AdminPage() {
 
         {/* Users Table */}
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground/50" />
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/50">
@@ -335,19 +335,19 @@ export default function AdminPage() {
                 ({users.length})
               </span>
             </div>
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search users..."
-                className="rounded-lg border border-border/40 bg-muted/20 pl-8 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all w-48"
+                className="rounded-lg border border-border/40 bg-muted/20 pl-8 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all w-full sm:w-48"
               />
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
-            <table className="w-full text-xs">
+          <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-x-auto">
+            <table className="w-full text-xs min-w-[500px]">
               <thead>
                 <tr className="border-b border-border/30 text-muted-foreground/50">
                   <th className="text-left px-4 py-2.5 font-medium">User</th>

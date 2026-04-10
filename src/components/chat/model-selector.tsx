@@ -99,7 +99,7 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        <span className="max-w-[200px] truncate">{displayName}</span>
+        <span className="max-w-[120px] sm:max-w-[200px] truncate">{displayName}</span>
         <ChevronsUpDown className="h-3 w-3 opacity-40" />
       </button>
 

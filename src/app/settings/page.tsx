@@ -555,8 +555,8 @@ export default function SettingsPage() {
 
               {/* Breakdown table */}
               {usage.breakdown.length > 0 && (
-                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
-                  <table className="w-full text-xs">
+                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-x-auto">
+                  <table className="w-full text-xs min-w-[300px]">
                     <thead>
                       <tr className="border-b border-border/30 text-muted-foreground/50">
                         <th className="text-left px-4 py-2 font-medium">Type</th>
@@ -587,10 +587,10 @@ export default function SettingsPage() {
                   </div>
                   <div className="divide-y divide-border/20 max-h-64 overflow-y-auto">
                     {usage.recent.slice(0, 20).map((log) => (
-                      <div key={log.id} className="flex items-center justify-between px-4 py-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="capitalize text-muted-foreground">{log.type.replace(/_/g, " ")}</span>
-                          <span className="text-muted-foreground/30">{log.model.split("/").pop()}</span>
+                      <div key={log.id} className="flex items-center justify-between px-4 py-2 text-xs min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="capitalize text-muted-foreground shrink-0">{log.type.replace(/_/g, " ")}</span>
+                          <span className="text-muted-foreground/30 truncate">{log.model.split("/").pop()}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-medium">${log.costUsd.toFixed(5)}</span>

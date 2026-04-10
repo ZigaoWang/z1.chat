@@ -225,7 +225,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     return (
       <div key={conv.id} className="relative group">
         <button
-          onClick={() => setActiveId(conv.id)}
+          onClick={() => {
+            setActiveId(conv.id);
+            // Close sidebar on mobile after selecting a conversation
+            if (window.innerWidth < 1024) onClose();
+          }}
           className={`w-full flex items-center justify-between gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors ${
             isActive ? "bg-muted" : "hover:bg-muted/50"
           }`}
@@ -267,20 +271,38 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     );
   };
 
+  // On mobile (fixed), use default width so -translate-x-full works.
+  // On desktop (lg:relative), use inline width for resizable behavior.
+  const sidebarStyle = mounted
+    ? isOpen
+      ? { width }
+      : undefined // closed: let CSS classes handle it
+    : undefined;
+
   return (
     <>
       <div
-        style={mounted ? { width: isOpen ? width : 0 } : undefined}
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200 ease-out lg:relative ${
-          !mounted ? "w-[250px] " : ""
-        }${isOpen ? "translate-x-0" : "-translate-x-full"
-        } ${isOpen ? "" : "lg:-translate-x-full lg:w-0 lg:overflow-hidden"}`}
+        style={sidebarStyle}
+        className={[
+          "fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200 ease-out lg:relative",
+          // Mobile: always keep a width so -translate-x-full moves it fully off-screen
+          !isOpen ? "w-[250px]" : "",
+          // When open on desktop with mounted, inline style sets width; otherwise fallback
+          !mounted ? "w-[250px]" : "",
+          // Slide transform
+          isOpen ? "translate-x-0" : "-translate-x-full",
+          // Desktop closed: collapse to 0 width + hide overflow
+          !isOpen ? "lg:w-0 lg:overflow-hidden" : "",
+        ].filter(Boolean).join(" ")}
       >
         <div className="flex h-10 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
           <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
           <div className="flex items-center gap-0.5">
             <Tooltip>
-              <TooltipTrigger onClick={createConversation}
+              <TooltipTrigger onClick={() => {
+                createConversation();
+                if (window.innerWidth < 1024) onClose();
+              }}
                 className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
                 <Plus className="h-3.5 w-3.5" />
               </TooltipTrigger>
@@ -358,10 +380,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        {/* Resize handle */}
+        {/* Resize handle — hidden on mobile where sidebar is an overlay */}
         <div
           onMouseDown={handleDragStart}
-          className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+          className="hidden lg:block absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
         />
       </div>
 

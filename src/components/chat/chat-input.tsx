@@ -151,7 +151,9 @@ export default function ChatInput({
                 Cancel
               </button>
             ) : (
-              <FileUpload onFilesUploaded={(f) => onFilesChange([...files, ...f])} disabled={disabled || isLoading} />
+              <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                <FileUpload onFilesUploaded={(f) => onFilesChange([...files, ...f])} disabled={disabled || isLoading} />
+              </div>
             )}
             <button
               type="button"
@@ -165,7 +167,7 @@ export default function ChatInput({
                 }
               }}
               disabled={editing ? !isEditChanged : !canSubmit}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+              className={`flex h-8 w-8 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors ${
                 isLoading && !editing ? "bg-foreground text-background hover:bg-foreground/80" :
                 (editing ? isEditChanged : value.trim()) ? "bg-foreground text-background hover:bg-foreground/80" :
                 "bg-muted text-muted-foreground/25"
