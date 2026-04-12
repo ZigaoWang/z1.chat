@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -14,6 +14,8 @@ import {
   Link2,
   Copy,
   Check,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -25,14 +27,25 @@ interface AdminUser {
   role: string;
   creditBalance: number;
   createdAt: string;
-  totalCost: number;
+  totalCharged: number;
 }
 
 interface AdminStats {
   totalUsers: number;
   totalCost: number;
   totalRevenue: number;
+  margin: number;
   activeUsers: number;
+}
+
+interface UsageLog {
+  type: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  userCostUsd: number;
+  createdAt: string;
 }
 
 interface InviteData {
@@ -58,6 +71,10 @@ export default function AdminPage() {
   const [generatedLink, setGeneratedLink] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [usageLogs, setUsageLogs] = useState<Record<string, UsageLog[]>>({});
+  const [loadingUsage, setLoadingUsage] = useState<string | null>(null);
+  const usageCacheRef = useRef<Record<string, UsageLog[]>>({});
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "admin")) {
@@ -128,6 +145,37 @@ export default function AdminPage() {
       setEditingCredit(null);
     },
     [creditInput, updateUser]
+  );
+
+  const toggleUsage = useCallback(
+    async (userId: string) => {
+      if (expandedUser === userId) {
+        setExpandedUser(null);
+        return;
+      }
+      setExpandedUser(userId);
+
+      // Use cache if available
+      if (usageCacheRef.current[userId]) {
+        setUsageLogs((prev) => ({ ...prev, [userId]: usageCacheRef.current[userId] }));
+        return;
+      }
+
+      setLoadingUsage(userId);
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/usage`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          usageCacheRef.current[userId] = data;
+          setUsageLogs((prev) => ({ ...prev, [userId]: data }));
+        }
+      } catch {
+        toast.error("Failed to load usage logs");
+      } finally {
+        setLoadingUsage(null);
+      }
+    },
+    [expandedUser]
   );
 
   const generateInvite = useCallback(async () => {
@@ -213,13 +261,18 @@ export default function AdminPage() {
             />
             <StatCard
               icon={DollarSign}
-              label="Raw Cost"
+              label="API Cost"
               value={`$${stats.totalCost.toFixed(4)}`}
             />
             <StatCard
               icon={CreditCard}
-              label="Revenue"
+              label="User Charges"
               value={`$${stats.totalRevenue.toFixed(4)}`}
+              subtitle={
+                <span className={stats.margin >= 0 ? "text-green-500" : "text-red-500"}>
+                  Margin: ${stats.margin.toFixed(4)}
+                </span>
+              }
             />
           </div>
         )}
@@ -350,93 +403,33 @@ export default function AdminPage() {
             <table className="w-full text-xs min-w-[500px]">
               <thead>
                 <tr className="border-b border-border/30 text-muted-foreground/50">
+                  <th className="w-8 px-2 py-2.5" />
                   <th className="text-left px-4 py-2.5 font-medium">User</th>
                   <th className="text-left px-4 py-2.5 font-medium">Role</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Credits</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Spent</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Actions</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Balance</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Charged</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/20">
                 {filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium">{u.name || "Unnamed"}</p>
-                        <p className="text-muted-foreground/50 text-[11px]">
-                          {u.email}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={u.role}
-                        onChange={(e) =>
-                          updateUser(u.id, { role: e.target.value })
-                        }
-                        className="rounded-md border border-border/30 bg-muted/20 px-2 py-1 text-xs outline-none"
-                      >
-                        <option value="user">user</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {editingCredit === u.id ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-muted-foreground">$</span>
-                          <input
-                            value={creditInput}
-                            onChange={(e) => setCreditInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveCreditEdit(u.id);
-                              if (e.key === "Escape") setEditingCredit(null);
-                            }}
-                            className="w-20 rounded-md border border-border/30 bg-muted/20 px-2 py-1 text-xs text-right outline-none ring-1 ring-primary/30"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => saveCreditEdit(u.id)}
-                            className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingCredit(null)}
-                            className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingCredit(u.id);
-                            setCreditInput(u.creditBalance.toFixed(2));
-                          }}
-                          className="text-right hover:text-primary transition-colors"
-                          title="Click to edit credits"
-                        >
-                          ${u.creditBalance.toFixed(2)}
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      ${Number(u.totalCost).toFixed(4)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => {
-                          setEditingCredit(u.id);
-                          setCreditInput(
-                            (u.creditBalance + 5).toFixed(2)
-                          );
-                        }}
-                        className="rounded-md border border-border/30 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        +$5
-                      </button>
-                    </td>
-                  </tr>
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    expanded={expandedUser === u.id}
+                    onToggle={() => toggleUsage(u.id)}
+                    editingCredit={editingCredit === u.id}
+                    creditInput={creditInput}
+                    onStartEdit={() => {
+                      setEditingCredit(u.id);
+                      setCreditInput(u.creditBalance.toFixed(2));
+                    }}
+                    onCreditInputChange={setCreditInput}
+                    onSaveCredit={() => saveCreditEdit(u.id)}
+                    onCancelEdit={() => setEditingCredit(null)}
+                    onRoleChange={(role) => updateUser(u.id, { role })}
+                    loadingUsage={loadingUsage === u.id}
+                    logs={usageLogs[u.id]}
+                  />
                 ))}
                 {filteredUsers.length === 0 && (
                   <tr>
@@ -457,14 +450,182 @@ export default function AdminPage() {
   );
 }
 
+function UserRow({
+  user: u,
+  expanded,
+  onToggle,
+  editingCredit,
+  creditInput,
+  onStartEdit,
+  onCreditInputChange,
+  onSaveCredit,
+  onCancelEdit,
+  onRoleChange,
+  loadingUsage,
+  logs,
+}: {
+  user: AdminUser;
+  expanded: boolean;
+  onToggle: () => void;
+  editingCredit: boolean;
+  creditInput: string;
+  onStartEdit: () => void;
+  onCreditInputChange: (v: string) => void;
+  onSaveCredit: () => void;
+  onCancelEdit: () => void;
+  onRoleChange: (role: string) => void;
+  loadingUsage: boolean;
+  logs?: UsageLog[];
+}) {
+  return (
+    <>
+      <tr className="hover:bg-muted/30 transition-colors">
+        <td className="px-2 py-3">
+          <button
+            onClick={onToggle}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-all"
+          >
+            <ChevronRight
+              className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
+            />
+          </button>
+        </td>
+        <td className="px-4 py-3">
+          <div>
+            <p className="font-medium">{u.name || "Unnamed"}</p>
+            <p className="text-muted-foreground/50 text-[11px]">
+              {u.email}
+            </p>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <select
+            value={u.role}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="rounded-md border border-border/30 bg-muted/20 px-2 py-1 text-xs outline-none"
+          >
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </td>
+        <td className="px-4 py-3 text-right">
+          {editingCredit ? (
+            <div className="flex items-center justify-end gap-1">
+              <span className="text-muted-foreground">$</span>
+              <input
+                value={creditInput}
+                onChange={(e) => onCreditInputChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onSaveCredit();
+                  if (e.key === "Escape") onCancelEdit();
+                }}
+                className="w-20 rounded-md border border-border/30 bg-muted/20 px-2 py-1 text-xs text-right outline-none ring-1 ring-primary/30"
+                autoFocus
+              />
+              <button
+                onClick={onSaveCredit}
+                className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+              >
+                Save
+              </button>
+              <button
+                onClick={onCancelEdit}
+                className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onStartEdit}
+              className="text-right hover:text-primary transition-colors"
+              title="Click to edit balance"
+            >
+              ${u.creditBalance.toFixed(2)}
+            </button>
+          )}
+        </td>
+        <td className="px-4 py-3 text-right text-muted-foreground">
+          ${u.totalCharged.toFixed(4)}
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={5} className="bg-muted/10 px-4 py-3">
+            {loadingUsage ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
+              </div>
+            ) : logs && logs.length > 0 ? (
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-muted-foreground/50">
+                    <th className="text-left pb-1.5 font-medium">Date</th>
+                    <th className="text-left pb-1.5 font-medium">Type</th>
+                    <th className="text-left pb-1.5 font-medium">Model</th>
+                    <th className="text-right pb-1.5 font-medium">Input</th>
+                    <th className="text-right pb-1.5 font-medium">Output</th>
+                    <th className="text-right pb-1.5 font-medium">Cost</th>
+                    <th className="text-right pb-1.5 font-medium">Charged</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/10">
+                  {logs.map((log, i) => (
+                    <tr key={i} className="text-muted-foreground">
+                      <td className="py-1.5 pr-3">
+                        {new Date(log.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        <span className="rounded-full bg-muted/50 px-1.5 py-0.5">
+                          {log.type}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-3 font-mono truncate max-w-[120px]">
+                        {log.model.split("/").pop()}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {log.inputTokens.toLocaleString()}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {log.outputTokens.toLocaleString()}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        ${log.costUsd.toFixed(6)}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        ${log.userCostUsd.toFixed(6)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-center text-muted-foreground/40 py-3">
+                No usage logs
+              </p>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
   value,
+  subtitle,
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
+  subtitle?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
@@ -475,6 +636,9 @@ function StatCard({
         </p>
       </div>
       <p className="text-lg font-semibold">{value}</p>
+      {subtitle && (
+        <p className="text-[11px] mt-0.5">{subtitle}</p>
+      )}
     </div>
   );
 }

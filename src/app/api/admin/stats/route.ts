@@ -32,10 +32,14 @@ export async function GET() {
       .from(usageLogs)
       .where(gte(usageLogs.createdAt, thirtyDaysAgo));
 
+    const totalCost = Number(rawCost.total);
+    const totalRevenue = Number(revenue.total);
+
     return Response.json({
       totalUsers: Number(userCount.count),
-      totalCost: Number(rawCost.total),
-      totalRevenue: Number(revenue.total),
+      totalCost,
+      totalRevenue,
+      margin: totalRevenue - totalCost,
       activeUsers: Number(activeUsers.count),
     });
   } catch (error) {

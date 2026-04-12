@@ -14,7 +14,6 @@ type UsageType =
   | "consolidation"
   | "immediate_memory"
   | "compaction"
-  | "suggestions"
   | "search";
 
 interface LogMeta {
@@ -31,7 +30,7 @@ export async function logUsage(
 ): Promise<void> {
   try {
     const costUsd = await calculateCost(meta.model, inputTokens, outputTokens);
-    const userCostUsd = calculateUserCost(costUsd, meta.type);
+    const userCostUsd = calculateUserCost(costUsd);
 
     await db.insert(usageLogs).values({
       userId: meta.userId,
@@ -44,7 +43,7 @@ export async function logUsage(
       userCostUsd,
     });
 
-    // Deduct from credit balance for billable types (skip for admins)
+    // Deduct from credit balance (skip for admins)
     if (new Decimal(userCostUsd).greaterThan(0)) {
       const [user] = await db
         .select({ role: users.role })
@@ -69,7 +68,7 @@ export async function logSearchUsage(
 ): Promise<void> {
   try {
     const rawCost = getSearchCost();
-    const userCostUsd = calculateUserCost(rawCost, "search");
+    const userCostUsd = calculateUserCost(rawCost);
 
     await db.insert(usageLogs).values({
       userId,

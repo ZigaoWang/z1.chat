@@ -205,7 +205,7 @@ export const usageLogs = pgTable(
       () => conversations.id,
       { onDelete: "set null" }
     ),
-    type: text("type").notNull(), // 'chat', 'title', 'summary', 'memory_extraction', 'memory_dedup', 'consolidation', 'immediate_memory', 'compaction', 'suggestions', 'search'
+    type: text("type").notNull(), // 'chat', 'title', 'summary', 'memory_extraction', 'memory_dedup', 'consolidation', 'immediate_memory', 'compaction', 'search'
     model: text("model").notNull(),
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),

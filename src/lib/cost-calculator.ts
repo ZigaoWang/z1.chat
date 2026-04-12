@@ -1,14 +1,12 @@
 import { Decimal } from "decimal.js";
 import { getCachedModels, getModelPricing } from "./models-cache";
 
-const SEARCH_COST_USD = process.env.SEARCH_COST_USD || "0.01";
+// Tavily basic search = 1 credit = $0.008
+const SEARCH_COST_USD = process.env.SEARCH_COST_USD || "0.008";
 const COST_MARKUP = process.env.COST_MARKUP || "1.1";
 
-// Types that are billed to the user (vs background tasks that are free)
-const BILLABLE_TYPES = new Set(["chat", "search"]);
-
 /**
- * Calculate cost for an AI call using arbitrary-precision arithmetic.
+ * Calculate raw cost for an AI call using arbitrary-precision arithmetic.
  * OpenRouter pricing is per-token (prompt/completion fields are cost per token).
  * Returns a decimal string for lossless DB storage.
  */
@@ -31,19 +29,14 @@ export async function calculateCost(
 }
 
 /**
- * Calculate the user-facing cost with markup.
- * Only billable types (chat, search) are charged; background tasks are free.
+ * Apply markup to raw cost to get the user-facing charge.
+ * All usage types are charged — raw cost * COST_MARKUP (default 1.1x).
  * Takes and returns decimal strings.
  */
-export function calculateUserCost(rawCost: string, type: string): string {
-  if (!BILLABLE_TYPES.has(type)) return "0";
+export function calculateUserCost(rawCost: string): string {
   return new Decimal(rawCost).times(COST_MARKUP).toString();
 }
 
 export function getSearchCost(): string {
   return SEARCH_COST_USD;
-}
-
-export function getCostMarkup(): number {
-  return parseFloat(COST_MARKUP);
 }

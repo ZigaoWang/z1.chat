@@ -29,7 +29,7 @@ export async function GET() {
       allUsers.map((u) => ({
         ...u,
         creditBalance: Number(u.creditBalance),
-        totalCost: Number(u.totalCost),
+        totalCharged: Number(u.totalCost),
       }))
     );
   } catch (error) {

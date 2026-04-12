@@ -10,19 +10,19 @@ export async function GET(req: Request) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    // Total cost (all time)
+    // Total charged (all time) — what the user pays
     const [totalResult] = await db
-      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.userCostUsd}), 0)` })
       .from(usageLogs)
       .where(eq(usageLogs.userId, userId));
 
-    // This month's cost
+    // This month's charged
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
     const [monthResult] = await db
-      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)` })
+      .select({ total: sql<string>`COALESCE(SUM(${usageLogs.userCostUsd}), 0)` })
       .from(usageLogs)
       .where(
         and(
@@ -36,14 +36,14 @@ export async function GET(req: Request) {
       .select({
         type: usageLogs.type,
         count: sql<string>`COUNT(*)`,
-        totalCost: sql<string>`COALESCE(SUM(${usageLogs.costUsd}), 0)`,
+        totalCost: sql<string>`COALESCE(SUM(${usageLogs.userCostUsd}), 0)`,
         totalInputTokens: sql<string>`COALESCE(SUM(${usageLogs.inputTokens}), 0)`,
         totalOutputTokens: sql<string>`COALESCE(SUM(${usageLogs.outputTokens}), 0)`,
       })
       .from(usageLogs)
       .where(eq(usageLogs.userId, userId))
       .groupBy(usageLogs.type)
-      .orderBy(sql`COALESCE(SUM(${usageLogs.costUsd}), 0) DESC`);
+      .orderBy(sql`COALESCE(SUM(${usageLogs.userCostUsd}), 0) DESC`);
 
     // Recent logs
     const recent = await db
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
         model: usageLogs.model,
         inputTokens: usageLogs.inputTokens,
         outputTokens: usageLogs.outputTokens,
-        costUsd: usageLogs.costUsd,
+        costUsd: usageLogs.userCostUsd,
         createdAt: usageLogs.createdAt,
       })
       .from(usageLogs)
