@@ -151,10 +151,24 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
 
 function VersionNav({ current, total, onChange }: { current: number; total: number; onChange: (i: number) => void }) {
   return (
-    <div className="inline-flex items-center gap-0.5 text-xs text-muted-foreground/40">
-      <button onClick={() => onChange(current - 1)} disabled={current === 0} className="p-0.5 hover:text-foreground disabled:opacity-25"><ChevronLeft className="h-3 w-3" /></button>
-      <span className="tabular-nums px-0.5">{current + 1}/{total}</span>
-      <button onClick={() => onChange(current + 1)} disabled={current === total - 1} className="p-0.5 hover:text-foreground disabled:opacity-25"><ChevronRight className="h-3 w-3" /></button>
+    <div className="inline-flex items-center">
+      <button
+        onClick={() => onChange(current - 1)}
+        disabled={current === 0}
+        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="text-xs tabular-nums text-muted-foreground/60 select-none">
+        {current + 1}&thinsp;/&thinsp;{total}
+      </span>
+      <button
+        onClick={() => onChange(current + 1)}
+        disabled={current === total - 1}
+        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -207,16 +221,18 @@ function MessageBubble({
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
           </div>
           {/* Actions */}
-          <div className="flex justify-end items-center gap-1 mt-0.5 h-5 opacity-0 group-hover:opacity-100 transition-opacity">
-            {onEdit && !isStreaming && (
-              <button onClick={() => onEdit(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
-            )}
-            <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
-              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            </button>
+          <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
+            <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+              {onEdit && !isStreaming && (
+                <button onClick={() => onEdit(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
+              )}
+              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -319,18 +335,20 @@ function MessageBubble({
 
         {/* Actions */}
         {!isStreaming && content.length > 0 && (
-          <div className="flex items-center gap-0.5 mt-1 h-5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
-              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            </button>
-            {isLast && onRegenerate && (
-              <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Regenerate">
-                <RotateCcw className="h-3 w-3" />
-              </button>
-            )}
+          <div className={`flex items-center gap-1 mt-1 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
+            <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+              {isLast && onRegenerate && (
+                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Regenerate">
+                  <RotateCcw className="h-3 w-3" />
+                </button>
+              )}
+            </div>
             {modelLabel && <span className="text-[10px] text-muted-foreground/20 ml-auto">{modelLabel}</span>}
           </div>
         )}

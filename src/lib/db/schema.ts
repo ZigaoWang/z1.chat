@@ -90,6 +90,8 @@ export const messages = pgTable(
     role: messageRoleEnum("role").notNull(),
     content: text("content").notNull(),
     model: text("model"),
+    parentId: uuid("parent_id"),
+    branchIndex: integer("branch_index").notNull().default(0),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     cost: numeric("cost", { precision: 20, scale: 10 }),
@@ -101,6 +103,7 @@ export const messages = pgTable(
   (table) => [
     index("messages_conversation_id_idx").on(table.conversationId),
     index("messages_created_at_idx").on(table.createdAt),
+    index("messages_parent_id_idx").on(table.parentId),
   ]
 );
 
@@ -282,11 +285,17 @@ export const conversationsRelations = relations(
   })
 );
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const messagesRelations = relations(messages, ({ one, many }) => ({
   conversation: one(conversations, {
     fields: [messages.conversationId],
     references: [conversations.id],
   }),
+  parent: one(messages, {
+    fields: [messages.parentId],
+    references: [messages.id],
+    relationName: "messageTree",
+  }),
+  children: many(messages, { relationName: "messageTree" }),
 }));
 
 export const memoriesRelations = relations(memories, ({ one }) => ({

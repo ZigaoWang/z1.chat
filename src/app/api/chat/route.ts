@@ -10,7 +10,7 @@ import { extractMemories, updateConversationSummary, extractImmediateMemory } fr
 import { checkAndCompactConversation } from "@/lib/context-manager";
 import { getTools } from "@/lib/tools";
 import { trackedStreamText, logSearchUsage } from "@/lib/usage-logger";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 
 export const maxDuration = 120;
 
@@ -23,6 +23,8 @@ const REMEMBER_PATTERNS = [
   /\bnote\s+that\b/i,
 ];
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -32,12 +34,16 @@ export async function POST(req: Request) {
       model: modelId,
       attachments,
       regenerate,
+      parentId,
+      editedMessageId,
     } = body as {
       messages: UIMessage[];
       conversationId?: string;
       model?: string;
       attachments?: { images: string[]; files: { name: string; type: string; url: string; size?: number }[] };
       regenerate?: boolean;
+      parentId?: string | null;
+      editedMessageId?: string | null;
     };
 
     if (!chatMessages || !Array.isArray(chatMessages) || chatMessages.length === 0) {
@@ -105,13 +111,80 @@ export async function POST(req: Request) {
         .join("");
     }
 
+    // Resolve parentId: client may send non-UUID IDs (from useChat's in-memory messages)
+    // For edits, look up the original message's parent to make the new message a sibling
+    // For regenerate, find the last user message
+    // For normal sends, find the latest message as parent
+    let resolvedParentId: string | null = null;
+
+    if (editedMessageId && UUID_RE.test(editedMessageId)) {
+      // Edit: new message should be a sibling of the edited message (same parent)
+      const [editedMsg] = await db
+        .select({ parentId: messages.parentId })
+        .from(messages)
+        .where(eq(messages.id, editedMessageId))
+        .limit(1);
+      resolvedParentId = editedMsg?.parentId ?? null;
+    } else if (editedMessageId && convId) {
+      // Edit with non-UUID editedMessageId: find the latest user message's parent
+      // The edited message is the latest user message in the DB
+      const [lastUserMsg] = await db
+        .select({ parentId: messages.parentId })
+        .from(messages)
+        .where(and(eq(messages.conversationId, convId!), eq(messages.role, "user")))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+      resolvedParentId = lastUserMsg?.parentId ?? null;
+    } else if (parentId && UUID_RE.test(parentId)) {
+      resolvedParentId = parentId;
+    } else if (convId && !isNewConversation) {
+      if (regenerate) {
+        // For regenerate, parent should be the last user message
+        const [lastUserDbMsg] = await db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(and(eq(messages.conversationId, convId!), eq(messages.role, "user")))
+          .orderBy(desc(messages.createdAt))
+          .limit(1);
+        resolvedParentId = lastUserDbMsg?.id ?? null;
+      } else {
+        // For normal send, parent is the latest message
+        const [lastDbMsg] = await db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(eq(messages.conversationId, convId!))
+          .orderBy(desc(messages.createdAt))
+          .limit(1);
+        resolvedParentId = lastDbMsg?.id ?? null;
+      }
+    }
+
+    // Save user message (or compute branchIndex for regenerate)
+    let savedUserMessageId: string | null = null;
+    let assistantParentId: string | null = null;
+    let assistantBranchIndex = 0;
+
     if (userContent && !regenerate) {
-      await db.insert(messages).values({
+      // Compute branchIndex: count existing siblings with same parentId
+      let userBranchIndex = 0;
+      if (resolvedParentId) {
+        const [siblingCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(messages)
+          .where(and(eq(messages.conversationId, convId!), eq(messages.parentId, resolvedParentId)));
+        userBranchIndex = Number(siblingCount?.count || 0);
+      }
+
+      const [savedMsg] = await db.insert(messages).values({
         conversationId: convId!,
         role: "user",
         content: userContent,
+        parentId: resolvedParentId,
+        branchIndex: userBranchIndex,
         metadata: attachments ? { attachments } : undefined,
-      });
+      }).returning({ id: messages.id });
+      savedUserMessageId = savedMsg.id;
+      assistantParentId = savedMsg.id;
 
       // Check for explicit "remember this" requests
       if (REMEMBER_PATTERNS.some((p) => p.test(userContent))) {
@@ -119,6 +192,14 @@ export async function POST(req: Request) {
           console.error
         );
       }
+    } else if (regenerate && resolvedParentId) {
+      // Regenerate: assistant is a new sibling under the same parent (user message)
+      assistantParentId = resolvedParentId;
+      const [siblingCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(messages)
+        .where(and(eq(messages.conversationId, convId!), eq(messages.parentId, resolvedParentId)));
+      assistantBranchIndex = Number(siblingCount?.count || 0);
     }
 
     // Build dynamic system prompt with conversation context
@@ -187,6 +268,8 @@ export async function POST(req: Request) {
           role: "assistant",
           content: text,
           model: selectedModel,
+          parentId: assistantParentId,
+          branchIndex: assistantBranchIndex,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           metadata: toolInvocations.length > 0

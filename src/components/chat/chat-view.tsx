@@ -27,23 +27,24 @@ interface MessageAttachments {
   files: { name: string; type: string; url: string; size?: number }[];
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel } = useModels();
-  const greeting = getGreeting();
+  const [greeting, setGreeting] = useState("What's on your mind?");
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 17) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [editingState, setEditingState] = useState<EditingState | null>(null);
+  const [viewingOldBranch, setViewingOldBranch] = useState(false);
   const [artifactPanel, setArtifactPanel] = useState<{ code: string; language: string; title?: string; streaming?: boolean } | null>(null);
   const [artifactWidth, setArtifactWidth] = useState(50); // percentage
   const [isDraggingArtifact, setIsDraggingArtifact] = useState(false);
@@ -180,9 +181,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               (m: { role: string }) =>
                 m.role === "user" || m.role === "assistant"
             );
+
+            // Build metadata maps (attachments, tools, model)
             const restoredAttachments: Record<string, MessageAttachments> = {};
             const restoredTools: Record<string, ToolInvocation[]> = {};
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msgById = new Map<string, any>();
             for (const m of filtered) {
+              msgById.set(m.id, m);
               if (m.model) messageModelMap.current.set(m.id, m.model);
               if (m.metadata?.attachments) {
                 restoredAttachments[m.id] = m.metadata.attachments as MessageAttachments;
@@ -202,19 +208,129 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 }));
               }
             }
-            if (Object.keys(restoredAttachments).length > 0) {
-              setMessageAttachments(restoredAttachments);
+
+            // Check if any messages have parentId set (branching data exists)
+            const hasBranchData = filtered.some((m: { parentId?: string | null }) => m.parentId != null);
+
+            if (hasBranchData) {
+              // Build tree: group children by parentId
+              const childrenMap = new Map<string | null, typeof filtered>();
+              for (const m of filtered) {
+                const pid = m.parentId ?? null;
+                if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+                childrenMap.get(pid)!.push(m);
+              }
+              // Sort each group by branchIndex
+              for (const children of childrenMap.values()) {
+                children.sort((a: { branchIndex: number }, b: { branchIndex: number }) => a.branchIndex - b.branchIndex);
+              }
+
+              // Walk active path: at each level, pick highest branchIndex child
+              const activePath: typeof filtered = [];
+              let currentParentId: string | null = null;
+              while (true) {
+                const children = childrenMap.get(currentParentId);
+                if (!children || children.length === 0) break;
+                const active = children[children.length - 1]; // highest branchIndex
+                activePath.push(active);
+                currentParentId = active.id;
+              }
+
+              // Build regenerationHistory and editBranches from sibling data
+              const newRegenHistory: Record<string, VersionEntry[]> = {};
+              const newEditBranches: Record<string, EditBranch[]> = {};
+
+              for (const msg of activePath) {
+                const pid = msg.parentId ?? null;
+                const siblings = childrenMap.get(pid) || [];
+                if (siblings.length <= 1) continue;
+
+                if (msg.role === "assistant") {
+                  // Assistant forks → regenerationHistory keyed by the parent (user) message ID
+                  const userMsgId = pid; // parentId is the user message
+                  if (userMsgId) {
+                    const oldVersions: VersionEntry[] = siblings
+                      .filter((s: { id: string }) => s.id !== msg.id)
+                      .map((s: { id: string; content: string; model?: string | null; metadata?: Record<string, unknown> }) => ({
+                        id: s.id,
+                        content: s.content,
+                        model: s.model,
+                        toolInvocations: restoredTools[s.id],
+                      }));
+                    if (oldVersions.length > 0) {
+                      newRegenHistory[userMsgId] = oldVersions;
+                    }
+                  }
+                } else if (msg.role === "user") {
+                  // User forks → editBranches keyed by the active user message ID
+                  const olderSiblings = siblings.filter((s: { id: string }) => s.id !== msg.id);
+                  if (olderSiblings.length > 0) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const branches: EditBranch[] = olderSiblings.map((s: any) => {
+                      // Collect the full subtree following this sibling
+                      const following: typeof filtered = [];
+                      let walkId: string | null = s.id;
+                      while (walkId) {
+                        const kids = childrenMap.get(walkId);
+                        if (!kids || kids.length === 0) break;
+                        const best = kids[kids.length - 1]; // highest branchIndex
+                        following.push(best);
+                        walkId = best.id;
+                      }
+                      return {
+                        userContent: s.content,
+                        followingMessages: following.map((fm: { id: string; role: string; content: string; model?: string | null }) => ({
+                          id: fm.id,
+                          role: fm.role as "user" | "assistant" | "system",
+                          content: fm.content,
+                          model: fm.model || messageModelMap.current.get(fm.id) || null,
+                          images: restoredAttachments[fm.id]?.images,
+                          files: restoredAttachments[fm.id]?.files,
+                          toolInvocations: restoredTools[fm.id],
+                        })),
+                      };
+                    });
+                    newEditBranches[msg.id] = branches;
+                  }
+                }
+              }
+
+              if (Object.keys(restoredAttachments).length > 0) {
+                setMessageAttachments(restoredAttachments);
+              }
+              if (Object.keys(restoredTools).length > 0) {
+                setRestoredToolInvocations(restoredTools);
+              }
+              if (Object.keys(newRegenHistory).length > 0) {
+                setRegenerationHistory(newRegenHistory);
+              }
+              if (Object.keys(newEditBranches).length > 0) {
+                setEditBranches(newEditBranches);
+              }
+
+              setMessages(
+                activePath.map((m: { id: string; role: string; content: string }) => ({
+                  id: m.id,
+                  role: m.role as "user" | "assistant",
+                  parts: [{ type: "text" as const, text: m.content }],
+                }))
+              );
+            } else {
+              // Legacy: no branching data — show flat list as before
+              if (Object.keys(restoredAttachments).length > 0) {
+                setMessageAttachments(restoredAttachments);
+              }
+              if (Object.keys(restoredTools).length > 0) {
+                setRestoredToolInvocations(restoredTools);
+              }
+              setMessages(
+                filtered.map((m: { id: string; role: string; content: string }) => ({
+                  id: m.id,
+                  role: m.role as "user" | "assistant",
+                  parts: [{ type: "text" as const, text: m.content }],
+                }))
+              );
             }
-            if (Object.keys(restoredTools).length > 0) {
-              setRestoredToolInvocations(restoredTools);
-            }
-            setMessages(
-              filtered.map((m: { id: string; role: string; content: string }) => ({
-                id: m.id,
-                role: m.role as "user" | "assistant",
-                parts: [{ type: "text" as const, text: m.content }],
-              }))
-            );
           } else {
             setMessages([]);
           }
@@ -241,6 +357,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setEditBranches({});
     setEditingState(null);
     setArtifactPanel(null);
+    pendingEditTransfer.current = null;
+    pendingRegenTransfer.current = null;
   }, [setActiveId, setMessages, stop]);
 
   const pendingAttachments = useRef<MessageAttachments>({ images: [], files: [] });
@@ -248,7 +366,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const handleSendMessage = useCallback(
     (overrideText?: string) => {
       const text = (overrideText ?? input).trim();
-      if (!text || isLoading) return;
+      if (!text || isLoading || viewingOldBranch) return;
       setChatError(null);
 
       const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
@@ -297,6 +415,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           body: {
             conversationId: conversationIdRef.current,
             model: selectedModelRef.current,
+            parentId: messages.length > 0 ? messages[messages.length - 1].id : null,
             attachments: (displayImages.length > 0 || displayFiles.length > 0)
               ? { images: displayImages, files: displayFiles }
               : undefined,
@@ -304,7 +423,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         }
       );
     },
-    [input, isLoading, files, sendMessage]
+    [input, isLoading, viewingOldBranch, files, sendMessage]
   );
 
   useEffect(() => {
@@ -445,6 +564,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       body: {
         conversationId: conversationIdRef.current,
         model: selectedModelRef.current,
+        parentId: userMsg.id,
         regenerate: true,
       },
     });
@@ -464,6 +584,50 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     },
     [isLoading, messages, input]
   );
+
+  // Track pending regen transfer: old user msg ID → needs to be re-keyed after reload
+  const pendingRegenTransfer = useRef<{ oldUserMsgId: string; messageIndex: number } | null>(null);
+
+  // Transfer regenerationHistory key when messages reload with different IDs
+  useEffect(() => {
+    const transfer = pendingRegenTransfer.current;
+    if (!transfer) return;
+    const { oldUserMsgId, messageIndex } = transfer;
+    const newMsg = messages[messageIndex];
+    if (newMsg && newMsg.role === "user" && newMsg.id !== oldUserMsgId) {
+      pendingRegenTransfer.current = null;
+      setRegenerationHistory((prev) => {
+        const history = prev[oldUserMsgId];
+        if (!history) return prev;
+        const next = { ...prev, [newMsg.id]: history };
+        delete next[oldUserMsgId];
+        return next;
+      });
+    }
+  }, [messages]);
+
+  // Track pending edit branch transfer: old message ID → needs to be re-keyed to new message ID
+  const pendingEditTransfer = useRef<{ oldId: string; messageIndex: number } | null>(null);
+
+  // Transfer editBranches key when a new message replaces an edited one
+  useEffect(() => {
+    const transfer = pendingEditTransfer.current;
+    if (!transfer) return;
+    const { oldId, messageIndex } = transfer;
+    // After edit, messages array is: [truncated..., newUserMsg, assistantMsg?]
+    // The new user message should be at messageIndex
+    const newMsg = messages[messageIndex];
+    if (!newMsg || newMsg.role !== "user") return;
+    if (newMsg.id === oldId) return; // same ID, no transfer needed
+    pendingEditTransfer.current = null;
+    setEditBranches((prev) => {
+      const branches = prev[oldId];
+      if (!branches) return prev;
+      // Re-key: add new key, remove old
+      const { [oldId]: _, ...rest } = prev;
+      return { ...rest, [newMsg.id]: branches };
+    });
+  }, [messages]);
 
   // Actually perform the edit (called when user submits from editing mode)
   const handleSubmitEdit = useCallback(() => {
@@ -504,11 +668,18 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       return { ...prev, [key]: [...existing, branch] };
     });
 
+    // Schedule re-keying editBranches once the new message appears
+    pendingEditTransfer.current = { oldId: editedMsg.id, messageIndex };
+
     const truncated = messages.slice(0, messageIndex);
     setMessages(truncated);
 
     setEditingState(null);
     setInput("");
+
+    // parentId = the message before the edited one (its parent in the tree)
+    // editedMessageId = the message being edited, so server can make the new one a sibling
+    const editParentId = messageIndex > 0 ? messages[messageIndex - 1].id : null;
 
     sendMessage(
       { text: newContent },
@@ -516,6 +687,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         body: {
           conversationId: conversationIdRef.current,
           model: selectedModelRef.current,
+          parentId: editParentId,
+          editedMessageId: editedMsg.id,
         },
       }
     );
@@ -719,6 +892,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           onOpenArtifact={handleOpenArtifact}
           regenerationHistory={regenerationHistory}
           editBranches={editBranches}
+          onViewingOldBranch={setViewingOldBranch}
         />
       )}
 
@@ -745,6 +919,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                       body: {
                         conversationId: conversationIdRef.current,
                         model: selectedModelRef.current,
+                        parentId: lastUser.id,
                         regenerate: true,
                       },
                     });
@@ -774,6 +949,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         onSubmit={() => handleSendMessage()}
         onStop={stop}
         isLoading={isLoading}
+        disabled={viewingOldBranch}
+        placeholder={viewingOldBranch ? "Switch to the latest version to continue chatting" : undefined}
         files={files}
         onFilesChange={setFiles}
         onEditLastMessage={handleEditLastMessage}

@@ -34,6 +34,7 @@ interface ChatMessagesProps {
   onOpenArtifact?: (code: string, language: string) => void;
   regenerationHistory?: Record<string, VersionEntry[]>;
   editBranches?: Record<string, EditBranch[]>;
+  onViewingOldBranch?: (viewing: boolean) => void;
 }
 
 interface MessageSlot {
@@ -106,7 +107,7 @@ function ThinkingIndicator() {
 }
 
 function ChatMessages({
-  messages, isStreaming, onRegenerate, onEditMessage, onOpenArtifact, regenerationHistory, editBranches,
+  messages, isStreaming, onRegenerate, onEditMessage, onOpenArtifact, regenerationHistory, editBranches, onViewingOldBranch,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -164,10 +165,38 @@ function ChatMessages({
   const lastMsg = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMsg?.role === "user";
 
+  // Determine if any edit group is viewing an old branch — if so, hide all slots after it
+  let cutoffSlotIdx = slots.length; // by default, show all slots
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (slot.type === "user-edit-group") {
+      const branches = slot.branches!;
+      const totalVersions = branches.length + 1;
+      const selectedIdx = selectedBranches[slot.messages[0].id] ?? totalVersions - 1;
+      if (selectedIdx !== totalVersions - 1) {
+        // Viewing an old branch — cut off everything after this slot
+        cutoffSlotIdx = i + 1;
+        break;
+      }
+    }
+  }
+
+  const visibleSlots = slots.slice(0, cutoffSlotIdx);
+  const isViewingOldBranch = cutoffSlotIdx < slots.length;
+
+  // Notify parent about old branch viewing state
+  const prevViewingOldBranch = useRef(false);
+  useEffect(() => {
+    if (prevViewingOldBranch.current !== isViewingOldBranch) {
+      prevViewingOldBranch.current = isViewingOldBranch;
+      onViewingOldBranch?.(isViewingOldBranch);
+    }
+  }, [isViewingOldBranch, onViewingOldBranch]);
+
   return (
     <div ref={containerRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl py-4">
-        {slots.map((slot, slotIdx) => {
+        {visibleSlots.map((slot, slotIdx) => {
           if (slot.type === "user-edit-group") {
             const msg = slot.messages[0];
             const branches = slot.branches!;
@@ -192,7 +221,8 @@ function ChatMessages({
                     versionCount={totalVersions} currentVersion={selectedIdx}
                     onVersionChange={(idx) => setSelectedBranches((p) => ({ ...p, [msg.id]: idx }))} />
                   {branch.followingMessages.map((fm) => (
-                    <MessageBubble key={fm.id} role={fm.role} content={fm.content} model={fm.model} toolInvocations={fm.toolInvocations} onOpenArtifact={onOpenArtifact} />
+                    <MessageBubble key={fm.id} role={fm.role} content={fm.content} model={fm.model}
+                      images={fm.images} files={fm.files} toolInvocations={fm.toolInvocations} onOpenArtifact={onOpenArtifact} />
                   ))}
                 </div>
               );
