@@ -190,7 +190,7 @@ function MessageBubble({
 
     return (
       <div className="group flex justify-end px-4 py-1">
-        <div className="max-w-[80%] lg:max-w-[65%]">
+        <div className="max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
               {files.map((file, i) => {
