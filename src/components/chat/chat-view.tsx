@@ -38,7 +38,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     else if (hour < 17) setGreeting("Good afternoon");
     else setGreeting("Good evening");
   }, []);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -116,7 +115,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   );
 
   const [chatError, setChatError] = useState<string | null>(null);
-  const lastSendRef = useRef<{ text?: string; body?: Record<string, unknown> } | null>(null);
 
   const {
     messages,
@@ -185,10 +183,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             // Build metadata maps (attachments, tools, model)
             const restoredAttachments: Record<string, MessageAttachments> = {};
             const restoredTools: Record<string, ToolInvocation[]> = {};
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const msgById = new Map<string, any>();
             for (const m of filtered) {
-              msgById.set(m.id, m);
               if (m.model) messageModelMap.current.set(m.id, m.model);
               if (m.metadata?.attachments) {
                 restoredAttachments[m.id] = m.metadata.attachments as MessageAttachments;
@@ -599,9 +594,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       setRegenerationHistory((prev) => {
         const history = prev[oldUserMsgId];
         if (!history) return prev;
-        const next = { ...prev, [newMsg.id]: history };
-        delete next[oldUserMsgId];
-        return next;
+        const { [oldUserMsgId]: _, ...rest } = prev;
+        return { ...rest, [newMsg.id]: history };
       });
     }
   }, [messages]);
