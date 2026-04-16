@@ -300,7 +300,10 @@ export async function POST(req: Request) {
         }
 
         // Background: Update conversation summary (Layer 1)
-        updateConversationSummary(convId!, userId).catch(console.error);
+        // Skip for edits — summary would mix branches
+        if (!isEdit) {
+          updateConversationSummary(convId!, userId).catch(console.error);
+        }
 
         // Background: Extract user memories (Layer 2)
         if (text && userContent) {

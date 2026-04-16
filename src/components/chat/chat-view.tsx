@@ -77,6 +77,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setConversationId(activeId);
     initialLoadDone.current = false;
     setEditingState(null);
+    setViewingOldBranch(false);
     setArtifactPanel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -156,6 +157,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const isLoading = status === "streaming" || status === "submitted";
 
   const messageModelMap = useRef<Map<string, string>>(new Map());
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const [messageAttachments, setMessageAttachments] = useState<Record<string, MessageAttachments>>({});
   const [regenerationHistory, setRegenerationHistory] = useState<Record<string, VersionEntry[]>>({});
   const [editBranches, setEditBranches] = useState<Record<string, EditBranch[]>>({});
@@ -204,10 +207,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               }
             }
 
-            // Check if any messages have parentId set (branching data exists)
+            // Check if any messages have parentId set OR if there are root-level siblings (branching data)
             const hasBranchData = filtered.some((m: { parentId?: string | null }) => m.parentId != null);
+            const rootMessages = filtered.filter((m: { parentId?: string | null }) => m.parentId == null);
+            const hasRootSiblings = rootMessages.filter((m: { role: string }) => m.role === "user").length > 1
+              || rootMessages.filter((m: { role: string }) => m.role === "assistant").length > 1;
 
-            if (hasBranchData) {
+            if (hasBranchData || hasRootSiblings) {
               // Build tree: group children by parentId
               const childrenMap = new Map<string | null, typeof filtered>();
               for (const m of filtered) {
@@ -229,6 +235,20 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 const active = children[children.length - 1]; // highest branchIndex
                 activePath.push(active);
                 currentParentId = active.id;
+              }
+
+              // Safety: if tree walk produced nothing, fall back to flat list
+              if (activePath.length === 0) {
+                setMessageAttachments(restoredAttachments);
+                setRestoredToolInvocations(restoredTools);
+                setMessages(
+                  filtered.map((m: { id: string; role: string; content: string }) => ({
+                    id: m.id,
+                    role: m.role as "user" | "assistant",
+                    parts: [{ type: "text" as const, text: m.content }],
+                  }))
+                );
+                return;
               }
 
               // Build regenerationHistory and editBranches from sibling data
@@ -410,7 +430,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           body: {
             conversationId: conversationIdRef.current,
             model: selectedModelRef.current,
-            parentId: messages.length > 0 ? messages[messages.length - 1].id : null,
+            parentId: messagesRef.current.length > 0 ? messagesRef.current[messagesRef.current.length - 1].id : null,
             attachments: (displayImages.length > 0 || displayFiles.length > 0)
               ? { images: displayImages, files: displayFiles }
               : undefined,
@@ -608,16 +628,24 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     const transfer = pendingEditTransfer.current;
     if (!transfer) return;
     const { oldId, messageIndex } = transfer;
-    // After edit, messages array is: [truncated..., newUserMsg, assistantMsg?]
-    // The new user message should be at messageIndex
-    const newMsg = messages[messageIndex];
+    // Find the new user message at or after the expected index
+    // (useChat may insert the message at slightly different positions)
+    let newMsg = messages[messageIndex];
+    if (!newMsg || newMsg.role !== "user") {
+      // Search nearby for the user message
+      for (let i = Math.max(0, messageIndex - 1); i < Math.min(messages.length, messageIndex + 2); i++) {
+        if (messages[i]?.role === "user" && messages[i].id !== oldId) {
+          newMsg = messages[i];
+          break;
+        }
+      }
+    }
     if (!newMsg || newMsg.role !== "user") return;
-    if (newMsg.id === oldId) return; // same ID, no transfer needed
+    if (newMsg.id === oldId) return;
     pendingEditTransfer.current = null;
     setEditBranches((prev) => {
       const branches = prev[oldId];
       if (!branches) return prev;
-      // Re-key: add new key, remove old
       const { [oldId]: _, ...rest } = prev;
       return { ...rest, [newMsg.id]: branches };
     });

@@ -201,7 +201,9 @@ function ChatMessages({
             const msg = slot.messages[0];
             const branches = slot.branches!;
             const totalVersions = branches.length + 1;
-            const selectedIdx = selectedBranches[msg.id] ?? totalVersions - 1;
+            const rawIdx = selectedBranches[msg.id] ?? totalVersions - 1;
+            // Clamp to valid range in case branches changed
+            const selectedIdx = Math.max(0, Math.min(rawIdx, totalVersions - 1));
             const isOnCurrentBranch = selectedIdx === totalVersions - 1;
 
             if (isOnCurrentBranch) {
@@ -232,7 +234,7 @@ function ChatMessages({
           if (slot.type === "assistant-versions" && slot.messages.length > 1) {
             const groupKey = slot.messages[0].id;
             const vc = slot.messages.length;
-            const sel = selectedVersions[groupKey] ?? vc - 1;
+            const sel = Math.max(0, Math.min(selectedVersions[groupKey] ?? vc - 1, vc - 1));
             const cur = slot.messages[sel];
             const isLA = slotIdx === lastAssistantSlotIdx;
             return (
