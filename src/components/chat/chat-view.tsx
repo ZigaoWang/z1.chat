@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, AlertCircle, RotateCcw, X } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw, X, Eye } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
 import ArtifactPreview, { extractArtifacts, isArtifact } from "./artifact-preview";
-import { toast } from "sonner";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -30,7 +30,7 @@ interface MessageAttachments {
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { activeId, setActiveId, refreshConversations } = useConversations();
-  const { selectedModel, selectModel } = useModels();
+  const { selectedModel, selectModel, currentModel } = useModels();
   const [greeting, setGreeting] = useState("What's on your mind?");
   useEffect(() => {
     const hour = new Date().getHours();
@@ -115,7 +115,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       })
   );
 
-  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<ReactNode | null>(null);
 
   const {
     messages,
@@ -389,11 +389,18 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       const displayFiles: { name: string; type: string; url: string; size?: number }[] = [];
       const fileContentBlocks: string[] = [];
 
+      const hasImages = files.some(f => f.isImage && f.dataUrl);
+      const modelSupportsVision = currentModel?.supportsVision !== false;
+
+      // Block sending images to non-vision models — warning is shown inline near file preview
+      if (hasImages && !modelSupportsVision) {
+        return;
+      }
+
       if (files.length > 0) {
         for (const f of files) {
-          // Image with successfully converted dataUrl → send ONLY as visual part
-          // The AI can already see it — no text tag needed, no sandbox hint
           if (f.isImage && f.dataUrl) {
+            // Vision model — send image as visual part
             const dataUrlMediaType = f.dataUrl.match(/^data:([^;]+);/)?.[1] || "image/jpeg";
             fileParts.push({
               type: "file" as const,
@@ -402,7 +409,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             });
             displayImages.push(f.url);
           } else {
-            // Non-image file, or image that couldn't be converted
             displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
             if (f.textContent) {
               fileContentBlocks.push(`<attached_file name="${f.name}" url="${f.url}" sandbox_path="/home/user/${f.name}">\n${f.textContent}\n</attached_file>`);
@@ -436,7 +442,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         }
       );
     },
-    [input, isLoading, viewingOldBranch, files, sendMessage]
+    [input, isLoading, viewingOldBranch, files, sendMessage, currentModel]
   );
 
   useEffect(() => {
@@ -958,6 +964,23 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               <span className="sr-only">Dismiss</span>
               <span className="text-xs">&#x2715;</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Vision warning — shown when images are attached to a non-vision model */}
+      {files.some(f => f.isImage && f.dataUrl) && currentModel && !currentModel.supportsVision && (
+        <div className="shrink-0 px-4">
+          <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+            <p className="flex-1 text-sm text-amber-700 dark:text-amber-400">
+              {currentModel.name || selectedModel.split("/").pop()} doesn&apos;t support images. Switch to a model with the{" "}
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-blue-500/10 text-blue-500 border-0 inline-flex align-text-bottom">
+                <Eye className="h-2.5 w-2.5" />
+                Vision
+              </Badge>
+              {" "}badge, or remove the image.
+            </p>
           </div>
         </div>
       )}

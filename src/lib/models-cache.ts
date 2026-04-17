@@ -16,6 +16,7 @@ export interface OpenRouterModel {
     modality: string;
     tokenizer: string;
     instruct_type: string;
+    input_modalities?: string[];
   };
 }
 

@@ -18,6 +18,7 @@ function formatModels(models: OpenRouterModel[]) {
     contextLength: number;
     pricing: { prompt: number; completion: number };
     isFree: boolean;
+    supportsVision: boolean;
   }>> = {};
 
   for (const model of models) {
@@ -30,6 +31,7 @@ function formatModels(models: OpenRouterModel[]) {
 
     const promptPrice = parseFloat(model.pricing.prompt) || 0;
     const completionPrice = parseFloat(model.pricing.completion) || 0;
+    const inputModalities = model.architecture?.input_modalities || [];
 
     grouped[providerName].push({
       id: model.id,
@@ -41,6 +43,7 @@ function formatModels(models: OpenRouterModel[]) {
         completion: completionPrice,
       },
       isFree: promptPrice === 0 && completionPrice === 0,
+      supportsVision: inputModalities.includes("image"),
     });
   }
 

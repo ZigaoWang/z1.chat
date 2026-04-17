@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronsUpDown, Zap } from "lucide-react";
+import { ChevronsUpDown, Zap, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   CommandDialog,
@@ -93,6 +93,29 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
     return `$${(price * 1_000_000).toFixed(2)}/M`;
   };
 
+  const ModelBadges = ({ model }: { model: { isFree: boolean; supportsVision?: boolean } }) => (
+    <>
+      {model.supportsVision && (
+        <Badge
+          variant="secondary"
+          className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-blue-500/10 text-blue-500 border-0"
+        >
+          <Eye className="h-2.5 w-2.5" />
+          Vision
+        </Badge>
+      )}
+      {model.isFree && (
+        <Badge
+          variant="secondary"
+          className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
+        >
+          <Zap className="h-2.5 w-2.5" />
+          Free
+        </Badge>
+      )}
+    </>
+  );
+
   return (
     <>
       <button
@@ -128,17 +151,9 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
                     data-checked={value === model.id ? "true" : undefined}
                   >
                     <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate text-xs">{model.name}</span>
-                        {model.isFree && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
-                          >
-                            <Zap className="h-2.5 w-2.5" />
-                            Free
-                          </Badge>
-                        )}
+                        <ModelBadges model={model} />
                       </div>
                       {!model.isFree && (
                         <span className="shrink-0 text-[11px] text-muted-foreground/40 tabular-nums">
@@ -162,17 +177,9 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
                     data-checked={value === model.id ? "true" : undefined}
                   >
                     <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate text-xs">{model.name}</span>
-                        {model.isFree && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
-                          >
-                            <Zap className="h-2.5 w-2.5" />
-                            Free
-                          </Badge>
-                        )}
+                        <ModelBadges model={model} />
                       </div>
                       {!model.isFree && (
                         <span className="shrink-0 text-[11px] text-muted-foreground/40 tabular-nums">

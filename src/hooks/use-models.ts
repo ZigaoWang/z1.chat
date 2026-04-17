@@ -10,6 +10,7 @@ interface Model {
   contextLength: number;
   pricing: { prompt: number; completion: number };
   isFree: boolean;
+  supportsVision: boolean;
 }
 
 interface Provider {
