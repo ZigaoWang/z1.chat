@@ -270,7 +270,7 @@ export default function ArtifactPreview({ code, language, title, streaming, onCl
   }, [onClose]);
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-fade-in">
+    <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-slide-in-right">
       {/* Header */}
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3">
         <div className="flex items-center gap-1">

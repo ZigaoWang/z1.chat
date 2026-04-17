@@ -851,7 +851,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   return (
     <div ref={outerRef} className="flex h-full flex-1 relative">
     <div
-      style={artifactPanel ? { width: `${100 - artifactWidth}%` } : undefined}
+      style={artifactPanel ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.2s ease-out' } : undefined}
       className={`relative flex h-full flex-col bg-background ${artifactPanel ? "max-lg:flex-1" : "flex-1"}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
