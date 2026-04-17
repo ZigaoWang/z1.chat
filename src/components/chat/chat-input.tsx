@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useEffect, KeyboardEvent, useCallback } from "react";
-import { ArrowUp, Square, X, FileText, Image as ImageIcon, Pencil } from "lucide-react";
+import { useRef, useEffect, KeyboardEvent, useCallback, useState } from "react";
+import { ArrowUp, Square, X, FileText, Image as ImageIcon, Pencil, Loader2 } from "lucide-react";
 import FileUpload, { type UploadedFile, uploadFiles } from "./file-upload";
 
 interface EditingState {
@@ -34,6 +34,7 @@ export default function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
+  const [pasteUploading, setPasteUploading] = useState(false);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -88,8 +89,10 @@ export default function ChatInput({
     }
     if (pastedFiles.length > 0) {
       e.preventDefault();
+      setPasteUploading(true);
       const uploaded = await uploadFiles(pastedFiles);
       if (uploaded.length > 0) onFilesChange([...files, ...uploaded]);
+      setPasteUploading(false);
     }
   }, [files, onFilesChange]);
 
@@ -112,7 +115,7 @@ export default function ChatInput({
 
         <div className={`border border-border/60 bg-background transition-colors focus-within:border-border focus-within:ring-1 focus-within:ring-ring/10 ${editing ? "rounded-b-xl" : "rounded-xl"}`}>
           {/* File previews */}
-          {files.length > 0 && !editing && (
+          {(files.length > 0 || pasteUploading) && !editing && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
               {files.map((file, i) => (
                 <div key={i} className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
@@ -121,6 +124,12 @@ export default function ChatInput({
                   <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="ml-0.5 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground"><X className="h-3 w-3" /></button>
                 </div>
               ))}
+              {pasteUploading && (
+                <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground animate-pulse">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Uploading...</span>
+                </div>
+              )}
             </div>
           )}
 
