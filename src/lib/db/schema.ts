@@ -264,6 +264,54 @@ export const apiKeys = pgTable("api_keys", {
     .defaultNow(),
 });
 
+// Artifacts
+export const artifacts = pgTable(
+  "artifacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // 'document' | 'code' | 'html' | 'svg' | 'mermaid'
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    language: text("language"), // for code: 'python', 'typescript', etc.
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("artifacts_conversation_id_idx").on(table.conversationId),
+    index("artifacts_user_id_idx").on(table.userId),
+  ]
+);
+
+// Artifact Versions (for undo)
+export const artifactVersions = pgTable(
+  "artifact_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    artifactId: uuid("artifact_id")
+      .notNull()
+      .references(() => artifacts.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("artifact_versions_artifact_id_idx").on(table.artifactId),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
@@ -272,6 +320,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   apiKeys: many(apiKeys),
   sessions: many(sessions),
   usageLogs: many(usageLogs),
+  artifacts: many(artifacts),
 }));
 
 export const conversationsRelations = relations(
@@ -282,6 +331,7 @@ export const conversationsRelations = relations(
       references: [users.id],
     }),
     messages: many(messages),
+    artifacts: many(artifacts),
   })
 );
 
@@ -352,6 +402,25 @@ export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
   }),
 }));
 
+export const artifactsRelations = relations(artifacts, ({ one, many }) => ({
+  conversation: one(conversations, {
+    fields: [artifacts.conversationId],
+    references: [conversations.id],
+  }),
+  user: one(users, {
+    fields: [artifacts.userId],
+    references: [users.id],
+  }),
+  versions: many(artifactVersions),
+}));
+
+export const artifactVersionsRelations = relations(artifactVersions, ({ one }) => ({
+  artifact: one(artifacts, {
+    fields: [artifactVersions.artifactId],
+    references: [artifacts.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -365,6 +434,8 @@ export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type UsageLog = typeof usageLogs.$inferSelect;
 export type InviteToken = typeof inviteTokens.$inferSelect;
+export type Artifact = typeof artifacts.$inferSelect;
+export type ArtifactVersion = typeof artifactVersions.$inferSelect;
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";
