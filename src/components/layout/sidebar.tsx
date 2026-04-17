@@ -96,7 +96,7 @@ const STORAGE_KEY = "one:sidebar-width";
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const {
     conversations, activeId, setActiveId, createConversation,
-    deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery,
+    deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery, isLoading,
   } = useConversations();
   const { user, signOut } = useAuth();
 
@@ -328,7 +328,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 scrollbar-thin">
-          {conversations.length === 0 ? (
+          {isLoading && conversations.length === 0 ? (
+            <div className="space-y-1.5 px-1 pt-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-9 rounded-lg bg-muted/40 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+              ))}
+            </div>
+          ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-3">
               <MessageSquare className="h-5 w-5 text-muted-foreground/15" />
               <p className="mt-1.5 text-xs text-muted-foreground/25">{searchQuery ? "No results" : "No conversations"}</p>
