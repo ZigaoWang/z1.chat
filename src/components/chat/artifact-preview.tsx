@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw } from "lucide-react";
+import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 import xml from "highlight.js/lib/languages/xml";
 import css from "highlight.js/lib/languages/css";
@@ -194,12 +195,15 @@ export default function ArtifactPreview({ code, language, title, streaming, onCl
   useEffect(() => {
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
 
+    const sanitize = (html: string) =>
+      DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+
     // If not streaming, highlight immediately
     if (!streaming) {
       try {
-        setHighlightedCode(hljs.highlight(code, { language: "xml" }).value);
+        setHighlightedCode(sanitize(hljs.highlight(code, { language: "xml" }).value));
       } catch {
-        setHighlightedCode(code);
+        setHighlightedCode(sanitize(code));
       }
       return;
     }
@@ -207,9 +211,9 @@ export default function ArtifactPreview({ code, language, title, streaming, onCl
     // While streaming, debounce to every 300ms
     highlightTimer.current = setTimeout(() => {
       try {
-        setHighlightedCode(hljs.highlight(code, { language: "xml" }).value);
+        setHighlightedCode(sanitize(hljs.highlight(code, { language: "xml" }).value));
       } catch {
-        setHighlightedCode(code);
+        setHighlightedCode(sanitize(code));
       }
     }, 300);
 
