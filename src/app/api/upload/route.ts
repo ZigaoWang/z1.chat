@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       isImage,
       dataUrl,
       textContent,
-      processed: { ...processed, convertedBuffer: undefined },
+      processed,
     });
   } catch (error) {
     console.error("Upload error:", error);

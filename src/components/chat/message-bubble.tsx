@@ -282,19 +282,25 @@ function SandboxImages({ invocations, onLightbox }: { invocations: ToolInvocatio
 
   return (
     <div className="my-2 flex flex-wrap gap-2">
-      {allImages.map((base64, i) => (
-        <button
-          key={i}
-          onClick={() => onLightbox(`data:image/png;base64,${base64}`)}
-          className="block overflow-hidden rounded-lg border border-border/30 hover:border-border transition-colors"
-        >
-          <img
-            src={`data:image/png;base64,${base64}`}
-            alt={`Code output ${i + 1}`}
-            className="max-w-full sm:max-w-[400px] max-h-[300px] object-contain"
-          />
-        </button>
-      ))}
+      {allImages.map((base64, i) => {
+        // Detect format from base64 header or default to JPEG
+        const isJpeg = base64.startsWith("/9j/");
+        const mime = isJpeg ? "image/jpeg" : "image/png";
+        const src = `data:${mime};base64,${base64}`;
+        return (
+          <button
+            key={i}
+            onClick={() => onLightbox(src)}
+            className="block overflow-hidden rounded-lg border border-border/30 hover:border-border transition-colors"
+          >
+            <img
+              src={src}
+              alt={`Code output ${i + 1}`}
+              className="max-w-full sm:max-w-[400px] max-h-[300px] object-contain"
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }

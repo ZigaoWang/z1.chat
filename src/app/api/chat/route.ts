@@ -12,13 +12,14 @@ import { getTools, SANDBOX_TOOL_NAMES, IMAGE_TOOL_NAMES, SandboxManager } from "
 import { trackedStreamText, logSearchUsage, logSandboxUsage } from "@/lib/usage-logger";
 import { Sandbox } from "@e2b/code-interpreter";
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { join, basename } from "path";
 import { tmpdir } from "os";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
 
 export const maxDuration = 120;
 
 const TEMP_DIR = join(tmpdir(), "one-uploads");
+const SAFE_TEMP_FILENAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.\w+$/;
 
 // Patterns that indicate the user wants us to remember something
 const REMEMBER_PATTERNS = [
@@ -272,14 +273,20 @@ export async function POST(req: Request) {
               // Auto-upload any attached files into the sandbox
               for (const file of attachedFileUrls) {
                 try {
-                  const urlFilename = file.url.split("/").pop() || "file";
+                  const urlFilename = basename(file.url);
+                  if (!SAFE_TEMP_FILENAME.test(urlFilename)) {
+                    console.warn(`[sandbox] Skipping unsafe filename: ${urlFilename}`);
+                    continue;
+                  }
                   const localPath = join(TEMP_DIR, urlFilename);
                   const buffer = await readFile(localPath);
                   const destPath = `/home/user/${file.name}`;
                   await sandbox.files.write(destPath, buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
-                  console.log(`[sandbox] Auto-uploaded ${file.name} → ${destPath}`);
+                  console.log(`[sandbox] Auto-uploaded ${file.name} → ${destPath} (${(buffer.length / 1024).toFixed(0)}KB)`);
                 } catch (err) {
-                  console.error(`[sandbox] Failed to auto-upload ${file.name}:`, err);
+                  // File might have been cleaned up (1hr TTL) — not fatal
+                  const msg = err instanceof Error ? err.message : String(err);
+                  console.warn(`[sandbox] Could not auto-upload ${file.name}: ${msg}`);
                 }
               }
             }
