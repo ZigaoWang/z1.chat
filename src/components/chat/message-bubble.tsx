@@ -17,6 +17,7 @@ import {
   FileCode,
   FileSpreadsheet,
   File,
+  Code,
 } from "lucide-react";
 import MarkdownRenderer from "./markdown-renderer";
 import { extractArtifacts } from "./artifact-preview";
@@ -149,6 +150,155 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
   );
 }
 
+interface SandboxToolResult {
+  text?: string | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  error?: string | null;
+  images?: string[];
+  exitCode?: number;
+  path?: string;
+  size?: number;
+  filename?: string;
+  type?: string;
+  content?: string;
+}
+
+const SANDBOX_TOOL_NAMES = new Set(["code_execute", "shell_exec", "file_upload", "file_download"]);
+
+function getSandboxLabel(toolName: string, isRunning: boolean): string {
+  if (isRunning) {
+    switch (toolName) {
+      case "shell_exec": return "Running command...";
+      case "file_upload": return "Uploading file...";
+      case "file_download": return "Reading file...";
+      default: return "Running code...";
+    }
+  }
+  switch (toolName) {
+    case "shell_exec": return "Ran command";
+    case "file_upload": return "Uploaded file";
+    case "file_download": return "Read file";
+    default: return "Ran code";
+  }
+}
+
+// --- Sandbox status (code_execute, shell_exec, file_upload, file_download) ---
+function SandboxStatus({ invocations }: { invocations: ToolInvocation[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const executions = invocations.filter((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
+  if (executions.length === 0) return null;
+
+  const activeExec = executions.find((s) => s.state !== "output-available" && s.state !== "output-error");
+  const isRunning = !!activeExec;
+
+  // Collect output from completed executions
+  const outputs: { stdout: string; stderr: string; error: string | null; toolName: string }[] = [];
+  for (const e of executions) {
+    if (e.state === "output-available" && e.result) {
+      const r = e.result as SandboxToolResult;
+      outputs.push({
+        stdout: r.stdout || "",
+        stderr: r.stderr || "",
+        error: r.error || null,
+        toolName: e.toolName,
+      });
+    }
+  }
+
+  const hasOutput = outputs.some((o) => o.stdout || o.stderr);
+
+  // Determine label
+  const label = isRunning
+    ? getSandboxLabel(activeExec!.toolName, true)
+    : (() => {
+        const uniqueTools = [...new Set(executions.map((e) => e.toolName))];
+        if (uniqueTools.length === 1) {
+          const suffix = executions.length > 1 ? ` (${executions.length}x)` : "";
+          return getSandboxLabel(uniqueTools[0], false) + suffix;
+        }
+        return `Ran ${executions.length} sandbox operations`;
+      })();
+
+  return (
+    <div className="mb-2 text-xs text-muted-foreground/50">
+      {isRunning ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+          {label}
+        </span>
+      ) : (
+        <button
+          onClick={() => hasOutput && setExpanded(!expanded)}
+          className={`inline-flex items-center gap-1 ${hasOutput ? "hover:text-muted-foreground cursor-pointer" : ""}`}
+        >
+          <Code className="h-3 w-3" />
+          <span>{label}</span>
+          {hasOutput && <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />}
+        </button>
+      )}
+
+      {expanded && hasOutput && (
+        <div className="mt-1.5 pl-0.5 space-y-1">
+          {outputs.map((o, i) => (
+            <div key={i}>
+              {o.stdout && (
+                <pre className="text-[11px] text-muted-foreground/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto max-h-40 whitespace-pre-wrap">
+                  {o.stdout}
+                </pre>
+              )}
+              {o.stderr && (
+                <pre className="text-[11px] text-amber-500/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto max-h-20 whitespace-pre-wrap">
+                  {o.stderr}
+                </pre>
+              )}
+              {o.error && (
+                <pre className="text-[11px] text-red-500/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap">
+                  {o.error}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Inline images from sandbox tools (code_execute, file_download) ---
+function SandboxImages({ invocations, onLightbox }: { invocations: ToolInvocation[]; onLightbox: (src: string) => void }) {
+  const allImages: string[] = [];
+  for (const inv of invocations) {
+    if (
+      (inv.toolName === "code_execute" || inv.toolName === "file_download") &&
+      inv.state === "output-available" &&
+      inv.result
+    ) {
+      const r = inv.result as SandboxToolResult;
+      if (r.images) allImages.push(...r.images);
+    }
+  }
+  if (allImages.length === 0) return null;
+
+  return (
+    <div className="my-2 flex flex-wrap gap-2">
+      {allImages.map((base64, i) => (
+        <button
+          key={i}
+          onClick={() => onLightbox(`data:image/png;base64,${base64}`)}
+          className="block overflow-hidden rounded-lg border border-border/30 hover:border-border transition-colors"
+        >
+          <img
+            src={`data:image/png;base64,${base64}`}
+            alt={`Code output ${i + 1}`}
+            className="max-w-full sm:max-w-[400px] max-h-[300px] object-contain"
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function VersionNav({ current, total, onChange }: { current: number; total: number; onChange: (i: number) => void }) {
   return (
     <div className="inline-flex items-center">
@@ -188,6 +338,9 @@ function MessageBubble({
     const hasImages = images && images.length > 0;
     const hasFiles = files && files.length > 0;
 
+    // Strip <attached_file ...> blocks from display — they're metadata for the AI, not for the user
+    const displayContent = content.replace(/<attached_file\s[^>]*>[\s\S]*?<\/attached_file>\s*/g, "").replace(/<attached_file\s[^>]*\/>\s*/g, "").trim();
+
     return (
       <div className="group flex justify-end px-4 py-1">
         <div className="max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
@@ -218,7 +371,7 @@ function MessageBubble({
           )}
 
           <div className="rounded-2xl rounded-br-sm bg-primary/[0.08] dark:bg-primary/[0.12] px-3.5 py-2">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
           </div>
           {/* Actions */}
           <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
@@ -227,9 +380,9 @@ function MessageBubble({
             )}
             <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
               {onEdit && !isStreaming && (
-                <button onClick={() => onEdit(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
+                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
               )}
-              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
                 {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
@@ -255,6 +408,7 @@ function MessageBubble({
   const activeFetch = hasFetches && toolInvocations!.find(
     (t) => t.toolName === "fetch_page" && t.state !== "output-available" && t.state !== "output-error"
   );
+  const hasCodeExec = toolInvocations && toolInvocations.some((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
 
   // Extract <artifact> tags from content
   const { cleanContent: displayContent, artifacts } = extractArtifacts(content);
@@ -263,6 +417,7 @@ function MessageBubble({
     <div className="group px-4 py-1">
       <div className="mx-auto max-w-3xl">
         {hasSearches && <SearchStatus invocations={toolInvocations!} />}
+        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} />}
 
         {activeFetch && (
           <div className="mb-2 text-xs text-muted-foreground/50">
@@ -270,7 +425,7 @@ function MessageBubble({
           </div>
         )}
 
-        {isStreaming && displayContent.length === 0 && !hasSearches ? (
+        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec ? (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
@@ -281,6 +436,9 @@ function MessageBubble({
         ) : displayContent.length > 0 ? (
           <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
         ) : null}
+
+        {/* Inline images from sandbox tools */}
+        {hasCodeExec && <SandboxImages invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
 
         {/* Artifact preview cards */}
         {artifacts.length > 0 && onOpenArtifact && (
@@ -353,6 +511,12 @@ function MessageBubble({
           </div>
         )}
       </div>
+
+      {lightboxSrc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setLightboxSrc(null)}>
+          <img src={lightboxSrc} alt="" className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+        </div>
+      )}
     </div>
   );
 }

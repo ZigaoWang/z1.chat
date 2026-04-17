@@ -391,6 +391,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
       if (files.length > 0) {
         for (const f of files) {
+          // Image with successfully converted dataUrl → send ONLY as visual part
+          // The AI can already see it — no text tag needed, no sandbox hint
           if (f.isImage && f.dataUrl) {
             const dataUrlMediaType = f.dataUrl.match(/^data:([^;]+);/)?.[1] || "image/jpeg";
             fileParts.push({
@@ -399,17 +401,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               url: f.dataUrl,
             });
             displayImages.push(f.url);
-          } else if (f.isImage && f.url) {
-            fileParts.push({
-              type: "file" as const,
-              mediaType: f.type || "image/png",
-              url: `${window.location.origin}${f.url}`,
-            });
-            displayImages.push(f.url);
           } else {
+            // Non-image file, or image that couldn't be converted
             displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
             if (f.textContent) {
-              fileContentBlocks.push(`<file name="${f.name}">\n${f.textContent}\n</file>`);
+              fileContentBlocks.push(`<attached_file name="${f.name}" url="${f.url}" sandbox_path="/home/user/${f.name}">\n${f.textContent}\n</attached_file>`);
+            } else {
+              fileContentBlocks.push(`<attached_file name="${f.name}" url="${f.url}" sandbox_path="/home/user/${f.name}" />`);
             }
           }
         }

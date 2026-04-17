@@ -116,7 +116,7 @@ export default function ChatInput({
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
               {files.map((file, i) => (
                 <div key={i} className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
-                  {file.isImage ? (file.url ? <img src={file.url} alt={file.name} className="h-7 w-7 rounded object-cover" /> : <ImageIcon className="h-3.5 w-3.5" />) : <FileText className="h-3.5 w-3.5" />}
+                  {file.isImage ? ((file.dataUrl || file.url) ? <img src={file.dataUrl || file.url} alt={file.name} className="h-7 w-7 rounded object-cover" /> : <ImageIcon className="h-3.5 w-3.5" />) : <FileText className="h-3.5 w-3.5" />}
                   <span className="max-w-[100px] truncate">{file.name}</span>
                   <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="ml-0.5 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground"><X className="h-3 w-3" /></button>
                 </div>
