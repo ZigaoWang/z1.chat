@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { processFile } from "@/lib/file-processor";
+import { getCurrentUserId } from "@/lib/auth";
 import { MAX_UPLOAD_SIZE } from "@/lib/constants";
 
 const TEMP_DIR = join(tmpdir(), "one-uploads");
@@ -28,6 +29,8 @@ async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
 
 export async function POST(req: Request) {
   try {
+    await getCurrentUserId();
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
