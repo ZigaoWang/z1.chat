@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { getCurrentUserId } from "@/lib/auth";
 
 const TEMP_DIR = join(tmpdir(), "one-uploads");
 
@@ -46,6 +47,8 @@ export async function GET(
   { params }: { params: Promise<{ filename: string }> },
 ) {
   const { filename } = await params;
+
+  await getCurrentUserId();
 
   if (!SAFE_FILENAME.test(filename)) {
     return new Response("Not found", { status: 404 });
