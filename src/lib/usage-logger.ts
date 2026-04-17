@@ -1,7 +1,7 @@
 import { generateText, streamText, type GenerateTextResult, type StreamTextResult } from "ai";
 import { db } from "./db";
 import { usageLogs, users } from "./db/schema";
-import { calculateCost, calculateUserCost, getSearchCost } from "./cost-calculator";
+import { calculateCost, calculateUserCost, getSearchCost, getCodeExecCost } from "./cost-calculator";
 import { sql, eq } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 
@@ -14,7 +14,9 @@ type UsageType =
   | "consolidation"
   | "immediate_memory"
   | "compaction"
-  | "search";
+  | "search"
+  | "code_execute"
+  | "sandbox";
 
 interface LogMeta {
   userId: string;
@@ -97,6 +99,51 @@ export async function logSearchUsage(
     }
   } catch (error) {
     console.error("[usage-logger] Failed to log search:", error);
+  }
+}
+
+export async function logCodeExecUsage(
+  userId: string,
+  conversationId?: string
+): Promise<void> {
+  return logSandboxUsage(userId, conversationId);
+}
+
+export async function logSandboxUsage(
+  userId: string,
+  conversationId?: string
+): Promise<void> {
+  try {
+    const rawCost = getCodeExecCost();
+    const userCostUsd = calculateUserCost(rawCost);
+
+    await db.insert(usageLogs).values({
+      userId,
+      conversationId: conversationId || null,
+      type: "sandbox",
+      model: "e2b",
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: rawCost,
+      userCostUsd,
+    });
+
+    // Deduct from credit balance (skip for admins)
+    if (new Decimal(userCostUsd).greaterThan(0)) {
+      const [user] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (user?.role !== "admin") {
+        await db
+          .update(users)
+          .set({ creditBalance: sql`GREATEST(0, ${users.creditBalance} - ${userCostUsd}::numeric)` })
+          .where(sql`${users.id} = ${userId}`);
+      }
+    }
+  } catch (error) {
+    console.error("[usage-logger] Failed to log sandbox usage:", error);
   }
 }
 

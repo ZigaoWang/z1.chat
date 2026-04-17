@@ -38,3 +38,6 @@ export const MAX_FILES_PER_MESSAGE = 10;
 
 // Skills: max number of skill prompts injected per message
 export const MAX_SKILLS_PER_MESSAGE = 3;
+
+// E2B code execution cost per run
+export const CODE_EXEC_COST_USD = process.env.CODE_EXEC_COST_USD || "0.005";

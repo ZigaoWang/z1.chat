@@ -40,3 +40,9 @@ export function calculateUserCost(rawCost: string): string {
 export function getSearchCost(): string {
   return SEARCH_COST_USD;
 }
+
+const CODE_EXEC_COST_USD = process.env.CODE_EXEC_COST_USD || "0.005";
+
+export function getCodeExecCost(): string {
+  return CODE_EXEC_COST_USD;
+}
