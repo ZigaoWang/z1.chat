@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, memo, useCallback, useState } from "react";
+import { useRef, useEffect, memo, useCallback, useState, useMemo } from "react";
 import { ArrowDown } from "lucide-react";
 import MessageBubble, { type ToolInvocation } from "./message-bubble";
 
@@ -155,7 +155,10 @@ function ChatMessages({
 
   if (messages.length === 0) return null;
 
-  const slots = processMessages(messages, regenerationHistory, editBranches);
+  const slots = useMemo(
+    () => processMessages(messages, regenerationHistory, editBranches),
+    [messages, regenerationHistory, editBranches]
+  );
   let lastAssistantSlotIdx = -1;
   for (let i = slots.length - 1; i >= 0; i--) {
     if (slots[i].messages[0].role === "assistant") { lastAssistantSlotIdx = i; break; }

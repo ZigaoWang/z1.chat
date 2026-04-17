@@ -1,11 +1,10 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
 import { memo, useState, useCallback, useRef } from "react";
 import { Check, Copy, Eye } from "lucide-react";
 import { isArtifact } from "./artifact-preview";
@@ -50,7 +49,7 @@ function CodeBlock({
           )}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors opacity-0 group-hover/code:opacity-100 hover:text-foreground hover:bg-muted"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors sm:opacity-0 sm:group-hover/code:opacity-100 hover:text-foreground hover:bg-muted"
           >
             {copied ? (
               <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></>
@@ -71,57 +70,84 @@ function CodeBlock({
   );
 }
 
+// Hoisted to module level — stable references, won't defeat memo
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkPlugins: any[] = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const rehypePlugins: any[] = [rehypeHighlight, rehypeKatex];
+
+function makeComponents(onOpenArtifact?: (code: string, language: string) => void): Components {
+  return {
+    code({ className, children, ...props }) {
+      const isInline = !className;
+      if (isInline) {
+        return (
+          <code className="rounded bg-muted px-1 py-0.5 text-[13px] font-mono font-medium" {...props}>
+            {children}
+          </code>
+        );
+      }
+      return <CodeBlock className={className} onOpenArtifact={onOpenArtifact}>{children}</CodeBlock>;
+    },
+    pre({ children }) {
+      return <>{children}</>;
+    },
+    a({ href, children }) {
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer"
+          className="text-foreground underline decoration-foreground/20 underline-offset-3 transition-colors hover:decoration-foreground/50">
+          {children}
+        </a>
+      );
+    },
+    table({ children }) {
+      return (
+        <div className="my-1 overflow-x-auto rounded-lg border border-border/50">
+          <table className="w-full text-sm border-collapse">{children}</table>
+        </div>
+      );
+    },
+    tr({ children }) {
+      return <tr className="even:bg-muted/20">{children}</tr>;
+    },
+    th({ children }) {
+      return <th className="border-b border-border bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">{children}</th>;
+    },
+    td({ children }) {
+      return <td className="border-b border-border/30 px-3 py-2 text-sm">{children}</td>;
+    },
+    blockquote({ children }) {
+      return <blockquote className="border-l-2 border-border pl-3 text-muted-foreground not-italic">{children}</blockquote>;
+    },
+    hr() {
+      return <hr className="my-4 border-border/50" />;
+    },
+  };
+}
+
+// Cache components object per onOpenArtifact identity
+const componentsCache = new WeakMap<Function, Components>();
+const defaultComponents = makeComponents();
+
+function getComponents(onOpenArtifact?: (code: string, language: string) => void): Components {
+  if (!onOpenArtifact) return defaultComponents;
+  let cached = componentsCache.get(onOpenArtifact);
+  if (!cached) {
+    cached = makeComponents(onOpenArtifact);
+    componentsCache.set(onOpenArtifact, cached);
+  }
+  return cached;
+}
+
 function MarkdownRenderer({ content, onOpenArtifact }: { content: string; onOpenArtifact?: (code: string, language: string) => void }) {
   if (!content) return null;
 
   return (
-    <div className="prose prose-neutral dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:font-semibold prose-headings:tracking-tight prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-code:before:content-none prose-code:after:content-none prose-li:my-0.5 prose-table:my-0 prose-thead:border-0 prose-tr:border-0">
+    <div className="prose prose-neutral dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:font-semibold prose-headings:tracking-tight prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-code:before:content-none prose-code:after:content-none prose-li:my-1 prose-table:my-0 prose-thead:border-0 prose-tr:border-0">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-        rehypePlugins={[rehypeRaw, rehypeHighlight, rehypeKatex]}
-        components={{
-          code({ className, children, ...props }) {
-            const isInline = !className;
-            if (isInline) {
-              return (
-                <code className="rounded bg-muted px-1 py-0.5 text-[13px] font-mono font-medium" {...props}>
-                  {children}
-                </code>
-              );
-            }
-            return <CodeBlock className={className} onOpenArtifact={onOpenArtifact}>{children}</CodeBlock>;
-          },
-          pre({ children }) {
-            return <>{children}</>;
-          },
-          a({ href, children }) {
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer"
-                className="text-foreground underline decoration-foreground/20 underline-offset-3 transition-colors hover:decoration-foreground/50">
-                {children}
-              </a>
-            );
-          },
-          table({ children }) {
-            return (
-              <div className="my-1 overflow-x-auto rounded-lg border border-border/50">
-                <table className="w-full text-sm border-collapse">{children}</table>
-              </div>
-            );
-          },
-          th({ children }) {
-            return <th className="border-b border-border bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">{children}</th>;
-          },
-          td({ children }) {
-            return <td className="border-b border-border/30 px-3 py-2 text-sm">{children}</td>;
-          },
-          blockquote({ children }) {
-            return <blockquote className="border-l-2 border-border pl-3 text-muted-foreground not-italic">{children}</blockquote>;
-          },
-          hr() {
-            return <hr className="my-4 border-border/50" />;
-          },
-        }}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={getComponents(onOpenArtifact)}
       >
         {content}
       </ReactMarkdown>

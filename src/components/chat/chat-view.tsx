@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { PanelLeft, Plus, AlertCircle, RotateCcw, X, Eye } from "lucide-react";
@@ -475,6 +475,20 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     []
   );
 
+  // Memoized content map — avoids re-running regex per message per render
+  const messageContentMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of messages) {
+      map.set(m.id, getMessageContent(m));
+    }
+    return map;
+  }, [messages, getMessageContent]);
+
+  const getCachedContent = useCallback(
+    (msg: (typeof messages)[0]): string => messageContentMap.get(msg.id) ?? getMessageContent(msg),
+    [messageContentMap, getMessageContent]
+  );
+
   const getToolInvocations = useCallback(
     (msg: (typeof messages)[0]): ToolInvocation[] | undefined => {
       // First check live streaming tool parts
@@ -904,7 +918,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           messages={messages.map((m) => ({
             id: m.id,
             role: m.role as "user" | "assistant" | "system",
-            content: getMessageContent(m),
+            content: getCachedContent(m),
             model:
               messageModelMap.current.get(m.id) ||
               (m.role === "assistant" ? selectedModelRef.current : null),
