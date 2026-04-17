@@ -15,6 +15,9 @@ export async function GET(req: Request) {
     let conversationIds: string[] | null = null;
 
     if (search) {
+      // Escape SQL LIKE wildcards in user input
+      const escapedSearch = search.replace(/[\\%_]/g, (c) => `\\${c}`);
+
       // Search across conversation titles AND message content
       const titleMatches = await db
         .select({ id: conversations.id })
@@ -22,7 +25,7 @@ export async function GET(req: Request) {
         .where(
           and(
             eq(conversations.userId, userId),
-            ilike(conversations.title, `%${search}%`)
+            ilike(conversations.title, `%${escapedSearch}%`)
           )
         );
 
@@ -36,7 +39,7 @@ export async function GET(req: Request) {
         .where(
           and(
             eq(conversations.userId, userId),
-            ilike(messages.content, `%${search}%`)
+            ilike(messages.content, `%${escapedSearch}%`)
           )
         );
 
