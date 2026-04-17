@@ -130,19 +130,24 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       // Parse the error into a human-readable message
       let msg = raw;
       try {
-        // Error might be a JSON string from OpenRouter
         const parsed = JSON.parse(raw);
         msg = parsed.message || parsed.error || raw;
       } catch {
         // Not JSON, use as-is
       }
-      // Simplify common errors
-      if (msg.includes("rate") && (msg.includes("limit") || msg.includes("increased"))) {
+      // Map known errors to friendly messages
+      if (msg.includes("No endpoints found that support image input") || msg.includes("does not represent a valid image")) {
+        msg = "This model doesn't support images. Try a model with the Vision badge.";
+      } else if (msg.includes("context length") || msg.includes("too long") || msg.includes("maximum")) {
+        msg = "This message is too long for the current model. Try a shorter message or switch to a model with more context.";
+      } else if (msg.includes("rate") && (msg.includes("limit") || msg.includes("increased"))) {
         msg = "This model is currently rate-limited. Try a different model or wait a moment.";
       } else if (msg.includes("temporarily") && msg.includes("unavailable")) {
         msg = "This model is temporarily unavailable. Try a different model.";
+      } else if (msg.includes("credits") || msg.includes("balance")) {
+        msg = "You've run out of credits. Contact an admin to add more.";
       } else if (msg.length > 200) {
-        msg = msg.slice(0, 200) + "...";
+        msg = "Something went wrong. Please try again.";
       }
       console.error("[chat] Error:", raw);
       setChatError(msg);
