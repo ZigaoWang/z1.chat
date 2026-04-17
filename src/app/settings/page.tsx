@@ -97,6 +97,8 @@ export default function SettingsPage() {
   const [instructionsSaved, setInstructionsSaved] = useState(true);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const { theme, setTheme } = useTheme();
+  const [themeMounted, setThemeMounted] = useState(false);
+  useEffect(() => setThemeMounted(true), []);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -290,7 +292,7 @@ export default function SettingsPage() {
                       updatePreference("theme", t.value);
                     }}
                     className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      theme === t.value
+                      themeMounted && theme === t.value
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
