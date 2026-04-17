@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import type { ProcessedFile } from "../types";
 
-const MAX_DIMENSION = 1024;
+const MAX_PREVIEW_DIMENSION = 1024;
 
 export async function processImage(
   buffer: Buffer,
@@ -9,33 +9,49 @@ export async function processImage(
   mimeType: string,
 ): Promise<ProcessedFile> {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  let dataUrl: string;
 
-  // GIF and SVG: use raw base64 (sharp can't handle animated GIFs well, SVG is already small)
+  // GIF and SVG: use raw base64
   if (ext === "gif" || ext === "svg") {
-    dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
-  } else {
-    try {
-      const compressed = await sharp(buffer)
-        .resize(MAX_DIMENSION, MAX_DIMENSION, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      dataUrl = `data:image/jpeg;base64,${compressed.toString("base64")}`;
-    } catch {
-      // Fallback to raw base64
-      dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
-    }
+    const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    return {
+      fileType: "image",
+      originalName: filename,
+      mimeType,
+      size: buffer.length,
+      imageData: { dataUrl },
+      display: { icon: "image", label: ext.toUpperCase() || "Image" },
+    };
   }
 
-  return {
-    fileType: "image",
-    originalName: filename,
-    mimeType,
-    size: buffer.length,
-    imageData: { dataUrl },
-    display: { icon: "image", label: ext.toUpperCase() || "Image" },
-  };
+  // All other images: resize for preview via sharp
+  // HEIC/HEIF are already converted to JPEG by the upload route before reaching here
+  try {
+    const preview = await sharp(buffer)
+      .resize(MAX_PREVIEW_DIMENSION, MAX_PREVIEW_DIMENSION, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    const dataUrl = `data:image/jpeg;base64,${preview.toString("base64")}`;
+    return {
+      fileType: "image",
+      originalName: filename,
+      mimeType: mimeType.startsWith("image/") ? mimeType : "image/jpeg",
+      size: buffer.length,
+      imageData: { dataUrl },
+      display: { icon: "image", label: ext.toUpperCase() || "Image" },
+    };
+  } catch {
+    // Fallback: raw base64
+    const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    return {
+      fileType: "image",
+      originalName: filename,
+      mimeType,
+      size: buffer.length,
+      imageData: { dataUrl },
+      display: { icon: "image", label: ext.toUpperCase() || "Image" },
+    };
+  }
 }
