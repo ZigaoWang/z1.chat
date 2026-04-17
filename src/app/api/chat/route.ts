@@ -8,11 +8,17 @@ import { buildSystemPrompt } from "@/lib/system-prompt";
 import { generateConversationTitle } from "@/lib/title-generator";
 import { extractMemories, updateConversationSummary, extractImmediateMemory } from "@/lib/memory";
 import { checkAndCompactConversation } from "@/lib/context-manager";
-import { getTools } from "@/lib/tools";
-import { trackedStreamText, logSearchUsage } from "@/lib/usage-logger";
+import { getTools, SANDBOX_TOOL_NAMES, IMAGE_TOOL_NAMES, SandboxManager } from "@/lib/tools";
+import { trackedStreamText, logSearchUsage, logSandboxUsage } from "@/lib/usage-logger";
+import { Sandbox } from "@e2b/code-interpreter";
+import { readFile } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
 
 export const maxDuration = 120;
+
+const TEMP_DIR = join(tmpdir(), "one-uploads");
 
 // Patterns that indicate the user wants us to remember something
 const REMEMBER_PATTERNS = [
@@ -223,12 +229,110 @@ export async function POST(req: Request) {
       await checkAndCompactConversation(convId!, userId).catch(console.error);
     }
 
-    // Get available tools
-    const tools = getTools();
+    // Get available tools with shared sandbox lifecycle
+    // Collect ALL attached files (images + non-images) for potential sandbox auto-upload
+    const attachedFileUrls: { url: string; name: string }[] = [];
+    // From attachments body field (images + files)
+    if (attachments?.files) {
+      for (const f of attachments.files) {
+        if (f.url) attachedFileUrls.push({ url: f.url, name: f.name });
+      }
+    }
+    if (attachments?.images) {
+      // Images are stored as temp URLs like /api/upload/temp/uuid.jpg
+      for (const imgUrl of attachments.images) {
+        if (imgUrl.startsWith("/api/upload/temp/")) {
+          const name = imgUrl.split("/").pop() || "image";
+          attachedFileUrls.push({ url: imgUrl, name });
+        }
+      }
+    }
+    // Also extract from <attached_file> tags in message text (for non-image files)
+    const fileTagRegex = /<attached_file\s[^>]*?url="([^"]+)"[^>]*?name="([^"]+)"[^>]*?\/?>/g;
+    let fileMatch: RegExpExecArray | null;
+    while ((fileMatch = fileTagRegex.exec(userContent)) !== null) {
+      if (!attachedFileUrls.some(f => f.url === fileMatch![1])) {
+        attachedFileUrls.push({ url: fileMatch[1], name: fileMatch[2] });
+      }
+    }
+    const fileTagRegex2 = /<attached_file\s[^>]*?name="([^"]+)"[^>]*?url="([^"]+)"[^>]*?\/?>/g;
+    while ((fileMatch = fileTagRegex2.exec(userContent)) !== null) {
+      if (!attachedFileUrls.some(f => f.url === fileMatch![2])) {
+        attachedFileUrls.push({ url: fileMatch[2], name: fileMatch[1] });
+      }
+    }
+
+    const e2bKey = process.env.E2B_API_KEY;
+    let sandbox: Sandbox | null = null;
+    const sandboxManager: SandboxManager | undefined = e2bKey
+      ? {
+          async get() {
+            if (!sandbox) {
+              sandbox = await Sandbox.create({ apiKey: e2bKey });
+              // Auto-upload any attached files into the sandbox
+              for (const file of attachedFileUrls) {
+                try {
+                  const urlFilename = file.url.split("/").pop() || "file";
+                  const localPath = join(TEMP_DIR, urlFilename);
+                  const buffer = await readFile(localPath);
+                  const destPath = `/home/user/${file.name}`;
+                  await sandbox.files.write(destPath, buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
+                  console.log(`[sandbox] Auto-uploaded ${file.name} → ${destPath}`);
+                } catch (err) {
+                  console.error(`[sandbox] Failed to auto-upload ${file.name}:`, err);
+                }
+              }
+            }
+            return sandbox;
+          },
+          async kill() {
+            if (sandbox) {
+              await sandbox.kill().catch(console.error);
+              sandbox = null;
+            }
+          },
+        }
+      : undefined;
+
+    const tools = getTools(sandboxManager);
     const hasToolsDefined = Object.keys(tools).length > 0;
 
-    // Convert UI messages to model messages
-    const modelMessages = await convertToModelMessages(chatMessages);
+    // Convert UI messages to model messages.
+    // Strip base64 images from sandbox tool results to avoid sending
+    // massive payloads back to the model (the model doesn't need them).
+    const cleanedMessages = chatMessages.map((msg: UIMessage) => {
+      if (!msg.parts) return msg;
+      const hasImageToolResult = msg.parts.some(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (p: any) => p.type === "tool-invocation" && IMAGE_TOOL_NAMES.has(p.toolInvocation?.toolName)
+      );
+      if (!hasImageToolResult) return msg;
+      return {
+        ...msg,
+        parts: msg.parts.map((p) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const part = p as any;
+          if (
+            part.type === "tool-invocation" &&
+            IMAGE_TOOL_NAMES.has(part.toolInvocation?.toolName) &&
+            part.toolInvocation?.result?.images
+          ) {
+            return {
+              ...part,
+              toolInvocation: {
+                ...part.toolInvocation,
+                result: {
+                  ...part.toolInvocation.result,
+                  images: [], // strip for model
+                },
+              },
+            };
+          }
+          return p;
+        }),
+      };
+    });
+    const modelMessages = await convertToModelMessages(cleanedMessages);
 
     const result = trackedStreamText({
       model: openrouter(selectedModel),
@@ -248,11 +352,13 @@ export async function POST(req: Request) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const toolInvocations: Array<Record<string, any>> = [];
         let searchCallCount = 0;
+        let sandboxCallCount = 0;
         if (steps) {
           for (const step of steps) {
             if (step.toolCalls) {
               for (const tc of step.toolCalls) {
                 if (tc.toolName === "web_search") searchCallCount++;
+                if (SANDBOX_TOOL_NAMES.has(tc.toolName)) sandboxCallCount++;
                 const result = step.toolResults?.find(
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (tr: any) => tr.toolCallId === tc.toolCallId
@@ -275,6 +381,18 @@ export async function POST(req: Request) {
           for (let i = 0; i < searchCallCount; i++) {
             logSearchUsage(userId, convId!).catch(console.error);
           }
+        }
+
+        // Log sandbox tool usage (code_execute, shell_exec, file_upload, file_download)
+        if (sandboxCallCount > 0) {
+          for (let i = 0; i < sandboxCallCount; i++) {
+            logSandboxUsage(userId, convId!).catch(console.error);
+          }
+        }
+
+        // Kill sandbox after response is complete
+        if (sandboxManager) {
+          sandboxManager.kill().catch(console.error);
         }
 
         // Save assistant message with tool invocations
