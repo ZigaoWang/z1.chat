@@ -535,10 +535,30 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
 
-    // Check for artifact tool results — auto-open/refresh panel
+    // Check for artifact tool invocations
     const toolInvs = getToolInvocations(lastMsg);
     if (toolInvs) {
       for (const t of toolInvs) {
+        // Tool is being called — show loading placeholder immediately
+        if (
+          t.toolName === "create_artifact" &&
+          (t.state === "input-available" || t.state === "input-streaming") &&
+          !artifactPanel &&
+          !lastOpenedArtifactId.current
+        ) {
+          const args = t.args as { title?: string; type?: string };
+          sidebarWasOpen.current = sidebarOpen;
+          onCollapseSidebar();
+          setArtifactPanel({
+            type: args.type || "document",
+            title: args.title || "Creating...",
+            content: "",
+          });
+          setArtifactStreaming(true);
+          artifactAutoOpened.current = true;
+        }
+
+        // Tool returned — load real content
         if (t.state !== "output-available" || !t.result) continue;
         if (t.toolCallId === lastHandledToolCallId.current) continue;
 
@@ -821,28 +841,30 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
   }, [artifactPanel?.id]);
 
-  const handleArtifactUndo = useCallback(async () => {
+  const handleLoadVersion = useCallback(async (targetVersion: number) => {
     if (!artifactPanel?.id) return;
     try {
+      if (targetVersion === artifactPanel.version) return;
+      // Fetch the version content from the versions API
       const res = await fetch(`/api/artifacts/${artifactPanel.id}/versions`);
       if (!res.ok) return;
       const versions = await res.json();
-      if (versions.length === 0) return;
-      // Restore the most recent version
-      const latest = versions[0];
+      const target = versions.find((v: { version: number }) => v.version === targetVersion);
+      if (!target) return;
+      // Restore that version's content
       const patchRes = await fetch(`/api/artifacts/${artifactPanel.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: latest.content }),
+        body: JSON.stringify({ content: target.content }),
       });
       if (patchRes.ok) {
         const updated = await patchRes.json();
         setArtifactPanel(updated);
       }
     } catch (err) {
-      console.error("Failed to undo:", err);
+      console.error("Failed to load version:", err);
     }
-  }, [artifactPanel?.id]);
+  }, [artifactPanel?.id, artifactPanel?.version]);
 
   const handleSendToChat = useCallback((text: string) => {
     setInput((prev) => {
@@ -1140,7 +1162,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
               onSendToChat={handleSendToChat}
               onEditRequest={handleArtifactEditRequest}
-              onUndo={artifactPanel.id ? handleArtifactUndo : undefined}
+              onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
             />
           </div>
         </div>
@@ -1167,7 +1189,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
               onSendToChat={handleSendToChat}
               onEditRequest={handleArtifactEditRequest}
-              onUndo={artifactPanel.id ? handleArtifactUndo : undefined}
+              onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
             />
           </div>
         </div>

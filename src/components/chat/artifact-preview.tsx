@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, Undo2, MessageSquare } from "lucide-react";
+import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, MessageSquare } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 import xml from "highlight.js/lib/languages/xml";
@@ -446,6 +446,22 @@ export default function ArtifactPreview({
   // Preview content by type
   const renderPreview = () => {
     if (streaming) {
+      // Content not ready yet (tool still executing)
+      if (!content) {
+        return (
+          <div className="flex-1 flex items-center justify-center bg-card">
+            <div className="text-center">
+              <div className="flex justify-center gap-1 mb-3">
+                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_infinite]" />
+                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+              </div>
+              <p className="text-sm text-muted-foreground/50">Generating {title}...</p>
+            </div>
+          </div>
+        );
+      }
+      // Content is available (legacy streaming HTML/SVG)
       return (
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0 bg-card">
           <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
@@ -581,10 +597,19 @@ export default function ArtifactPreview({
         </div>
 
         <div className="flex items-center gap-0.5">
-          {onUndo && version && version > 1 && (
-            <button onClick={onUndo} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Undo to previous version">
-              <Undo2 className="h-3.5 w-3.5" />
-            </button>
+          {version && version > 1 && onLoadVersion && (
+            <select
+              value={version}
+              onChange={(e) => onLoadVersion(Number(e.target.value))}
+              className="h-7 rounded-md border border-border/40 bg-transparent px-1.5 text-[11px] text-muted-foreground outline-none cursor-pointer hover:bg-muted transition-colors"
+            >
+              {Array.from({ length: version }, (_, i) => i + 1).reverse().map((v) => (
+                <option key={v} value={v}>v{v}{v === version ? " (current)" : ""}</option>
+              ))}
+            </select>
+          )}
+          {version && version === 1 && (
+            <span className="text-[10px] text-muted-foreground/40 tabular-nums px-1">v1</span>
           )}
           <button onClick={handleDownload} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Download">
             <Download className="h-3.5 w-3.5" />
