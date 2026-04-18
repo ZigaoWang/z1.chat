@@ -1,35 +1,36 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw } from "lucide-react";
+import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, Undo2, MessageSquare } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 import xml from "highlight.js/lib/languages/xml";
 import css from "highlight.js/lib/languages/css";
 import javascript from "highlight.js/lib/languages/javascript";
+import python from "highlight.js/lib/languages/python";
+import typescript from "highlight.js/lib/languages/typescript";
+import MarkdownRenderer from "./markdown-renderer";
 
 hljs.registerLanguage("xml", xml);
 hljs.registerLanguage("css", css);
 hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("typescript", typescript);
 
-// --- Detection ---
+// --- Detection (legacy fallback) ---
 
 export function isArtifact(language: string, code: string): boolean {
   const lang = language.toLowerCase().trim();
   const trimmed = code.trimStart();
-
   if (lang === "html") {
     if (/^<!doctype/i.test(trimmed) || /^<html/i.test(trimmed)) return true;
     if (code.length > 500 && (/<body/i.test(code) || /<head/i.test(code) || /<style/i.test(code))) return true;
   }
-
   if (lang === "svg" && /^<svg/i.test(trimmed)) return true;
-
   return false;
 }
 
-// --- Artifact tag extraction ---
-// Models like Claude output <artifact id="..." type="text/html" title="...">HTML</artifact>
+// --- Artifact tag extraction (legacy) ---
 
 export interface ExtractedArtifact {
   id: string;
@@ -45,7 +46,6 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
   const artifacts: ExtractedArtifact[] = [];
   let cleanContent = content;
 
-  // 1. Extract completed <artifact> tags
   const re = new RegExp(ARTIFACT_RE.source, "g");
   let match: RegExpExecArray | null;
 
@@ -53,13 +53,10 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
     const fullTag = match[0];
     const type = match[1];
     const code = match[3].trim();
-
     const titleMatch = fullTag.match(ARTIFACT_TITLE_RE);
     const title = titleMatch?.[1] || "Artifact";
-
     const idMatch = fullTag.match(/id="([^"]*)"/);
     const id = idMatch?.[1] || `artifact-${artifacts.length}`;
-
     if (type === "text/html" || type === "image/svg+xml") {
       artifacts.push({ id, type, title, code });
     }
@@ -72,30 +69,28 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
     return fullMatch;
   });
 
-  // 1b. Strip PARTIAL (unclosed) <artifact> tags (still streaming)
   const partialArtifactRe = /<artifact\s+[^>]*?type="(text\/html|image\/svg\+xml)"[^>]*?>([\s\S]*)$/;
   const partialMatch = cleanContent.match(partialArtifactRe);
   if (partialMatch) {
     const type = partialMatch[1];
     const code = partialMatch[2].trim();
     const tagStart = cleanContent.match(/<artifact\s+[^>]*?type="(text\/html|image\/svg\+xml)"/);
-    const fullTagPortion = cleanContent.slice(cleanContent.indexOf(tagStart![0]));
-    const titleMatch = fullTagPortion.match(ARTIFACT_TITLE_RE);
-    const title = titleMatch?.[1] || "Generating...";
-    const idMatch = fullTagPortion.match(/id="([^"]*)"/);
-    const id = idMatch?.[1] || `partial-artifact-${artifacts.length}`;
-
-    if (code.length > 0 || type) {
-      artifacts.push({ id, type, title, code });
+    if (tagStart) {
+      const fullTagPortion = cleanContent.slice(cleanContent.indexOf(tagStart[0]));
+      const titleMatch = fullTagPortion.match(ARTIFACT_TITLE_RE);
+      const title = titleMatch?.[1] || "Generating...";
+      const idMatch = fullTagPortion.match(/id="([^"]*)"/);
+      const id = idMatch?.[1] || `partial-artifact-${artifacts.length}`;
+      if (code.length > 0 || type) {
+        artifacts.push({ id, type, title, code });
+      }
+      cleanContent = cleanContent.slice(0, cleanContent.indexOf(tagStart[0])).trim();
     }
-    // Remove everything from <artifact onwards
-    cleanContent = cleanContent.slice(0, cleanContent.indexOf(tagStart![0])).trim();
   }
 
-  // 2. Extract completed ```html code blocks that qualify as artifacts
   const codeBlockRe = /```html\n([\s\S]*?)```/g;
-  let codeMatch: RegExpExecArray | null;
   const codeBlockRe2 = new RegExp(codeBlockRe.source, "g");
+  let codeMatch: RegExpExecArray | null;
 
   while ((codeMatch = codeBlockRe2.exec(cleanContent)) !== null) {
     const code = codeMatch[1].trim();
@@ -109,13 +104,11 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
     }
   }
 
-  // Remove completed artifact-eligible ```html blocks
   cleanContent = cleanContent.replace(codeBlockRe, (fullMatch, innerCode: string) => {
     if (isArtifact("html", innerCode.trim())) return "";
     return fullMatch;
   });
 
-  // 2b. Strip PARTIAL (unclosed) ```html blocks (still streaming)
   const partialCodeBlockRe = /```html\n([\s\S]+)$/;
   const partialCodeMatch = cleanContent.match(partialCodeBlockRe);
   if (partialCodeMatch) {
@@ -127,7 +120,6 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
         title: extractHtmlTitle(code) || "Generating...",
         code,
       });
-      // Remove from ```html onwards
       cleanContent = cleanContent.slice(0, cleanContent.lastIndexOf("```html")).trim();
     }
   }
@@ -135,94 +127,254 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
   return { cleanContent: cleanContent.trim(), artifacts };
 }
 
-/** Try to pull a <title> from HTML */
 function extractHtmlTitle(code: string): string | null {
   const m = code.match(/<title[^>]*>(.*?)<\/title>/i);
   return m ? m[1].trim() : null;
 }
 
-// --- Wrap partial HTML for preview ---
+// --- Helpers ---
 
 function wrapForPreview(code: string, language: string): string {
   if (language === "svg" || language === "image/svg+xml") {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff}</style></head><body>${code}</body></html>`;
   }
-
   const trimmed = code.trimStart();
-  if (/^<!doctype/i.test(trimmed) || /^<html/i.test(trimmed)) {
-    return code;
+  if (/^<!doctype/i.test(trimmed) || /^<html/i.test(trimmed)) return code;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"><\/script><style>body{margin:0}</style></head><body>${code}</body></html>`;
+}
+
+function getDownloadExtension(type: string, language?: string | null): string {
+  switch (type) {
+    case "document": return ".md";
+    case "html": return ".html";
+    case "svg": return ".svg";
+    case "mermaid": return ".mmd";
+    case "code": {
+      const extMap: Record<string, string> = {
+        python: ".py", typescript: ".ts", javascript: ".js", java: ".java",
+        go: ".go", rust: ".rs", cpp: ".cpp", c: ".c", ruby: ".rb",
+        php: ".php", swift: ".swift", kotlin: ".kt", css: ".css",
+      };
+      return extMap[language || ""] || ".txt";
+    }
+    default: return ".txt";
+  }
+}
+
+function getHighlightLang(type: string, language?: string | null): string {
+  if (type === "html") return "xml";
+  if (type === "svg") return "xml";
+  if (type === "mermaid") return "plaintext";
+  return language || "plaintext";
+}
+
+function highlightCode(code: string, lang: string): string {
+  try {
+    const result = hljs.highlight(code, { language: lang, ignoreIllegals: true });
+    return DOMPurify.sanitize(result.value, { USE_PROFILES: { html: true } });
+  } catch {
+    return DOMPurify.sanitize(code, { USE_PROFILES: { html: true } });
+  }
+}
+
+// --- Mermaid renderer ---
+
+function MermaidPreview({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mermaid = (await import("mermaid")).default;
+        mermaid.initialize({ startOnLoad: false, theme: "default" });
+        const { svg } = await mermaid.render(`mermaid-${Date.now()}`, code);
+        if (!cancelled) setSvg(svg);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to render diagram");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-8 text-sm text-red-500/60">
+        <pre className="whitespace-pre-wrap">{error}</pre>
+      </div>
+    );
   }
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://cdn.tailwindcss.com"><\/script>
-<style>body{margin:0}</style>
-</head>
-<body>
-${code}
-</body>
-</html>`;
+  return (
+    <div
+      ref={containerRef}
+      className="flex items-center justify-center min-h-full p-8"
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }}
+    />
+  );
 }
 
-// --- Component ---
+// --- Text selection toolbar ---
+
+function SelectionToolbar({
+  onSendToChat,
+  onEditRequest,
+}: {
+  onSendToChat: (text: string) => void;
+  onEditRequest: (selectedText: string, instruction: string) => void;
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [selectedText, setSelectedText] = useState("");
+  const [showInput, setShowInput] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleSelection = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        // Delay hiding to allow button clicks
+        setTimeout(() => {
+          const sel2 = window.getSelection();
+          if (!sel2 || sel2.isCollapsed) {
+            setPos(null);
+            setShowInput(false);
+          }
+        }, 200);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setSelectedText(sel.toString().trim());
+      setPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+    };
+
+    document.addEventListener("selectionchange", handleSelection);
+    return () => document.removeEventListener("selectionchange", handleSelection);
+  }, []);
+
+  useEffect(() => {
+    if (showInput && inputRef.current) inputRef.current.focus();
+  }, [showInput]);
+
+  if (!pos || !selectedText) return null;
+
+  return (
+    <div
+      className="fixed z-50 -translate-x-1/2 -translate-y-full animate-fade-in"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      {showInput ? (
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-popover p-1 shadow-lg">
+          <input
+            ref={inputRef}
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && instruction.trim()) {
+                onEditRequest(selectedText, instruction.trim());
+                setShowInput(false);
+                setInstruction("");
+                setPos(null);
+                window.getSelection()?.removeAllRanges();
+              }
+              if (e.key === "Escape") { setShowInput(false); setInstruction(""); }
+            }}
+            placeholder="Describe the change..."
+            className="w-48 rounded-md bg-transparent px-2 py-1 text-xs outline-none placeholder:text-muted-foreground/40"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-0.5 shadow-lg">
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setShowInput(true); }}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <Pencil className="h-3 w-3" />
+            Edit
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onSendToChat(selectedText);
+              setPos(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <MessageSquare className="h-3 w-3" />
+            Quote
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Main component ---
+
+export interface ArtifactData {
+  id?: string;
+  type: string; // document | code | html | svg | mermaid
+  title: string;
+  content: string;
+  language?: string | null;
+  version?: number;
+}
 
 interface ArtifactPreviewProps {
-  code: string;
-  language: string;
-  title?: string;
+  artifact: ArtifactData;
   streaming?: boolean;
   onClose: () => void;
+  onContentChange?: (content: string) => void;
+  onSendToChat?: (text: string) => void;
+  onEditRequest?: (selectedText: string, instruction: string) => void;
+  onUndo?: () => void;
 }
 
-export default function ArtifactPreview({ code, language, title, streaming, onClose }: ArtifactPreviewProps) {
+export default function ArtifactPreview({
+  artifact,
+  streaming,
+  onClose,
+  onContentChange,
+  onSendToChat,
+  onEditRequest,
+  onUndo,
+}: ArtifactPreviewProps) {
+  const { type, title, content, language, version } = artifact;
   const [tab, setTab] = useState<"preview" | "code">(streaming ? "code" : "preview");
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const codeRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const html = useMemo(() => wrapForPreview(code, language), [code, language]);
+  // Sync editContent when content changes externally (AI updates)
+  useEffect(() => { setEditContent(content); }, [content]);
 
-  // Debounce syntax highlighting during streaming to prevent page freeze
+  // Highlighted code for code tab
   const [highlightedCode, setHighlightedCode] = useState("");
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hLang = getHighlightLang(type, language);
 
   useEffect(() => {
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
-
-    const sanitize = (html: string) =>
-      DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-
-    // If not streaming, highlight immediately
     if (!streaming) {
-      try {
-        setHighlightedCode(sanitize(hljs.highlight(code, { language: "xml" }).value));
-      } catch {
-        setHighlightedCode(sanitize(code));
-      }
+      setHighlightedCode(highlightCode(content, hLang));
       return;
     }
-
-    // While streaming, debounce to every 300ms
     highlightTimer.current = setTimeout(() => {
-      try {
-        setHighlightedCode(sanitize(hljs.highlight(code, { language: "xml" }).value));
-      } catch {
-        setHighlightedCode(sanitize(code));
-      }
+      setHighlightedCode(highlightCode(content, hLang));
     }, 300);
+    return () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); };
+  }, [content, streaming, hLang]);
 
-    return () => {
-      if (highlightTimer.current) clearTimeout(highlightTimer.current);
-    };
-  }, [code, streaming]);
-
-  // Auto-scroll to bottom while streaming, but respect manual scroll-up
+  // Auto-scroll while streaming
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !stickToBottom.current) return;
@@ -232,161 +384,211 @@ export default function ArtifactPreview({ code, language, title, streaming, onCl
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    stickToBottom.current = distFromBottom < 40;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   }, []);
 
-  // When streaming ends, switch to preview tab
+  // Auto-switch to preview when streaming ends
   const prevStreaming = useRef(streaming);
   useEffect(() => {
-    if (prevStreaming.current && !streaming) {
-      setTab("preview");
-    }
+    if (prevStreaming.current && !streaming) setTab("preview");
     prevStreaming.current = streaming;
   }, [streaming]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(code);
+    await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [code]);
+  }, [content]);
+
+  const handleDownload = useCallback(() => {
+    const ext = getDownloadExtension(type, language);
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [content, type, language, title]);
 
   const handleOpenNew = useCallback(() => {
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
+    if (type === "html" || type === "svg") {
+      const html = wrapForPreview(content, type);
+      const w = window.open("", "_blank");
+      if (w) { w.document.open(); w.document.write(html); w.document.close(); }
     }
-  }, [html]);
+  }, [content, type]);
+
+  // Debounced save for user editing
+  const handleEditChange = useCallback((newContent: string) => {
+    setEditContent(newContent);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      onContentChange?.(newContent);
+    }, 1000);
+  }, [onContentChange]);
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // Preview content by type
+  const renderPreview = () => {
+    if (streaming) {
+      return (
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0 bg-card">
+          <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            <span>Generating...</span>
+          </div>
+          <pre className="p-4 overflow-x-auto">
+            <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+          </pre>
+        </div>
+      );
+    }
+
+    switch (type) {
+      case "html":
+        return (
+          <iframe
+            key={iframeKey}
+            ref={iframeRef}
+            srcDoc={wrapForPreview(content, "html")}
+            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            className="flex-1 w-full bg-white"
+            title="HTML preview"
+          />
+        );
+      case "svg":
+        return (
+          <iframe
+            key={iframeKey}
+            srcDoc={wrapForPreview(content, "svg")}
+            sandbox="allow-scripts"
+            className="flex-1 w-full bg-white"
+            title="SVG preview"
+          />
+        );
+      case "document":
+        return (
+          <div className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
+            {onSendToChat && onEditRequest && (
+              <SelectionToolbar onSendToChat={onSendToChat} onEditRequest={onEditRequest} />
+            )}
+            <MarkdownRenderer content={content} />
+          </div>
+        );
+      case "mermaid":
+        return (
+          <div className="flex-1 overflow-auto bg-white dark:bg-card">
+            <MermaidPreview code={content} />
+          </div>
+        );
+      case "code":
+      default:
+        return (
+          <div className="flex-1 overflow-auto">
+            {onSendToChat && onEditRequest && (
+              <SelectionToolbar onSendToChat={onSendToChat} onEditRequest={onEditRequest} />
+            )}
+            <pre className="p-4 overflow-x-auto">
+              <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+            </pre>
+          </div>
+        );
+    }
+  };
+
+  const renderEditMode = () => (
+    <div className="flex-1 flex flex-col min-h-0">
+      <textarea
+        value={editContent}
+        onChange={(e) => handleEditChange(e.target.value)}
+        className="flex-1 w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed font-mono outline-none"
+        spellCheck={type === "document"}
+      />
+    </div>
+  );
+
+  const canPreviewInNewTab = type === "html" || type === "svg";
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-slide-in-right">
       {/* Header */}
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3">
-        <div className="flex items-center gap-1">
-          {title && (
-            <span className="text-xs font-medium text-muted-foreground mr-2 max-w-[150px] truncate">{title}</span>
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="text-xs font-medium text-muted-foreground mr-2 max-w-[120px] truncate">{title}</span>
+          {version && version > 1 && (
+            <span className="text-[10px] text-muted-foreground/40 tabular-nums">v{version}</span>
           )}
-          {/* Tabs */}
-          <button
-            onClick={() => setTab("preview")}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-              tab === "preview"
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Eye className="h-3 w-3" />
-            Preview
-          </button>
-          <button
-            onClick={() => setTab("code")}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-              tab === "code"
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Code2 className="h-3 w-3" />
-            Code
-          </button>
+          <div className="flex items-center gap-0.5 ml-1">
+            <button
+              onClick={() => { setTab("preview"); setEditing(false); }}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                tab === "preview" && !editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </button>
+            <button
+              onClick={() => { setTab("code"); setEditing(false); }}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                tab === "code" && !editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Code2 className="h-3 w-3" />
+              Code
+            </button>
+            {!streaming && onContentChange && (
+              <button
+                onClick={() => { setEditing(!editing); setTab("code"); }}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                  editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          {!streaming && tab === "preview" && (
-            <button
-              onClick={() => setIframeKey((k) => k + 1)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="Refresh preview"
-            >
+        <div className="flex items-center gap-0.5">
+          {onUndo && version && version > 1 && (
+            <button onClick={onUndo} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Undo to previous version">
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button onClick={handleDownload} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Download">
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={handleCopy} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Copy">
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+          {!streaming && canPreviewInNewTab && (
+            <button onClick={handleOpenNew} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Open in new tab">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {!streaming && tab === "preview" && (type === "html" || type === "svg") && (
+            <button onClick={() => setIframeKey((k) => k + 1)} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Refresh">
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           )}
-          <button
-            onClick={handleOpenNew}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title="Open in new tab"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title="Close"
-          >
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Close">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
       {/* Content */}
-      {tab === "preview" ? (
-        streaming ? (
-          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0 bg-card">
-            <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              <span>Generating...</span>
-              <button
-                onClick={handleCopy}
-                className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {copied ? (
-                  <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></>
-                ) : (
-                  <><Copy className="h-3 w-3" />Copy</>
-                )}
-              </button>
-            </div>
-            <pre className="p-4 overflow-x-auto">
-              <code
-                className="text-[13px] leading-relaxed font-mono hljs"
-                dangerouslySetInnerHTML={{ __html: highlightedCode }}
-              />
-            </pre>
-          </div>
-        ) : (
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            srcDoc={html}
-            sandbox="allow-scripts allow-forms allow-popups allow-modals"
-            className="flex-1 w-full bg-white"
-            title="Artifact preview"
-          />
-        )
-      ) : (
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
-          <div className="sticky top-0 z-10 flex items-center justify-end px-3 py-1.5 bg-background/80 backdrop-blur-sm border-b border-border/20">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
-            >
-              {copied ? (
-                <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></>
-              ) : (
-                <><Copy className="h-3 w-3" />Copy</>
-              )}
-            </button>
-          </div>
-          <pre className="p-4 overflow-x-auto">
-            <code
-              ref={codeRef}
-              className="text-[13px] leading-relaxed font-mono hljs"
-              dangerouslySetInnerHTML={{ __html: highlightedCode }}
-            />
-          </pre>
-        </div>
-      )}
+      {editing ? renderEditMode() : renderPreview()}
     </div>
   );
 }

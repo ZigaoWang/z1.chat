@@ -54,6 +54,7 @@ interface MessageBubbleProps {
   onRegenerate?: () => void;
   onEdit?: (newContent: string) => void;
   onOpenArtifact?: (code: string, language: string) => void;
+  onOpenArtifactById?: (id: string) => void;
   versionCount?: number;
   currentVersion?: number;
   onVersionChange?: (index: number) => void;
@@ -331,7 +332,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
 
 function MessageBubble({
   role, content, isStreaming, model, images, files, toolInvocations,
-  isLast, onRegenerate, onEdit, onOpenArtifact, versionCount, currentVersion, onVersionChange,
+  isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, versionCount, currentVersion, onVersionChange,
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { copied, copy } = useCopy();
@@ -446,7 +447,7 @@ function MessageBubble({
         {/* Inline images from sandbox tools */}
         {hasCodeExec && <SandboxImages invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
 
-        {/* Artifact preview cards */}
+        {/* Artifact preview cards (legacy auto-detection) */}
         {artifacts.length > 0 && onOpenArtifact && (
           <div className="flex flex-wrap gap-2 my-2">
             {artifacts.map((artifact) => (
@@ -473,6 +474,61 @@ function MessageBubble({
             ))}
           </div>
         )}
+
+        {/* Artifact tool invocation cards */}
+        {toolInvocations && onOpenArtifactById && (() => {
+          const artifactTools = toolInvocations.filter(
+            (t) => t.toolName === "create_artifact" && t.state === "output-available" && t.result
+          );
+          if (artifactTools.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-2 my-2">
+              {artifactTools.map((t) => {
+                const result = t.result as { id?: string; type?: string; title?: string; error?: string };
+                if (result.error || !result.id) return null;
+                const typeLabel = result.type === "document" ? "Document" : result.type === "code" ? "Code" : result.type === "mermaid" ? "Diagram" : result.type === "html" ? "Website" : "Artifact";
+                return (
+                  <button
+                    key={t.toolCallId}
+                    onClick={() => onOpenArtifactById(result.id!)}
+                    className="group/art flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 hover:border-border w-full max-w-xs"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors">
+                      <Eye className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{result.title}</p>
+                      <p className="text-[11px] text-muted-foreground/50">{typeLabel}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Update/edit artifact indicators */}
+        {toolInvocations && (() => {
+          const updateTools = toolInvocations.filter(
+            (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") && t.state === "output-available" && t.result
+          );
+          if (updateTools.length === 0) return null;
+          return (
+            <div className="my-1">
+              {updateTools.map((t) => {
+                const result = t.result as { title?: string; version?: number; changed?: boolean; error?: string };
+                if (result.error) return null;
+                return (
+                  <p key={t.toolCallId} className="text-xs text-muted-foreground/40 flex items-center gap-1">
+                    <Pencil className="h-3 w-3" />
+                    {t.toolName === "update_artifact" ? "Rewrote" : "Edited"} &ldquo;{result.title}&rdquo;
+                    {result.version && result.version > 1 && <span className="text-[10px]">v{result.version}</span>}
+                  </p>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Sources inline after content */}
         {searchesDone && content.length > 0 && !isStreaming && (

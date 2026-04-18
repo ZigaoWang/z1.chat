@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
-import ArtifactPreview, { extractArtifacts, isArtifact } from "./artifact-preview";
+import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from "./artifact-preview";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -44,7 +44,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const [dragOver, setDragOver] = useState(false);
   const [editingState, setEditingState] = useState<EditingState | null>(null);
   const [viewingOldBranch, setViewingOldBranch] = useState(false);
-  const [artifactPanel, setArtifactPanel] = useState<{ code: string; language: string; title?: string; streaming?: boolean } | null>(null);
+  const [artifactPanel, setArtifactPanel] = useState<ArtifactData | null>(null);
+  const [artifactStreaming, setArtifactStreaming] = useState(false);
   const [artifactWidth, setArtifactWidth] = useState(50); // percentage
   const [isDraggingArtifact, setIsDraggingArtifact] = useState(false);
   const savedInputRef = useRef("");
@@ -521,7 +522,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     if (!isLoading) {
       // Streaming ended — finalize artifact if one was open
       if (artifactAutoOpened.current) {
-        setArtifactPanel((prev) => prev?.streaming ? { ...prev, streaming: false } : prev);
+        setArtifactStreaming(false);
       }
       artifactAutoOpened.current = false;
       lastArtifactLen.current = 0;
@@ -539,8 +540,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     const { artifacts } = extractArtifacts(content);
     if (artifacts.length > 0) {
       const art = artifacts[artifacts.length - 1];
-      const lang = art.type === "image/svg+xml" ? "svg" : "html";
-      // Only update if code actually grew
+      const artType = art.type === "image/svg+xml" ? "svg" : "html";
       if (art.code.length !== lastArtifactLen.current) {
         lastArtifactLen.current = art.code.length;
         if (!artifactAutoOpened.current) {
@@ -548,7 +548,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           sidebarWasOpen.current = sidebarOpen;
           onCollapseSidebar();
         }
-        setArtifactPanel({ code: art.code, language: lang, title: art.title, streaming: true });
+        setArtifactPanel({ type: artType, title: art.title, content: art.code });
+        setArtifactStreaming(true);
       }
       return;
     }
@@ -565,7 +566,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             sidebarWasOpen.current = sidebarOpen;
             onCollapseSidebar();
           }
-          setArtifactPanel({ code, language: "html", streaming: true });
+          setArtifactPanel({ type: "html", title: "Website", content: code });
+          setArtifactStreaming(true);
         }
       }
     }
@@ -760,12 +762,82 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const handleOpenArtifact = useCallback((code: string, language: string) => {
     sidebarWasOpen.current = sidebarOpen;
-    setArtifactPanel({ code, language, streaming: false });
+    setArtifactPanel({ type: language === "svg" ? "svg" : "html", title: "Preview", content: code });
+    setArtifactStreaming(false);
     onCollapseSidebar();
   }, [onCollapseSidebar, sidebarOpen]);
 
+  const handleOpenArtifactById = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/artifacts/${id}`);
+      if (!res.ok) return;
+      const artifact = await res.json();
+      sidebarWasOpen.current = sidebarOpen;
+      setArtifactPanel(artifact);
+      setArtifactStreaming(false);
+      onCollapseSidebar();
+    } catch (err) {
+      console.error("Failed to open artifact:", err);
+    }
+  }, [onCollapseSidebar, sidebarOpen]);
+
+  const handleArtifactContentChange = useCallback(async (content: string) => {
+    if (!artifactPanel?.id) return;
+    try {
+      const res = await fetch(`/api/artifacts/${artifactPanel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setArtifactPanel(updated);
+      }
+    } catch (err) {
+      console.error("Failed to save artifact:", err);
+    }
+  }, [artifactPanel?.id]);
+
+  const handleArtifactUndo = useCallback(async () => {
+    if (!artifactPanel?.id) return;
+    try {
+      const res = await fetch(`/api/artifacts/${artifactPanel.id}/versions`);
+      if (!res.ok) return;
+      const versions = await res.json();
+      if (versions.length === 0) return;
+      // Restore the most recent version
+      const latest = versions[0];
+      const patchRes = await fetch(`/api/artifacts/${artifactPanel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: latest.content }),
+      });
+      if (patchRes.ok) {
+        const updated = await patchRes.json();
+        setArtifactPanel(updated);
+      }
+    } catch (err) {
+      console.error("Failed to undo:", err);
+    }
+  }, [artifactPanel?.id]);
+
+  const handleSendToChat = useCallback((text: string) => {
+    setInput((prev) => {
+      const quote = text.split("\n").map((l) => `> ${l}`).join("\n");
+      return prev ? `${prev}\n\n${quote}\n\n` : `${quote}\n\n`;
+    });
+  }, []);
+
+  const handleArtifactEditRequest = useCallback((selectedText: string, instruction: string) => {
+    const artifactTitle = artifactPanel?.title || "the artifact";
+    const msg = `Edit "${artifactTitle}": ${instruction}\n\nSelected text:\n> ${selectedText}`;
+    setInput("");
+    handleSendMessage(msg);
+  }, [artifactPanel?.title, handleSendMessage]);
+
   const handleCloseArtifact = useCallback(() => {
     setArtifactPanel(null);
+    setArtifactStreaming(false);
     if (sidebarWasOpen.current) {
       onOpenSidebar();
     }
@@ -935,6 +1007,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           onRegenerate={handleRegenerate}
           onEditMessage={handleStartEdit}
           onOpenArtifact={handleOpenArtifact}
+          onOpenArtifactById={handleOpenArtifactById}
           regenerationHistory={regenerationHistory}
           editBranches={editBranches}
           onViewingOldBranch={setViewingOldBranch}
@@ -1038,11 +1111,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           </div>
           <div className="flex-1 min-h-0">
             <ArtifactPreview
-              code={artifactPanel.code}
-              language={artifactPanel.language}
-              title={artifactPanel.title}
-              streaming={artifactPanel.streaming}
+              artifact={artifactPanel}
+              streaming={artifactStreaming}
               onClose={handleCloseArtifact}
+              onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
+              onSendToChat={handleSendToChat}
+              onEditRequest={handleArtifactEditRequest}
+              onUndo={artifactPanel.id ? handleArtifactUndo : undefined}
             />
           </div>
         </div>
@@ -1063,11 +1138,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           </div>
           <div style={{ width: `${artifactWidth}%` }} className="h-full shrink-0">
             <ArtifactPreview
-              code={artifactPanel.code}
-              language={artifactPanel.language}
-              title={artifactPanel.title}
-              streaming={artifactPanel.streaming}
+              artifact={artifactPanel}
+              streaming={artifactStreaming}
               onClose={handleCloseArtifact}
+              onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
+              onSendToChat={handleSendToChat}
+              onEditRequest={handleArtifactEditRequest}
+              onUndo={artifactPanel.id ? handleArtifactUndo : undefined}
             />
           </div>
         </div>

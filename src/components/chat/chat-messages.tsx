@@ -32,6 +32,7 @@ interface ChatMessagesProps {
   onRegenerate?: () => void;
   onEditMessage?: (messageIndex: number, newContent: string) => void;
   onOpenArtifact?: (code: string, language: string) => void;
+  onOpenArtifactById?: (id: string) => void;
   regenerationHistory?: Record<string, VersionEntry[]>;
   editBranches?: Record<string, EditBranch[]>;
   onViewingOldBranch?: (viewing: boolean) => void;
@@ -107,7 +108,7 @@ function ThinkingIndicator() {
 }
 
 function ChatMessages({
-  messages, isStreaming, onRegenerate, onEditMessage, onOpenArtifact, regenerationHistory, editBranches, onViewingOldBranch,
+  messages, isStreaming, onRegenerate, onEditMessage, onOpenArtifact, onOpenArtifactById, regenerationHistory, editBranches, onViewingOldBranch,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -227,7 +228,7 @@ function ChatMessages({
                     onVersionChange={(idx) => setSelectedBranches((p) => ({ ...p, [msg.id]: idx }))} />
                   {branch.followingMessages.map((fm) => (
                     <MessageBubble key={fm.id} role={fm.role} content={fm.content} model={fm.model}
-                      images={fm.images} files={fm.files} toolInvocations={fm.toolInvocations} onOpenArtifact={onOpenArtifact} />
+                      images={fm.images} files={fm.files} toolInvocations={fm.toolInvocations} onOpenArtifact={onOpenArtifact} onOpenArtifactById={onOpenArtifactById} />
                   ))}
                 </div>
               );
@@ -246,6 +247,7 @@ function ChatMessages({
                 isStreaming={isStreaming && slotIdx === slots.length - 1 && sel === vc - 1}
                 isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
                 onOpenArtifact={onOpenArtifact}
+                onOpenArtifactById={onOpenArtifactById}
                 versionCount={vc} currentVersion={sel}
                 onVersionChange={(idx) => setSelectedVersions((p) => ({ ...p, [groupKey]: idx }))} />
             );
@@ -259,6 +261,7 @@ function ChatMessages({
               isStreaming={isStreaming && slotIdx === slots.length - 1 && msg.role === "assistant"}
               isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
               onOpenArtifact={onOpenArtifact}
+              onOpenArtifactById={onOpenArtifactById}
               onEdit={msg.role === "user" && onEditMessage && slot.originalIndex !== undefined
                 ? (c) => onEditMessage(slot.originalIndex!, c) : undefined} />
           );
