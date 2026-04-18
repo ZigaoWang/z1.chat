@@ -5,6 +5,9 @@ import { readFile } from "fs/promises";
 import { join, basename } from "path";
 import { tmpdir } from "os";
 import sharp from "sharp";
+import { db } from "./db";
+import { artifacts, artifactVersions } from "./db/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 const MAX_PAGE_TEXT = 30_000;
 const MAX_IMAGES_PER_EXEC = 3;
@@ -35,8 +38,13 @@ function resolveLocalTempPath(fileUrl: string): string | null {
   return join(TEMP_DIR, filename);
 }
 
+export interface ArtifactContext {
+  conversationId: string;
+  userId: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getTools(sandboxManager?: SandboxManager): Record<string, any> {
+export function getTools(sandboxManager?: SandboxManager, artifactCtx?: ArtifactContext): Record<string, any> {
   const tools: Record<string, unknown> = {};
 
   // Web search via Tavily
@@ -332,6 +340,119 @@ export function getTools(sandboxManager?: SandboxManager): Record<string, any> {
     });
   }
 
+  // Artifact tools — always available when we have a conversation context
+  if (artifactCtx) {
+    const { conversationId, userId } = artifactCtx;
+
+    tools.create_artifact = tool({
+      description:
+        "Create a substantial piece of content in the artifact panel. Use for documents/essays/reports (type: document), code files over 15 lines (type: code), full HTML pages (type: html), or diagrams (type: mermaid). Do NOT use for short answers or small code snippets.",
+      inputSchema: z.object({
+        type: z.enum(["document", "code", "html", "svg", "mermaid"]).describe("The artifact type"),
+        title: z.string().describe("A short descriptive title"),
+        content: z.string().describe("The full content"),
+        language: z.string().optional().describe("Programming language for code artifacts (e.g. python, typescript)"),
+      }),
+      execute: async ({ type, title, content, language }) => {
+        try {
+          const [artifact] = await db.insert(artifacts).values({
+            conversationId,
+            userId,
+            type,
+            title,
+            content,
+            language: language || null,
+          }).returning();
+          return { id: artifact.id, type, title, version: 1 };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("[create_artifact] Error:", msg);
+          return { error: `Failed to create artifact: ${msg}` };
+        }
+      },
+    });
+
+    tools.update_artifact = tool({
+      description:
+        "Replace the entire content of an existing artifact. Use for major rewrites. Creates a version snapshot for undo. Identify the artifact by its title.",
+      inputSchema: z.object({
+        identifier: z.string().describe("The artifact title to update"),
+        content: z.string().describe("The complete new content"),
+      }),
+      execute: async ({ identifier, content }) => {
+        try {
+          // Find by title within this conversation
+          const existing = await db.query.artifacts.findFirst({
+            where: and(
+              eq(artifacts.conversationId, conversationId),
+              eq(artifacts.title, identifier),
+            ),
+          });
+          if (!existing) {
+            return { error: `Artifact "${identifier}" not found` };
+          }
+
+          // Save current version for undo
+          await db.insert(artifactVersions).values({
+            artifactId: existing.id,
+            version: existing.version,
+            content: existing.content,
+          });
+
+          // Update with new content
+          const newVersion = existing.version + 1;
+          await db.update(artifacts)
+            .set({ content, version: newVersion, updatedAt: new Date() })
+            .where(eq(artifacts.id, existing.id));
+
+          return { id: existing.id, title: existing.title, version: newVersion };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("[update_artifact] Error:", msg);
+          return { error: `Failed to update artifact: ${msg}` };
+        }
+      },
+    });
+
+    tools.edit_artifact = tool({
+      description:
+        "Make a small edit to an existing artifact by finding and replacing text. Does not create a version snapshot. Use for minor fixes like typos, small paragraph changes, or updating a function.",
+      inputSchema: z.object({
+        identifier: z.string().describe("The artifact title to edit"),
+        find: z.string().describe("Exact text to find in the artifact"),
+        replace: z.string().describe("Text to replace it with"),
+      }),
+      execute: async ({ identifier, find, replace }) => {
+        try {
+          const existing = await db.query.artifacts.findFirst({
+            where: and(
+              eq(artifacts.conversationId, conversationId),
+              eq(artifacts.title, identifier),
+            ),
+          });
+          if (!existing) {
+            return { error: `Artifact "${identifier}" not found` };
+          }
+
+          if (!existing.content.includes(find)) {
+            return { error: `Text not found in artifact`, changed: false };
+          }
+
+          const newContent = existing.content.replace(find, replace);
+          await db.update(artifacts)
+            .set({ content: newContent, updatedAt: new Date() })
+            .where(eq(artifacts.id, existing.id));
+
+          return { id: existing.id, title: existing.title, changed: true };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("[edit_artifact] Error:", msg);
+          return { error: `Failed to edit artifact: ${msg}` };
+        }
+      },
+    });
+  }
+
   return tools;
 }
 
@@ -344,3 +465,6 @@ export const SANDBOX_TOOL_NAMES = new Set(["code_execute", "shell_exec", "file_u
 
 // Tool names that can produce images
 export const IMAGE_TOOL_NAMES = new Set(["code_execute", "file_download"]);
+
+// Artifact tool names
+export const ARTIFACT_TOOL_NAMES = new Set(["create_artifact", "update_artifact", "edit_artifact"]);

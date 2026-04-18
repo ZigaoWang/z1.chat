@@ -8,7 +8,7 @@ import { buildSystemPrompt } from "@/lib/system-prompt";
 import { generateConversationTitle } from "@/lib/title-generator";
 import { extractMemories, updateConversationSummary, extractImmediateMemory } from "@/lib/memory";
 import { checkAndCompactConversation } from "@/lib/context-manager";
-import { getTools, SANDBOX_TOOL_NAMES, IMAGE_TOOL_NAMES, SandboxManager } from "@/lib/tools";
+import { getTools, SANDBOX_TOOL_NAMES, IMAGE_TOOL_NAMES, SandboxManager, ArtifactContext } from "@/lib/tools";
 import { trackedStreamText, logSearchUsage, logSandboxUsage } from "@/lib/usage-logger";
 import { Sandbox } from "@e2b/code-interpreter";
 import { readFile } from "fs/promises";
@@ -301,7 +301,8 @@ export async function POST(req: Request) {
         }
       : undefined;
 
-    const tools = getTools(sandboxManager);
+    const artifactCtx: ArtifactContext = { conversationId: convId!, userId };
+    const tools = getTools(sandboxManager, artifactCtx);
     const hasToolsDefined = Object.keys(tools).length > 0;
 
     // Convert UI messages to model messages.
