@@ -337,6 +337,7 @@ interface ArtifactPreviewProps {
   onSendToChat?: (text: string) => void;
   onEditRequest?: (selectedText: string, instruction: string) => void;
   onUndo?: () => void;
+  onLoadVersion?: (version: number) => void;
 }
 
 export default function ArtifactPreview({
@@ -347,6 +348,7 @@ export default function ArtifactPreview({
   onSendToChat,
   onEditRequest,
   onUndo,
+  onLoadVersion,
 }: ArtifactPreviewProps) {
   const { type, title, content, language, version } = artifact;
   const [tab, setTab] = useState<"preview" | "code">(streaming ? "code" : "preview");
@@ -509,6 +511,14 @@ export default function ArtifactPreview({
     }
   };
 
+  const renderCodeView = () => (
+    <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
+      <pre className="p-4 overflow-x-auto">
+        <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+      </pre>
+    </div>
+  );
+
   const renderEditMode = () => (
     <div className="flex-1 flex flex-col min-h-0">
       <textarea
@@ -521,6 +531,12 @@ export default function ArtifactPreview({
   );
 
   const canPreviewInNewTab = type === "html" || type === "svg";
+
+  const renderContent = () => {
+    if (editing) return renderEditMode();
+    if (tab === "code") return renderCodeView();
+    return renderPreview();
+  };
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-slide-in-right">
@@ -593,7 +609,7 @@ export default function ArtifactPreview({
       </div>
 
       {/* Content */}
-      {editing ? renderEditMode() : renderPreview()}
+      {renderContent()}
     </div>
   );
 }

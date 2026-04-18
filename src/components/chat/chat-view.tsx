@@ -519,6 +519,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   // --- Live artifact detection during streaming ---
   const lastOpenedArtifactId = useRef<string | null>(null);
+  const lastHandledToolCallId = useRef<string | null>(null);
   useEffect(() => {
     if (!isLoading) {
       if (artifactAutoOpened.current) {
@@ -527,32 +528,29 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       artifactAutoOpened.current = false;
       lastArtifactLen.current = 0;
       lastOpenedArtifactId.current = null;
+      lastHandledToolCallId.current = null;
       return;
     }
 
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
 
-    // Check for create_artifact tool results — auto-open panel
+    // Check for artifact tool results — auto-open/refresh panel
     const toolInvs = getToolInvocations(lastMsg);
     if (toolInvs) {
-      const createResult = toolInvs.find(
-        (t) => t.toolName === "create_artifact" && t.state === "output-available" && t.result
-      );
-      if (createResult) {
-        const result = createResult.result as { id?: string; error?: string };
-        if (result.id && result.id !== lastOpenedArtifactId.current) {
+      for (const t of toolInvs) {
+        if (t.state !== "output-available" || !t.result) continue;
+        if (t.toolCallId === lastHandledToolCallId.current) continue;
+
+        const result = t.result as { id?: string; error?: string };
+        if (!result.id || result.error) continue;
+
+        if (t.toolName === "create_artifact") {
+          lastHandledToolCallId.current = t.toolCallId;
           lastOpenedArtifactId.current = result.id;
           handleOpenArtifactById(result.id);
-        }
-      }
-      // Also check for update_artifact — refresh the panel if open
-      const updateResult = toolInvs.find(
-        (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") && t.state === "output-available" && t.result
-      );
-      if (updateResult && artifactPanel?.id) {
-        const result = updateResult.result as { id?: string };
-        if (result.id === artifactPanel.id) {
+        } else if ((t.toolName === "update_artifact" || t.toolName === "edit_artifact") && artifactPanel?.id === result.id) {
+          lastHandledToolCallId.current = t.toolCallId;
           handleOpenArtifactById(result.id);
         }
       }
