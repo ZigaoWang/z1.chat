@@ -500,11 +500,12 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       // First check live streaming tool parts
       if (msg.parts) {
         const invocations = msg.parts
-          .filter((p) => p.type.startsWith("tool-"))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((p: any) => p.type.startsWith("tool-") || p.type === "dynamic-tool")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((p: any) => ({
             toolCallId: p.toolCallId as string,
-            toolName: p.type.replace(/^tool-/, "") as string,
+            toolName: (p.type === "dynamic-tool" ? p.toolName : p.type.replace(/^tool-/, "")) as string,
             state: p.state as string,
             args: p.input ?? {},
             result: p.output ?? undefined,
@@ -539,26 +540,49 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     const toolInvs = getToolInvocations(lastMsg);
     if (toolInvs) {
       for (const t of toolInvs) {
-        // Tool is being called — show loading placeholder immediately
-        if (
-          t.toolName === "create_artifact" &&
-          (t.state === "input-available" || t.state === "input-streaming") &&
-          !artifactPanel &&
-          !lastOpenedArtifactId.current
-        ) {
-          const args = t.args as { title?: string; type?: string };
-          sidebarWasOpen.current = sidebarOpen;
-          onCollapseSidebar();
-          setArtifactPanel({
-            type: args.type || "document",
-            title: args.title || "Creating...",
-            content: "",
-          });
-          setArtifactStreaming(true);
-          artifactAutoOpened.current = true;
+        // create_artifact — stream content as args build up
+        if (t.toolName === "create_artifact" && !lastOpenedArtifactId.current) {
+          const args = t.args as { title?: string; type?: string; content?: string };
+          if (t.state === "input-streaming" || t.state === "input-available") {
+            const newContent = args.content || "";
+            if (!artifactAutoOpened.current && (args.title || newContent.length > 0)) {
+              sidebarWasOpen.current = sidebarOpen;
+              onCollapseSidebar();
+              artifactAutoOpened.current = true;
+            }
+            if (artifactAutoOpened.current) {
+              setArtifactPanel({
+                type: args.type || "document",
+                title: args.title || "Creating...",
+                content: newContent,
+              });
+              setArtifactStreaming(true);
+            }
+          }
         }
 
-        // Tool returned — load real content
+        // update_artifact — show content streaming in panel
+        if (t.toolName === "update_artifact" && artifactPanel?.id) {
+          const args = t.args as { content?: string };
+          if ((t.state === "input-streaming" || t.state === "input-available") && args.content) {
+            setArtifactPanel((prev) => prev ? { ...prev, content: args.content! } : prev);
+            setArtifactStreaming(true);
+          }
+        }
+
+        // edit_artifact — show find/replace in panel
+        if (t.toolName === "edit_artifact" && artifactPanel?.id) {
+          const args = t.args as { find?: string; replace?: string };
+          if ((t.state === "input-streaming" || t.state === "input-available") && args.find && args.replace && artifactPanel.content.includes(args.find)) {
+            setArtifactPanel((prev) => {
+              if (!prev) return prev;
+              const newContent = prev.content.replace(args.find!, args.replace!);
+              return { ...prev, content: newContent };
+            });
+          }
+        }
+
+        // Tool returned — load real content from DB
         if (t.state !== "output-available" || !t.result) continue;
         if (t.toolCallId === lastHandledToolCallId.current) continue;
 
@@ -843,19 +867,18 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const handleLoadVersion = useCallback(async (targetVersion: number) => {
     if (!artifactPanel?.id) return;
+    if (targetVersion === artifactPanel.version) return;
     try {
-      if (targetVersion === artifactPanel.version) return;
-      // Fetch the version content from the versions API
       const res = await fetch(`/api/artifacts/${artifactPanel.id}/versions`);
       if (!res.ok) return;
       const versions = await res.json();
       const target = versions.find((v: { version: number }) => v.version === targetVersion);
       if (!target) return;
-      // Restore that version's content
+      // Restore without creating a new version
       const patchRes = await fetch(`/api/artifacts/${artifactPanel.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: target.content }),
+        body: JSON.stringify({ content: target.content, restoreVersion: targetVersion }),
       });
       if (patchRes.ok) {
         const updated = await patchRes.json();

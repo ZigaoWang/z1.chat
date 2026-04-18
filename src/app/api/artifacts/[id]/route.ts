@@ -40,7 +40,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Save current version for undo
+    // If restoring a version, just swap content without incrementing version
+    if (body.restoreVersion) {
+      await db.update(artifacts)
+        .set({ content: body.content, version: body.restoreVersion, updatedAt: new Date() })
+        .where(eq(artifacts.id, id));
+
+      const [restored] = await db.select().from(artifacts).where(eq(artifacts.id, id));
+      return Response.json(restored);
+    }
+
+    // Normal update — save snapshot, increment version
     await db.insert(artifactVersions).values({
       artifactId: existing.id,
       version: existing.version,
