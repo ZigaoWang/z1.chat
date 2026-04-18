@@ -185,23 +185,25 @@ function highlightCode(code: string, lang: string): string {
 // --- Mermaid renderer ---
 
 function MermaidPreview({ code }: { code: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
+    if (!code.trim()) return;
     let cancelled = false;
-    (async () => {
+    setError("");
+    setSvg("");
+    const timer = setTimeout(async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "default" });
+        mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
         const { svg } = await mermaid.render(`mermaid-${Date.now()}`, code);
         if (!cancelled) setSvg(svg);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to render diagram");
       }
-    })();
-    return () => { cancelled = true; };
+    }, 300); // debounce during streaming
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [code]);
 
   if (error) {
@@ -214,7 +216,6 @@ function MermaidPreview({ code }: { code: string }) {
 
   return (
     <div
-      ref={containerRef}
       className="flex items-center justify-center min-h-full p-8"
       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }}
     />

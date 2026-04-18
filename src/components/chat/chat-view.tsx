@@ -521,6 +521,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   // --- Live artifact detection during streaming ---
   const lastOpenedArtifactId = useRef<string | null>(null);
   const lastHandledToolCallId = useRef<string | null>(null);
+  const lastStreamedContentLen = useRef(0);
   useEffect(() => {
     if (!isLoading) {
       if (artifactAutoOpened.current) {
@@ -530,6 +531,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       lastArtifactLen.current = 0;
       lastOpenedArtifactId.current = null;
       lastHandledToolCallId.current = null;
+      lastStreamedContentLen.current = 0;
       return;
     }
 
@@ -545,18 +547,22 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           const args = t.args as { title?: string; type?: string; content?: string };
           if (t.state === "input-streaming" || t.state === "input-available") {
             const newContent = args.content || "";
-            if (!artifactAutoOpened.current && (args.title || newContent.length > 0)) {
-              sidebarWasOpen.current = sidebarOpen;
-              onCollapseSidebar();
-              artifactAutoOpened.current = true;
-            }
-            if (artifactAutoOpened.current) {
-              setArtifactPanel({
-                type: args.type || "document",
-                title: args.title || "Creating...",
-                content: newContent,
-              });
-              setArtifactStreaming(true);
+            // Only update if content actually grew
+            if (newContent.length > lastStreamedContentLen.current) {
+              lastStreamedContentLen.current = newContent.length;
+              if (!artifactAutoOpened.current && (args.title || newContent.length > 0)) {
+                sidebarWasOpen.current = sidebarOpen;
+                onCollapseSidebar();
+                artifactAutoOpened.current = true;
+                setArtifactStreaming(true);
+              }
+              if (artifactAutoOpened.current) {
+                setArtifactPanel({
+                  type: args.type || "document",
+                  title: args.title || "Creating...",
+                  content: newContent,
+                });
+              }
             }
           }
         }
@@ -565,19 +571,21 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         if (t.toolName === "update_artifact" && artifactPanel?.id) {
           const args = t.args as { content?: string };
           if ((t.state === "input-streaming" || t.state === "input-available") && args.content) {
-            setArtifactPanel((prev) => prev ? { ...prev, content: args.content! } : prev);
-            setArtifactStreaming(true);
+            if (args.content.length > lastStreamedContentLen.current) {
+              lastStreamedContentLen.current = args.content.length;
+              setArtifactPanel((prev) => prev ? { ...prev, content: args.content! } : prev);
+              setArtifactStreaming(true);
+            }
           }
         }
 
-        // edit_artifact — show find/replace in panel
-        if (t.toolName === "edit_artifact" && artifactPanel?.id) {
+        // edit_artifact — apply find/replace once when args are complete
+        if (t.toolName === "edit_artifact" && artifactPanel?.id && t.state === "input-available") {
           const args = t.args as { find?: string; replace?: string };
-          if ((t.state === "input-streaming" || t.state === "input-available") && args.find && args.replace && artifactPanel.content.includes(args.find)) {
+          if (args.find && args.replace && t.toolCallId !== lastHandledToolCallId.current) {
             setArtifactPanel((prev) => {
-              if (!prev) return prev;
-              const newContent = prev.content.replace(args.find!, args.replace!);
-              return { ...prev, content: newContent };
+              if (!prev || !prev.content.includes(args.find!)) return prev;
+              return { ...prev, content: prev.content.replace(args.find!, args.replace!) };
             });
           }
         }
