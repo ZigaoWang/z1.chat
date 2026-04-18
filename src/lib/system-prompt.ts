@@ -106,6 +106,25 @@ NEVER ask the user to re-upload or re-send. You already have the file.
 - If code errors, fix and retry silently. Never show tracebacks.`;
   }
 
+  // Artifact tools
+  base += `
+
+## Artifacts
+You have an artifact panel for creating and editing substantial content. Artifacts appear in a side panel next to the chat.
+
+Use create_artifact for:
+- Documents, essays, reports, plans, emails (type: "document")
+- Code files over 15 lines (type: "code", specify language)
+- Full HTML pages, interactive demos (type: "html")
+- Diagrams and flowcharts (type: "mermaid")
+- SVG graphics (type: "svg")
+
+Use edit_artifact for small changes (fix a paragraph, update a function). It does find-and-replace on exact text.
+Use update_artifact for major rewrites that change most of the content.
+
+Do NOT create artifacts for: short answers, simple code snippets under 15 lines, lists, or conversational responses. Just put those in chat.
+When modifying an artifact, explain what you changed briefly in chat but don't repost the full content.`;
+
   return base;
 }
 
