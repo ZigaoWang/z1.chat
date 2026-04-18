@@ -11,11 +11,14 @@ import python from "highlight.js/lib/languages/python";
 import typescript from "highlight.js/lib/languages/typescript";
 import MarkdownRenderer from "./markdown-renderer";
 
+import plaintext from "highlight.js/lib/languages/plaintext";
+
 hljs.registerLanguage("xml", xml);
 hljs.registerLanguage("css", css);
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("python", python);
 hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("plaintext", plaintext);
 
 // --- Detection (legacy fallback) ---
 
@@ -170,7 +173,9 @@ function getHighlightLang(type: string, language?: string | null): string {
 
 function highlightCode(code: string, lang: string): string {
   try {
-    const result = hljs.highlight(code, { language: lang, ignoreIllegals: true });
+    // Check if language is registered, fall back to plaintext
+    const safeLang = hljs.getLanguage(lang) ? lang : "plaintext";
+    const result = hljs.highlight(code, { language: safeLang, ignoreIllegals: true });
     return DOMPurify.sanitize(result.value, { USE_PROFILES: { html: true } });
   } catch {
     return DOMPurify.sanitize(code, { USE_PROFILES: { html: true } });

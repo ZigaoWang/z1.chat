@@ -518,20 +518,45 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   );
 
   // --- Live artifact detection during streaming ---
+  const lastOpenedArtifactId = useRef<string | null>(null);
   useEffect(() => {
     if (!isLoading) {
-      // Streaming ended — finalize artifact if one was open
       if (artifactAutoOpened.current) {
         setArtifactStreaming(false);
       }
       artifactAutoOpened.current = false;
       lastArtifactLen.current = 0;
+      lastOpenedArtifactId.current = null;
       return;
     }
 
-    // Check the last assistant message for artifact content
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
+
+    // Check for create_artifact tool results — auto-open panel
+    const toolInvs = getToolInvocations(lastMsg);
+    if (toolInvs) {
+      const createResult = toolInvs.find(
+        (t) => t.toolName === "create_artifact" && t.state === "output-available" && t.result
+      );
+      if (createResult) {
+        const result = createResult.result as { id?: string; error?: string };
+        if (result.id && result.id !== lastOpenedArtifactId.current) {
+          lastOpenedArtifactId.current = result.id;
+          handleOpenArtifactById(result.id);
+        }
+      }
+      // Also check for update_artifact — refresh the panel if open
+      const updateResult = toolInvs.find(
+        (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") && t.state === "output-available" && t.result
+      );
+      if (updateResult && artifactPanel?.id) {
+        const result = updateResult.result as { id?: string };
+        if (result.id === artifactPanel.id) {
+          handleOpenArtifactById(result.id);
+        }
+      }
+    }
 
     const content = getMessageContent(lastMsg);
     if (!content || content.length < 50) return;
