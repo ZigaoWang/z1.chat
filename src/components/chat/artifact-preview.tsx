@@ -341,7 +341,9 @@ export default function ArtifactPreview({
     // Preview: document — live markdown
     if (type === "document") return (
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto px-4 py-6 sm:px-6">
-        <MarkdownRenderer content={content} />
+        <div className="max-w-prose mx-auto">
+          <MarkdownRenderer content={content} />
+        </div>
       </div>
     );
 
@@ -373,7 +375,7 @@ export default function ArtifactPreview({
     <div className="flex h-full w-full flex-col bg-background overflow-hidden">
       {/* Header */}
       <div className="shrink-0 border-b border-border/40 overflow-hidden">
-        <div className="flex items-center gap-1 px-2 h-12 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1 px-2 h-11 min-w-0 overflow-hidden">
           {/* Title */}
           <span className="text-sm font-medium truncate min-w-0 shrink px-1">{title}</span>
           {numVersions > 1 && onLoadVersion ? (

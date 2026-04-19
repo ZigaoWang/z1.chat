@@ -200,7 +200,7 @@ function ChatMessages({
 
   return (
     <div ref={containerRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl py-4">
+      <div className="mx-auto max-w-3xl pt-6 pb-4">
         {visibleSlots.map((slot, slotIdx) => {
           if (slot.type === "user-edit-group") {
             const msg = slot.messages[0];

@@ -124,7 +124,7 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
     : `Found ${sources.length} source${sources.length !== 1 ? "s" : ""}`;
 
   return (
-    <div className="my-2">
+    <div className="mt-3">
       <div className="rounded-lg border border-border/40 overflow-hidden">
         <button
           onClick={() => sources.length > 0 && setExpanded(!expanded)}
@@ -225,7 +225,7 @@ function SandboxStatus({ invocations, onLightbox }: { invocations: ToolInvocatio
   if (executions.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 my-2">
+    <div className="flex flex-col gap-1.5 mt-3">
       {executions.map((exec) => (
         <SandboxCard key={exec.toolCallId} invocation={exec} onLightbox={onLightbox} />
       ))}
@@ -325,7 +325,7 @@ function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }:
   if (artifactTools.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 my-2">
+    <div className="flex flex-col gap-1.5 mt-3">
       {artifactTools.map((t) => {
         const isComplete = t.state === "output-available";
         const isToolStreaming = t.state === "input-streaming" || t.state === "input-available";
@@ -503,7 +503,7 @@ function MessageBubble({
         {hasSearches && <SearchStatus invocations={toolInvocations!} />}
 
         {fetchInvocations.length > 0 && (
-          <div className="flex flex-col gap-1.5 my-2">
+          <div className="flex flex-col gap-1.5 mt-3">
             {fetchInvocations.map((f) => {
               const isActive = f.state !== "output-available" && f.state !== "output-error";
               const url = f.args?.url as string | undefined;
@@ -531,7 +531,7 @@ function MessageBubble({
 
         {/* Artifact cards */}
         {artifacts.length > 0 && onOpenArtifact && (
-          <div className="flex flex-col gap-1.5 my-2">
+          <div className="flex flex-col gap-1.5 mt-3">
             {artifacts.map((artifact) => (
               <button
                 key={artifact.id}
@@ -554,9 +554,13 @@ function MessageBubble({
           <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
         )}
 
-        {/* Interrupted notice — shows after everything when generation was stopped */}
+        {/* Interrupted notice */}
         {!isStreaming && interrupted && (
-          <p className="text-xs text-muted-foreground/40 mt-2 italic">Stopped generating</p>
+          <div className="mt-2">
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground/50">
+              Stopped generating
+            </span>
+          </div>
         )}
 
         {/* Sources inline after content */}

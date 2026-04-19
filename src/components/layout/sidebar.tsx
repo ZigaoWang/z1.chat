@@ -295,7 +295,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           !isOpen ? "lg:w-0 lg:overflow-hidden" : "",
         ].filter(Boolean).join(" ")}
       >
-        <div className="flex h-10 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
+        <div className="flex h-11 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
           <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
           <div className="flex items-center gap-0.5">
             <Tooltip>
