@@ -9,6 +9,13 @@ import { db } from "./db";
 import { artifacts, artifactVersions } from "./db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
+/** Strip markdown code fences that models sometimes wrap artifact content in */
+function stripCodeFences(content: string): string {
+  const trimmed = content.trim();
+  const match = trimmed.match(/^```\w*\n([\s\S]*?)```$/);
+  return match ? match[1].trim() : trimmed;
+}
+
 const MAX_PAGE_TEXT = 30_000;
 const MAX_IMAGES_PER_EXEC = 3;
 const MAX_IMAGE_BASE64_SIZE = 500_000; // ~500KB base64
@@ -355,12 +362,13 @@ export function getTools(sandboxManager?: SandboxManager, artifactCtx?: Artifact
       }),
       execute: async ({ type, title, content, language }) => {
         try {
+          const cleanContent = stripCodeFences(content);
           const [artifact] = await db.insert(artifacts).values({
             conversationId,
             userId,
             type,
             title,
-            content,
+            content: cleanContent,
             language: language || null,
           }).returning();
           return { id: artifact.id, type, title, version: 1 };
@@ -381,6 +389,7 @@ export function getTools(sandboxManager?: SandboxManager, artifactCtx?: Artifact
       }),
       execute: async ({ identifier, content }) => {
         try {
+          const cleanContent = stripCodeFences(content);
           // Find by title within this conversation
           const existing = await db.query.artifacts.findFirst({
             where: and(
@@ -402,7 +411,7 @@ export function getTools(sandboxManager?: SandboxManager, artifactCtx?: Artifact
           // Update with new content
           const newVersion = existing.version + 1;
           await db.update(artifacts)
-            .set({ content, version: newVersion, updatedAt: new Date() })
+            .set({ content: cleanContent, version: newVersion, updatedAt: new Date() })
             .where(eq(artifacts.id, existing.id));
 
           return { id: existing.id, title: existing.title, version: newVersion };

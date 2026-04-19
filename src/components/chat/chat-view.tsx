@@ -562,7 +562,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           if (t.state !== "input-streaming" && t.state !== "input-available") continue;
 
           const args = t.args as { title?: string; type?: string; content?: string };
-          const newContent = args.content || "";
+          const rawContent = args.content || "";
+          // Strip code fences the model may wrap around content
+          const newContent = rawContent.replace(/^```\w*\n/, "").replace(/\n```$/, "").trim() || rawContent;
           const prevLen = streamedArtifactContent.current[t.toolCallId]?.length || 0;
 
           if (newContent.length <= prevLen) continue;
