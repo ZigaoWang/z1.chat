@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, MessageSquare } from "lucide-react";
+import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, ChevronDown } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 import xml from "highlight.js/lib/languages/xml";
@@ -173,7 +173,6 @@ function getHighlightLang(type: string, language?: string | null): string {
 
 function highlightCode(code: string, lang: string): string {
   try {
-    // Check if language is registered, fall back to plaintext
     const safeLang = hljs.getLanguage(lang) ? lang : "plaintext";
     const result = hljs.highlight(code, { language: safeLang, ignoreIllegals: true });
     return DOMPurify.sanitize(result.value, { USE_PROFILES: { html: true } });
@@ -187,23 +186,23 @@ function highlightCode(code: string, lang: string): string {
 function MermaidPreview({ code }: { code: string }) {
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const renderIdRef = useRef(0);
 
   useEffect(() => {
     if (!code.trim()) return;
-    let cancelled = false;
+    const id = ++renderIdRef.current;
     setError("");
-    setSvg("");
     const timer = setTimeout(async () => {
       try {
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
-        const { svg } = await mermaid.render(`mermaid-${Date.now()}`, code);
-        if (!cancelled) setSvg(svg);
+        const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, code);
+        if (id === renderIdRef.current) setSvg(rendered);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to render diagram");
+        if (id === renderIdRef.current) setError(err instanceof Error ? err.message : "Failed to render diagram");
       }
-    }, 300); // debounce during streaming
-    return () => { cancelled = true; clearTimeout(timer); };
+    }, 500);
+    return () => { clearTimeout(timer); };
   }, [code]);
 
   if (error) {
@@ -214,108 +213,19 @@ function MermaidPreview({ code }: { code: string }) {
     );
   }
 
+  if (!svg) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex items-center justify-center min-h-full p-8"
       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }}
     />
-  );
-}
-
-// --- Text selection toolbar ---
-
-function SelectionToolbar({
-  onSendToChat,
-  onEditRequest,
-}: {
-  onSendToChat: (text: string) => void;
-  onEditRequest: (selectedText: string, instruction: string) => void;
-}) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [selectedText, setSelectedText] = useState("");
-  const [showInput, setShowInput] = useState(false);
-  const [instruction, setInstruction] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const handleSelection = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-        // Delay hiding to allow button clicks
-        setTimeout(() => {
-          const sel2 = window.getSelection();
-          if (!sel2 || sel2.isCollapsed) {
-            setPos(null);
-            setShowInput(false);
-          }
-        }, 200);
-        return;
-      }
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      setSelectedText(sel.toString().trim());
-      setPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
-    };
-
-    document.addEventListener("selectionchange", handleSelection);
-    return () => document.removeEventListener("selectionchange", handleSelection);
-  }, []);
-
-  useEffect(() => {
-    if (showInput && inputRef.current) inputRef.current.focus();
-  }, [showInput]);
-
-  if (!pos || !selectedText) return null;
-
-  return (
-    <div
-      className="fixed z-50 -translate-x-1/2 -translate-y-full animate-fade-in"
-      style={{ left: pos.x, top: pos.y }}
-    >
-      {showInput ? (
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-popover p-1 shadow-lg">
-          <input
-            ref={inputRef}
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && instruction.trim()) {
-                onEditRequest(selectedText, instruction.trim());
-                setShowInput(false);
-                setInstruction("");
-                setPos(null);
-                window.getSelection()?.removeAllRanges();
-              }
-              if (e.key === "Escape") { setShowInput(false); setInstruction(""); }
-            }}
-            placeholder="Describe the change..."
-            className="w-48 rounded-md bg-transparent px-2 py-1 text-xs outline-none placeholder:text-muted-foreground/40"
-          />
-        </div>
-      ) : (
-        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-0.5 shadow-lg">
-          <button
-            onMouseDown={(e) => { e.preventDefault(); setShowInput(true); }}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <Pencil className="h-3 w-3" />
-            Edit
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              onSendToChat(selectedText);
-              setPos(null);
-              window.getSelection()?.removeAllRanges();
-            }}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <MessageSquare className="h-3 w-3" />
-            Quote
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -335,10 +245,8 @@ interface ArtifactPreviewProps {
   streaming?: boolean;
   onClose: () => void;
   onContentChange?: (content: string) => void;
-  onSendToChat?: (text: string) => void;
-  onEditRequest?: (selectedText: string, instruction: string) => void;
-  onUndo?: () => void;
   onLoadVersion?: (version: number) => void;
+  totalVersions?: number;
 }
 
 export default function ArtifactPreview({
@@ -346,29 +254,46 @@ export default function ArtifactPreview({
   streaming,
   onClose,
   onContentChange,
-  onSendToChat,
-  onEditRequest,
-  onUndo,
   onLoadVersion,
+  totalVersions,
 }: ArtifactPreviewProps) {
   const { type, title, content, language, version } = artifact;
-  const [tab, setTab] = useState<"preview" | "code">(streaming ? "code" : "preview");
+  const [tab, setTab] = useState<"preview" | "code">(streaming && type !== "document" ? "code" : "preview");
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
+  const [versionOpen, setVersionOpen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevContentRef = useRef(content);
 
-  // Sync editContent when content changes externally (AI updates)
-  useEffect(() => { setEditContent(content); }, [content]);
+  // Switch to code view during streaming (except documents), preview when done
+  const prevStreamingRef = useRef(streaming);
+  useEffect(() => {
+    if (streaming && !prevStreamingRef.current) {
+      // Documents render nicely in preview during streaming
+      if (type !== "document") setTab("code");
+    } else if (!streaming && prevStreamingRef.current) {
+      setTab("preview");
+    }
+    prevStreamingRef.current = streaming;
+  }, [streaming, type]);
 
-  // Highlighted code for code tab
+  // Sync editContent when content changes externally (only if not editing)
+  useEffect(() => {
+    if (!editing && content !== prevContentRef.current) {
+      setEditContent(content);
+    }
+    prevContentRef.current = content;
+  }, [content, editing]);
+
+  // Highlighted code — instant when not streaming, debounced when streaming
   const [highlightedCode, setHighlightedCode] = useState("");
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hLang = getHighlightLang(type, language);
+  const hLang = useMemo(() => getHighlightLang(type, language), [type, language]);
 
   useEffect(() => {
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
@@ -376,31 +301,26 @@ export default function ArtifactPreview({
       setHighlightedCode(highlightCode(content, hLang));
       return;
     }
+    // During streaming, debounce syntax highlighting (it's expensive)
     highlightTimer.current = setTimeout(() => {
       setHighlightedCode(highlightCode(content, hLang));
-    }, 300);
+    }, 500);
     return () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); };
   }, [content, streaming, hLang]);
 
-  // Auto-scroll while streaming
+  // Auto-scroll while streaming (trigger on raw content, not just highlighted)
   useEffect(() => {
+    if (!streaming) return;
     const el = scrollRef.current;
     if (!el || !stickToBottom.current) return;
     el.scrollTop = el.scrollHeight;
-  }, [highlightedCode, streaming]);
+  }, [content, streaming]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   }, []);
-
-  // Auto-switch to preview when streaming ends
-  const prevStreaming = useRef(streaming);
-  useEffect(() => {
-    if (prevStreaming.current && !streaming) setTab("preview");
-    prevStreaming.current = streaming;
-  }, [streaming]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(content);
@@ -434,7 +354,7 @@ export default function ArtifactPreview({
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       onContentChange?.(newContent);
-    }, 1000);
+    }, 1500);
   }, [onContentChange]);
 
   // Close on Escape
@@ -444,25 +364,46 @@ export default function ArtifactPreview({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Version count to display
+  const displayVersions = totalVersions || version || 1;
+
   // Preview content by type
   const renderPreview = () => {
-    if (streaming) {
-      // Content not ready yet (tool still executing)
-      if (!content) {
-        return (
-          <div className="flex-1 flex items-center justify-center bg-card">
-            <div className="text-center">
-              <div className="flex justify-center gap-1 mb-3">
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_infinite]" />
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
-              </div>
-              <p className="text-sm text-muted-foreground/50">Generating {title}...</p>
+    if (streaming && !content) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-card">
+          <div className="text-center">
+            <div className="flex justify-center gap-1 mb-3">
+              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_infinite]" />
+              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
             </div>
+            <p className="text-sm text-muted-foreground/50">Generating {title}...</p>
           </div>
-        );
-      }
-      // Content is available (legacy streaming HTML/SVG)
+        </div>
+      );
+    }
+
+    // Documents: render markdown directly even during streaming
+    if (type === "document") {
+      return (
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
+          {streaming && (
+            <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              <span>Writing...</span>
+            </div>
+          )}
+          <MarkdownRenderer content={content} />
+        </div>
+      );
+    }
+
+    if (streaming) {
+      // Show raw content immediately; highlighted code replaces it once ready
+      const displayHtml = highlightedCode || DOMPurify.sanitize(
+        content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      );
       return (
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0 bg-card">
           <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
@@ -470,7 +411,7 @@ export default function ArtifactPreview({
             <span>Generating...</span>
           </div>
           <pre className="p-4 overflow-x-auto">
-            <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+            <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: displayHtml }} />
           </pre>
         </div>
       );
@@ -501,9 +442,6 @@ export default function ArtifactPreview({
       case "document":
         return (
           <div className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
-            {onSendToChat && onEditRequest && (
-              <SelectionToolbar onSendToChat={onSendToChat} onEditRequest={onEditRequest} />
-            )}
             <MarkdownRenderer content={content} />
           </div>
         );
@@ -517,9 +455,6 @@ export default function ArtifactPreview({
       default:
         return (
           <div className="flex-1 overflow-auto">
-            {onSendToChat && onEditRequest && (
-              <SelectionToolbar onSendToChat={onSendToChat} onEditRequest={onEditRequest} />
-            )}
             <pre className="p-4 overflow-x-auto">
               <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
             </pre>
@@ -528,13 +463,25 @@ export default function ArtifactPreview({
     }
   };
 
-  const renderCodeView = () => (
-    <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
-      <pre className="p-4 overflow-x-auto">
-        <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
-      </pre>
-    </div>
-  );
+  const renderCodeView = () => {
+    // During streaming, show raw escaped content immediately if highlighted isn't ready yet
+    const displayHtml = (streaming && !highlightedCode)
+      ? DOMPurify.sanitize(content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
+      : highlightedCode;
+    return (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
+        {streaming && (
+          <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            <span>Generating...</span>
+          </div>
+        )}
+        <pre className="p-4 overflow-x-auto">
+          <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: displayHtml }} />
+        </pre>
+      </div>
+    );
+  };
 
   const renderEditMode = () => (
     <div className="flex-1 flex flex-col min-h-0">
@@ -558,17 +505,16 @@ export default function ArtifactPreview({
   return (
     <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-slide-in-right">
       {/* Header */}
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3">
-        <div className="flex items-center gap-1 min-w-0">
-          <span className="text-xs font-medium text-muted-foreground mr-2 max-w-[120px] truncate">{title}</span>
-          {version && version > 1 && (
-            <span className="text-[10px] text-muted-foreground/40 tabular-nums">v{version}</span>
-          )}
-          <div className="flex items-center gap-0.5 ml-1">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="text-xs font-medium text-foreground/80 max-w-[160px] truncate">{title}</span>
+
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0.5 ml-2 rounded-lg bg-muted/40 p-0.5">
             <button
               onClick={() => { setTab("preview"); setEditing(false); }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                tab === "preview" && !editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Eye className="h-3 w-3" />
@@ -576,8 +522,8 @@ export default function ArtifactPreview({
             </button>
             <button
               onClick={() => { setTab("code"); setEditing(false); }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                tab === "code" && !editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Code2 className="h-3 w-3" />
@@ -585,9 +531,9 @@ export default function ArtifactPreview({
             </button>
             {!streaming && onContentChange && (
               <button
-                onClick={() => { setEditing(!editing); setTab("code"); }}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  editing ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                onClick={() => { setEditing(!editing); if (!editing) setTab("code"); }}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                  editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Pencil className="h-3 w-3" />
@@ -597,21 +543,41 @@ export default function ArtifactPreview({
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5">
-          {version && version > 1 && onLoadVersion && (
-            <select
-              value={version}
-              onChange={(e) => onLoadVersion(Number(e.target.value))}
-              className="h-7 rounded-md border border-border/40 bg-transparent px-1.5 text-[11px] text-muted-foreground outline-none cursor-pointer hover:bg-muted transition-colors"
-            >
-              {Array.from({ length: version }, (_, i) => i + 1).reverse().map((v) => (
-                <option key={v} value={v}>v{v}{v === version ? " (current)" : ""}</option>
-              ))}
-            </select>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {/* Version selector */}
+          {displayVersions > 1 && onLoadVersion && (
+            <div className="relative">
+              <button
+                onClick={() => setVersionOpen(!versionOpen)}
+                className="flex items-center gap-0.5 h-7 rounded-md border border-border/40 bg-transparent px-1.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+              >
+                v{version || 1}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {versionOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[80px] rounded-lg border border-border bg-popover shadow-lg py-1">
+                    {Array.from({ length: displayVersions }, (_, i) => i + 1).reverse().map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => { onLoadVersion(v); setVersionOpen(false); }}
+                        className={`w-full px-3 py-1.5 text-left text-[11px] hover:bg-muted transition-colors ${
+                          v === version ? "text-foreground font-medium" : "text-muted-foreground"
+                        }`}
+                      >
+                        v{v}{v === version ? " (current)" : ""}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
-          {version && version === 1 && (
+          {displayVersions === 1 && (
             <span className="text-[10px] text-muted-foreground/40 tabular-nums px-1">v1</span>
           )}
+
           <button onClick={handleDownload} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Download">
             <Download className="h-3.5 w-3.5" />
           </button>
@@ -628,6 +594,7 @@ export default function ArtifactPreview({
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           )}
+          <div className="w-px h-4 bg-border/40 mx-0.5" />
           <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Close">
             <X className="h-3.5 w-3.5" />
           </button>

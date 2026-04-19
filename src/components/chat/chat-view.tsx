@@ -27,7 +27,6 @@ interface MessageAttachments {
   files: { name: string; type: string; url: string; size?: number }[];
 }
 
-
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
@@ -46,11 +45,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const [viewingOldBranch, setViewingOldBranch] = useState(false);
   const [artifactPanel, setArtifactPanel] = useState<ArtifactData | null>(null);
   const [artifactStreaming, setArtifactStreaming] = useState(false);
-  const [artifactWidth, setArtifactWidth] = useState(50); // percentage
+  const [artifactWidth, setArtifactWidth] = useState(50);
   const [isDraggingArtifact, setIsDraggingArtifact] = useState(false);
   const savedInputRef = useRef("");
-  const artifactAutoOpened = useRef(false);
-  const lastArtifactLen = useRef(0);
   const sidebarWasOpen = useRef(false);
   const artifactDragging = useRef(false);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -65,23 +62,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   useEffect(() => { setActiveIdRef.current = setActiveId; }, [setActiveId]);
 
   const isFirstMessageRef = useRef(false);
-
-  useEffect(() => {
-    // Don't stop the stream if this activeId change came from creating a new conversation
-    if (isFirstMessageRef.current) {
-      isFirstMessageRef.current = false;
-      setConversationId(activeId);
-      initialLoadDone.current = true;
-      return;
-    }
-    stop();
-    setConversationId(activeId);
-    initialLoadDone.current = false;
-    setEditingState(null);
-    setViewingOldBranch(false);
-    setArtifactPanel(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId]);
 
   const [transport] = useState(
     () =>
@@ -128,7 +108,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     transport,
     onError: (error) => {
       const raw = error.message || "Something went wrong";
-      // Parse the error into a human-readable message
       let msg = raw;
       try {
         const parsed = JSON.parse(raw);
@@ -136,7 +115,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       } catch {
         // Not JSON, use as-is
       }
-      // Map known errors to friendly messages
       if (msg.includes("No endpoints found that support image input") || msg.includes("does not represent a valid image")) {
         msg = "This model doesn't support images. Try a model with the Vision badge.";
       } else if (msg.includes("context length") || msg.includes("too long") || msg.includes("maximum")) {
@@ -162,14 +140,30 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const isLoading = status === "streaming" || status === "submitted";
 
+  // Reset state when switching conversations (moved after stop is defined)
+  useEffect(() => {
+    if (isFirstMessageRef.current) {
+      isFirstMessageRef.current = false;
+      setConversationId(activeId);
+      initialLoadDone.current = true;
+      return;
+    }
+    stop();
+    setConversationId(activeId);
+    initialLoadDone.current = false;
+    setEditingState(null);
+    setViewingOldBranch(false);
+    setArtifactPanel(null);
+    setArtifactStreaming(false);
+    sidebarWasOpen.current = false;
+  }, [activeId, stop]);
+
   const messageModelMap = useRef<Map<string, string>>(new Map());
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   const [messageAttachments, setMessageAttachments] = useState<Record<string, MessageAttachments>>({});
   const [regenerationHistory, setRegenerationHistory] = useState<Record<string, VersionEntry[]>>({});
   const [editBranches, setEditBranches] = useState<Record<string, EditBranch[]>>({});
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [restoredToolInvocations, setRestoredToolInvocations] = useState<Record<string, ToolInvocation[]>>({});
 
   useEffect(() => {
@@ -185,11 +179,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         .then((data) => {
           if (Array.isArray(data) && data.length > 0) {
             const filtered = data.filter(
-              (m: { role: string }) =>
-                m.role === "user" || m.role === "assistant"
+              (m: { role: string }) => m.role === "user" || m.role === "assistant"
             );
 
-            // Build metadata maps (attachments, tools, model)
             const restoredAttachments: Record<string, MessageAttachments> = {};
             const restoredTools: Record<string, ToolInvocation[]> = {};
             for (const m of filtered) {
@@ -213,37 +205,32 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               }
             }
 
-            // Check if any messages have parentId set OR if there are root-level siblings (branching data)
             const hasBranchData = filtered.some((m: { parentId?: string | null }) => m.parentId != null);
             const rootMessages = filtered.filter((m: { parentId?: string | null }) => m.parentId == null);
             const hasRootSiblings = rootMessages.filter((m: { role: string }) => m.role === "user").length > 1
               || rootMessages.filter((m: { role: string }) => m.role === "assistant").length > 1;
 
             if (hasBranchData || hasRootSiblings) {
-              // Build tree: group children by parentId
               const childrenMap = new Map<string | null, typeof filtered>();
               for (const m of filtered) {
                 const pid = m.parentId ?? null;
                 if (!childrenMap.has(pid)) childrenMap.set(pid, []);
                 childrenMap.get(pid)!.push(m);
               }
-              // Sort each group by branchIndex
               for (const children of childrenMap.values()) {
                 children.sort((a: { branchIndex: number }, b: { branchIndex: number }) => a.branchIndex - b.branchIndex);
               }
 
-              // Walk active path: at each level, pick highest branchIndex child
               const activePath: typeof filtered = [];
               let currentParentId: string | null = null;
               while (true) {
                 const children = childrenMap.get(currentParentId);
                 if (!children || children.length === 0) break;
-                const active = children[children.length - 1]; // highest branchIndex
+                const active = children[children.length - 1];
                 activePath.push(active);
                 currentParentId = active.id;
               }
 
-              // Safety: if tree walk produced nothing, fall back to flat list
               if (activePath.length === 0) {
                 setMessageAttachments(restoredAttachments);
                 setRestoredToolInvocations(restoredTools);
@@ -257,7 +244,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 return;
               }
 
-              // Build regenerationHistory and editBranches from sibling data
               const newRegenHistory: Record<string, VersionEntry[]> = {};
               const newEditBranches: Record<string, EditBranch[]> = {};
 
@@ -267,8 +253,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 if (siblings.length <= 1) continue;
 
                 if (msg.role === "assistant") {
-                  // Assistant forks → regenerationHistory keyed by the parent (user) message ID
-                  const userMsgId = pid; // parentId is the user message
+                  const userMsgId = pid;
                   if (userMsgId) {
                     const oldVersions: VersionEntry[] = siblings
                       .filter((s: { id: string }) => s.id !== msg.id)
@@ -283,18 +268,15 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                     }
                   }
                 } else if (msg.role === "user") {
-                  // User forks → editBranches keyed by the active user message ID
                   const olderSiblings = siblings.filter((s: { id: string }) => s.id !== msg.id);
                   if (olderSiblings.length > 0) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const branches: EditBranch[] = olderSiblings.map((s: any) => {
-                      // Collect the full subtree following this sibling
                       const following: typeof filtered = [];
                       let walkId: string | null = s.id;
                       while (walkId) {
                         const kids = childrenMap.get(walkId);
                         if (!kids || kids.length === 0) break;
-                        const best = kids[kids.length - 1]; // highest branchIndex
+                        const best = kids[kids.length - 1];
                         following.push(best);
                         walkId = best.id;
                       }
@@ -316,18 +298,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 }
               }
 
-              if (Object.keys(restoredAttachments).length > 0) {
-                setMessageAttachments(restoredAttachments);
-              }
-              if (Object.keys(restoredTools).length > 0) {
-                setRestoredToolInvocations(restoredTools);
-              }
-              if (Object.keys(newRegenHistory).length > 0) {
-                setRegenerationHistory(newRegenHistory);
-              }
-              if (Object.keys(newEditBranches).length > 0) {
-                setEditBranches(newEditBranches);
-              }
+              if (Object.keys(restoredAttachments).length > 0) setMessageAttachments(restoredAttachments);
+              if (Object.keys(restoredTools).length > 0) setRestoredToolInvocations(restoredTools);
+              if (Object.keys(newRegenHistory).length > 0) setRegenerationHistory(newRegenHistory);
+              if (Object.keys(newEditBranches).length > 0) setEditBranches(newEditBranches);
 
               setMessages(
                 activePath.map((m: { id: string; role: string; content: string }) => ({
@@ -337,13 +311,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 }))
               );
             } else {
-              // Legacy: no branching data — show flat list as before
-              if (Object.keys(restoredAttachments).length > 0) {
-                setMessageAttachments(restoredAttachments);
-              }
-              if (Object.keys(restoredTools).length > 0) {
-                setRestoredToolInvocations(restoredTools);
-              }
+              if (Object.keys(restoredAttachments).length > 0) setMessageAttachments(restoredAttachments);
+              if (Object.keys(restoredTools).length > 0) setRestoredToolInvocations(restoredTools);
               setMessages(
                 filtered.map((m: { id: string; role: string; content: string }) => ({
                   id: m.id,
@@ -364,7 +333,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       setRegenerationHistory({});
       setEditBranches({});
     }
-  }, [activeId, setMessages]);
+  }, [activeId, setMessages, refreshConversations]);
 
   const handleNewChat = useCallback(() => {
     stop();
@@ -378,8 +347,11 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setEditBranches({});
     setEditingState(null);
     setArtifactPanel(null);
-    pendingEditTransfer.current = null;
-    pendingRegenTransfer.current = null;
+    setArtifactStreaming(false);
+    sidebarWasOpen.current = false;
+    artifactOpenedRef.current = false;
+    streamedArtifactContent.current = {};
+    handledToolCallsRef.current.clear();
   }, [setActiveId, setMessages, stop]);
 
   const pendingAttachments = useRef<MessageAttachments>({ images: [], files: [] });
@@ -398,15 +370,11 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       const hasImages = files.some(f => f.isImage && f.dataUrl);
       const modelSupportsVision = currentModel?.supportsVision !== false;
 
-      // Block sending images to non-vision models — warning is shown inline near file preview
-      if (hasImages && !modelSupportsVision) {
-        return;
-      }
+      if (hasImages && !modelSupportsVision) return;
 
       if (files.length > 0) {
         for (const f of files) {
           if (f.isImage && f.dataUrl) {
-            // Vision model — send image as visual part
             const dataUrlMediaType = f.dataUrl.match(/^data:([^;]+);/)?.[1] || "image/jpeg";
             fileParts.push({
               type: "file" as const,
@@ -481,7 +449,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     []
   );
 
-  // Memoized content map — avoids re-running regex per message per render
   const messageContentMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const m of messages) {
@@ -497,171 +464,188 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const getToolInvocations = useCallback(
     (msg: (typeof messages)[0]): ToolInvocation[] | undefined => {
-      // First check live streaming tool parts
       if (msg.parts) {
         const invocations = msg.parts
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .filter((p: any) => p.type.startsWith("tool-") || p.type === "dynamic-tool")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((p): p is any => p.type.startsWith("tool-") || p.type === "dynamic-tool")
           .map((p: any) => ({
             toolCallId: p.toolCallId as string,
             toolName: (p.type === "dynamic-tool" ? p.toolName : p.type.replace(/^tool-/, "")) as string,
             state: p.state as string,
             args: p.input ?? {},
             result: p.output ?? undefined,
-          } as ToolInvocation));
+          }));
         if (invocations.length > 0) return invocations;
       }
-      // Fall back to restored tool invocations from DB
       return restoredToolInvocations[msg.id] || undefined;
     },
     [restoredToolInvocations]
   );
 
-  // --- Live artifact detection during streaming ---
-  const lastOpenedArtifactId = useRef<string | null>(null);
-  const lastHandledToolCallId = useRef<string | null>(null);
-  const lastStreamedContentLen = useRef(0);
+  // Track artifact streaming state via refs (avoid stale closures / infinite loops)
+  const handledToolCallsRef = useRef<Set<string>>(new Set());
+  const streamedArtifactContent = useRef<Record<string, string>>({});
+  const artifactOpenedRef = useRef(false);
+  const streamingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Separate effect for tool invocation -> DB sync after tool completes
   useEffect(() => {
-    if (!isLoading) {
-      if (artifactAutoOpened.current) {
-        setArtifactStreaming(false);
-      }
-      artifactAutoOpened.current = false;
-      lastArtifactLen.current = 0;
-      lastOpenedArtifactId.current = null;
-      lastHandledToolCallId.current = null;
-      lastStreamedContentLen.current = 0;
-      return;
-    }
+    if (!isLoading) return;
 
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
 
-    // Check for artifact tool invocations
     const toolInvs = getToolInvocations(lastMsg);
-    if (toolInvs) {
-      for (const t of toolInvs) {
-        // create_artifact — stream content as args build up
-        if (t.toolName === "create_artifact" && !lastOpenedArtifactId.current) {
-          const args = t.args as { title?: string; type?: string; content?: string };
-          if (t.state === "input-streaming" || t.state === "input-available") {
-            const newContent = args.content || "";
-            // Only update if content actually grew
-            if (newContent.length > lastStreamedContentLen.current) {
-              lastStreamedContentLen.current = newContent.length;
-              if (!artifactAutoOpened.current && (args.title || newContent.length > 0)) {
-                sidebarWasOpen.current = sidebarOpen;
-                onCollapseSidebar();
-                artifactAutoOpened.current = true;
-                setArtifactStreaming(true);
-              }
-              if (artifactAutoOpened.current) {
-                setArtifactPanel({
-                  type: args.type || "document",
-                  title: args.title || "Creating...",
-                  content: newContent,
-                });
-              }
-            }
+    if (!toolInvs) return;
+
+    for (const t of toolInvs) {
+      if (t.state !== "output-available" || !t.result || handledToolCallsRef.current.has(t.toolCallId)) continue;
+      const result = t.result as { id?: string; error?: string };
+      if (result.error || !result.id) continue;
+
+      handledToolCallsRef.current.add(t.toolCallId);
+
+      fetch(`/api/artifacts/${result.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((artifact) => {
+          if (artifact) {
+            setArtifactPanel(artifact);
+            setArtifactStreaming(false);
           }
-        }
+        })
+        .catch(console.error);
+    }
+  }, [isLoading, messages, getToolInvocations]);
 
-        // update_artifact — show content streaming in panel
-        if (t.toolName === "update_artifact" && artifactPanel?.id) {
-          const args = t.args as { content?: string };
-          if ((t.state === "input-streaming" || t.state === "input-available") && args.content) {
-            if (args.content.length > lastStreamedContentLen.current) {
-              lastStreamedContentLen.current = args.content.length;
-              setArtifactPanel((prev) => prev ? { ...prev, content: args.content! } : prev);
-              setArtifactStreaming(true);
-            }
-          }
-        }
-
-        // edit_artifact — apply find/replace once when args are complete
-        if (t.toolName === "edit_artifact" && artifactPanel?.id && t.state === "input-available") {
-          const args = t.args as { find?: string; replace?: string };
-          if (args.find && args.replace && t.toolCallId !== lastHandledToolCallId.current) {
-            setArtifactPanel((prev) => {
-              if (!prev || !prev.content.includes(args.find!)) return prev;
-              return { ...prev, content: prev.content.replace(args.find!, args.replace!) };
-            });
-          }
-        }
-
-        // Tool returned — load real content from DB
-        if (t.state !== "output-available" || !t.result) continue;
-        if (t.toolCallId === lastHandledToolCallId.current) continue;
-
-        const result = t.result as { id?: string; error?: string };
-        if (!result.id || result.error) continue;
-
-        if (t.toolName === "create_artifact") {
-          lastHandledToolCallId.current = t.toolCallId;
-          lastOpenedArtifactId.current = result.id;
-          handleOpenArtifactById(result.id);
-        } else if ((t.toolName === "update_artifact" || t.toolName === "edit_artifact") && artifactPanel?.id === result.id) {
-          lastHandledToolCallId.current = t.toolCallId;
-          handleOpenArtifactById(result.id);
-        }
-      }
+  // Streaming artifact content — uses an interval to poll messagesRef
+  // instead of depending on `messages` state (which would cause infinite loops).
+  useEffect(() => {
+    if (streamingTimerRef.current) {
+      clearInterval(streamingTimerRef.current);
+      streamingTimerRef.current = null;
     }
 
-    const content = getMessageContent(lastMsg);
-    if (!content || content.length < 50) return;
-
-    // Detect <artifact> tags
-    const { artifacts } = extractArtifacts(content);
-    if (artifacts.length > 0) {
-      const art = artifacts[artifacts.length - 1];
-      const artType = art.type === "image/svg+xml" ? "svg" : "html";
-      if (art.code.length !== lastArtifactLen.current) {
-        lastArtifactLen.current = art.code.length;
-        if (!artifactAutoOpened.current) {
-          artifactAutoOpened.current = true;
-          sidebarWasOpen.current = sidebarOpen;
-          onCollapseSidebar();
-        }
-        setArtifactPanel({ type: artType, title: art.title, content: art.code });
-        setArtifactStreaming(true);
-      }
+    if (!isLoading) {
+      setArtifactStreaming(false);
+      streamedArtifactContent.current = {};
       return;
     }
 
-    // Detect ```html code blocks with artifact-worthy content
-    const htmlBlockMatch = content.match(/```html\n([\s\S]*?)(?:```|$)/);
-    if (htmlBlockMatch) {
-      const code = htmlBlockMatch[1];
-      if (code.length > 100 && isArtifact("html", code)) {
-        if (code.length !== lastArtifactLen.current) {
-          lastArtifactLen.current = code.length;
-          if (!artifactAutoOpened.current) {
-            artifactAutoOpened.current = true;
-            sidebarWasOpen.current = sidebarOpen;
+    const pollArtifactContent = () => {
+      const msgs = messagesRef.current;
+      const lastMsg = msgs[msgs.length - 1];
+      if (!lastMsg || lastMsg.role !== "assistant") return;
+
+      // Check tool invocations for create_artifact / update_artifact
+      let toolInvs: ToolInvocation[] | undefined;
+      if (lastMsg.parts) {
+        const invocations = lastMsg.parts
+          .filter((p: any) => p.type?.startsWith("tool-") || p.type === "dynamic-tool")
+          .map((p: any) => ({
+            toolCallId: p.toolCallId as string,
+            toolName: (p.type === "dynamic-tool" ? p.toolName : p.type.replace(/^tool-/, "")) as string,
+            state: p.state as string,
+            args: p.input ?? {},
+            result: p.output ?? undefined,
+          }));
+        if (invocations.length > 0) toolInvs = invocations;
+      }
+
+      if (toolInvs && toolInvs.length > 0) {
+        for (const t of toolInvs) {
+          const isCreate = t.toolName === "create_artifact";
+          const isUpdate = t.toolName === "update_artifact";
+          if (!isCreate && !isUpdate) continue;
+          if (t.state !== "input-streaming" && t.state !== "input-available") continue;
+
+          const args = t.args as { title?: string; type?: string; content?: string };
+          const newContent = args.content || "";
+          const prevLen = streamedArtifactContent.current[t.toolCallId]?.length || 0;
+
+          if (newContent.length <= prevLen) continue;
+          streamedArtifactContent.current[t.toolCallId] = newContent;
+
+          if (!artifactOpenedRef.current) {
+            artifactOpenedRef.current = true;
+            sidebarWasOpen.current = true;
             onCollapseSidebar();
           }
-          setArtifactPanel({ type: "html", title: "Website", content: code });
+
+          setArtifactPanel({
+            type: args.type || "document",
+            title: args.title || "Creating...",
+            content: newContent,
+          });
+          setArtifactStreaming(true);
+          return;
+        }
+        return;
+      }
+
+      // Fallback: detect <artifact> tags
+      const content = getMessageContent(lastMsg);
+      if (!content || content.length < 50) return;
+
+      const { artifacts } = extractArtifacts(content);
+      if (artifacts.length > 0) {
+        const art = artifacts[artifacts.length - 1];
+        const artType = art.type === "image/svg+xml" ? "svg" : "html";
+        const prevLen = streamedArtifactContent.current["__tag__"]?.length || 0;
+        if (art.code.length > prevLen) {
+          streamedArtifactContent.current["__tag__"] = art.code;
+          if (!artifactOpenedRef.current) {
+            artifactOpenedRef.current = true;
+            sidebarWasOpen.current = true;
+            onCollapseSidebar();
+          }
+          setArtifactPanel({ type: artType, title: art.title, content: art.code });
           setArtifactStreaming(true);
         }
+        return;
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, messages]);
+
+      // Detect ```html code blocks
+      const htmlBlockMatch = content.match(/```html\n([\s\S]*?)(?:```|$)/);
+      if (htmlBlockMatch) {
+        const code = htmlBlockMatch[1];
+        if (code.length > 100 && isArtifact("html", code)) {
+          const prevLen = streamedArtifactContent.current["__html__"]?.length || 0;
+          if (code.length > prevLen) {
+            streamedArtifactContent.current["__html__"] = code;
+            if (!artifactOpenedRef.current) {
+              artifactOpenedRef.current = true;
+              sidebarWasOpen.current = true;
+              onCollapseSidebar();
+            }
+            setArtifactPanel({ type: "html", title: "Website", content: code });
+            setArtifactStreaming(true);
+          }
+        }
+      }
+    };
+
+    // Poll every 150ms during streaming — fast enough for smooth UX, no infinite loops
+    streamingTimerRef.current = setInterval(pollArtifactContent, 150);
+    // Run immediately too
+    pollArtifactContent();
+
+    return () => {
+      if (streamingTimerRef.current) {
+        clearInterval(streamingTimerRef.current);
+        streamingTimerRef.current = null;
+      }
+    };
+  }, [isLoading, getMessageContent, onCollapseSidebar]);
 
   const handleRegenerate = useCallback(() => {
     if (isLoading || messages.length < 2) return;
-
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.role !== "assistant") return;
-
     const userMsg = messages[messages.length - 2];
     if (userMsg?.role === "user") {
       const oldVersion: VersionEntry = {
         id: lastMsg.id,
         content: getMessageContent(lastMsg),
-        model:
-          messageModelMap.current.get(lastMsg.id) || selectedModelRef.current,
+        model: messageModelMap.current.get(lastMsg.id) || selectedModelRef.current,
         toolInvocations: getToolInvocations(lastMsg),
       };
       setRegenerationHistory((prev) => {
@@ -671,10 +655,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         return { ...prev, [key]: [...existing, oldVersion] };
       });
     }
-
     const withoutLast = messages.slice(0, -1);
     setMessages(withoutLast);
-
     sendMessage(undefined, {
       body: {
         conversationId: conversationIdRef.current,
@@ -685,14 +667,11 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     });
   }, [isLoading, messages, setMessages, sendMessage, getMessageContent, getToolInvocations]);
 
-  // Enter edit mode: populate the input bar with the message content
   const handleStartEdit = useCallback(
     (messageIndex: number, currentContent: string) => {
       if (isLoading || messageIndex < 0 || messageIndex >= messages.length) return;
       const msg = messages[messageIndex];
       if (msg.role !== "user") return;
-
-      // Save current input so we can restore on cancel
       savedInputRef.current = input;
       setEditingState({ messageIndex, originalContent: currentContent });
       setInput(currentContent);
@@ -700,10 +679,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     [isLoading, messages, input]
   );
 
-  // Track pending regen transfer: old user msg ID → needs to be re-keyed after reload
   const pendingRegenTransfer = useRef<{ oldUserMsgId: string; messageIndex: number } | null>(null);
 
-  // Transfer regenerationHistory key when messages reload with different IDs
   useEffect(() => {
     const transfer = pendingRegenTransfer.current;
     if (!transfer) return;
@@ -720,19 +697,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
   }, [messages]);
 
-  // Track pending edit branch transfer: old message ID → needs to be re-keyed to new message ID
   const pendingEditTransfer = useRef<{ oldId: string; messageIndex: number } | null>(null);
 
-  // Transfer editBranches key when a new message replaces an edited one
   useEffect(() => {
     const transfer = pendingEditTransfer.current;
     if (!transfer) return;
     const { oldId, messageIndex } = transfer;
-    // Find the new user message at or after the expected index
-    // (useChat may insert the message at slightly different positions)
     let newMsg = messages[messageIndex];
     if (!newMsg || newMsg.role !== "user") {
-      // Search nearby for the user message
       for (let i = Math.max(0, messageIndex - 1); i < Math.min(messages.length, messageIndex + 2); i++) {
         if (messages[i]?.role === "user" && messages[i].id !== oldId) {
           newMsg = messages[i];
@@ -740,8 +712,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         }
       }
     }
-    if (!newMsg || newMsg.role !== "user") return;
-    if (newMsg.id === oldId) return;
+    if (!newMsg || newMsg.role !== "user" || newMsg.id === oldId) return;
     pendingEditTransfer.current = null;
     setEditBranches((prev) => {
       const branches = prev[oldId];
@@ -751,58 +722,42 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     });
   }, [messages]);
 
-  // Actually perform the edit (called when user submits from editing mode)
   const handleSubmitEdit = useCallback(() => {
     if (!editingState) return;
     const { messageIndex } = editingState;
     const newContent = input.trim();
     if (!newContent || newContent === editingState.originalContent) {
-      // No change — cancel
       setInput(savedInputRef.current);
       setEditingState(null);
       return;
     }
-
     const editedMsg = messages[messageIndex];
     if (!editedMsg || editedMsg.role !== "user") return;
-
     const oldUserContent = getMessageContent(editedMsg);
     const followingMessages = messages.slice(messageIndex + 1).map((m) => ({
       id: m.id,
       role: m.role as "user" | "assistant" | "system",
       content: getMessageContent(m),
-      model:
-        messageModelMap.current.get(m.id) ||
-        (m.role === "assistant" ? selectedModelRef.current : null),
+      model: messageModelMap.current.get(m.id) || (m.role === "assistant" ? selectedModelRef.current : null),
       images: messageAttachments[m.id]?.images,
       files: messageAttachments[m.id]?.files,
       toolInvocations: getToolInvocations(m),
     }));
-
     const branch: EditBranch = {
       userContent: oldUserContent,
       followingMessages,
     };
-
     setEditBranches((prev) => {
       const key = editedMsg.id;
       const existing = prev[key] || [];
       return { ...prev, [key]: [...existing, branch] };
     });
-
-    // Schedule re-keying editBranches once the new message appears
     pendingEditTransfer.current = { oldId: editedMsg.id, messageIndex };
-
     const truncated = messages.slice(0, messageIndex);
     setMessages(truncated);
-
     setEditingState(null);
     setInput("");
-
-    // parentId = the message before the edited one (its parent in the tree)
-    // editedMessageId = the message being edited, so server can make the new one a sibling
     const editParentId = messageIndex > 0 ? messages[messageIndex - 1].id : null;
-
     sendMessage(
       { text: newContent },
       {
@@ -821,20 +776,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setEditingState(null);
   }, []);
 
-  // Edit last user message (triggered by up arrow in empty input)
-  const handleEditLastMessage = useCallback(() => {
-    if (isLoading || messages.length === 0) return;
-    // Find last user message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        // We can't directly trigger the edit UI in the bubble from here,
-        // but we can use the edit message handler approach
-        // For now, just focus — the actual edit is handled by the message bubble
-        break;
-      }
-    }
-  }, [isLoading, messages]);
-
   const handleOpenArtifact = useCallback((code: string, language: string) => {
     sidebarWasOpen.current = sidebarOpen;
     setArtifactPanel({ type: language === "svg" ? "svg" : "html", title: "Preview", content: code });
@@ -850,6 +791,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       sidebarWasOpen.current = sidebarOpen;
       setArtifactPanel(artifact);
       setArtifactStreaming(false);
+      artifactOpenedRef.current = true;
       onCollapseSidebar();
     } catch (err) {
       console.error("Failed to open artifact:", err);
@@ -882,7 +824,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       const versions = await res.json();
       const target = versions.find((v: { version: number }) => v.version === targetVersion);
       if (!target) return;
-      // Restore without creating a new version
       const patchRes = await fetch(`/api/artifacts/${artifactPanel.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -897,23 +838,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
   }, [artifactPanel?.id, artifactPanel?.version]);
 
-  const handleSendToChat = useCallback((text: string) => {
-    setInput((prev) => {
-      const quote = text.split("\n").map((l) => `> ${l}`).join("\n");
-      return prev ? `${prev}\n\n${quote}\n\n` : `${quote}\n\n`;
-    });
-  }, []);
-
-  const handleArtifactEditRequest = useCallback((selectedText: string, instruction: string) => {
-    const artifactTitle = artifactPanel?.title || "the artifact";
-    const msg = `Edit "${artifactTitle}": ${instruction}\n\nSelected text:\n> ${selectedText}`;
-    setInput("");
-    handleSendMessage(msg);
-  }, [artifactPanel?.title, handleSendMessage]);
-
   const handleCloseArtifact = useCallback(() => {
     setArtifactPanel(null);
     setArtifactStreaming(false);
+    artifactOpenedRef.current = false;
     if (sidebarWasOpen.current) {
       onOpenSidebar();
     }
@@ -925,7 +853,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setIsDraggingArtifact(true);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-
     const handleMove = (ev: MouseEvent) => {
       if (!artifactDragging.current) return;
       cancelAnimationFrame(rafRef.current);
@@ -950,7 +877,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     document.addEventListener("mouseup", handleUp);
   }, []);
 
-  // Auto-focus input on mount and when returning to empty state
   useEffect(() => {
     if (messages.length === 0) {
       setTimeout(() => {
@@ -1000,6 +926,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     },
     []
   );
+
+  // Reset streaming refs when conversation changes
+  useEffect(() => {
+    artifactOpenedRef.current = false;
+    streamedArtifactContent.current = {};
+    handledToolCallsRef.current.clear();
+  }, [activeId]);
 
   return (
     <div ref={outerRef} className="flex h-full flex-1 relative">
@@ -1099,13 +1032,11 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             <button
               onClick={() => {
                 setChatError(null);
-                // Retry: resend the last user message
                 if (messages.length > 0) {
                   const lastUser = [...messages].reverse().find((m) => m.role === "user");
                   if (lastUser) {
                     const lastAssistant = messages[messages.length - 1];
                     if (lastAssistant?.role !== "assistant" || getMessageContent(lastAssistant).length === 0) {
-                      // Remove the failed empty assistant message if present
                       const cleaned = messages.filter((m) => m.role === "user" || getMessageContent(m).length > 0);
                       setMessages(cleaned);
                     }
@@ -1136,7 +1067,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         </div>
       )}
 
-      {/* Vision warning — shown when images are attached to a non-vision model */}
+      {/* Vision warning */}
       {files.some(f => f.isImage && f.dataUrl) && currentModel && !currentModel.supportsVision && (
         <div className="shrink-0 px-4">
           <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
@@ -1164,7 +1095,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         placeholder={viewingOldBranch ? "Switch to the latest version to continue chatting" : undefined}
         files={files}
         onFilesChange={setFiles}
-        onEditLastMessage={handleEditLastMessage}
+        onEditLastMessage={() => {}}
         editing={editingState}
         onCancelEdit={handleCancelEdit}
         onSubmitEdit={handleSubmitEdit}
@@ -1174,37 +1105,22 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     {/* Artifact Preview Panel */}
     {artifactPanel && (
       <>
-        {/* Mobile: full-screen overlay */}
+        {/* Mobile: full-screen overlay — ArtifactPreview has its own header */}
         <div className="fixed inset-0 z-50 flex flex-col bg-background lg:hidden">
-          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3">
-            <span className="text-xs font-medium truncate">{artifactPanel.title || "Preview"}</span>
-            <button
-              onClick={handleCloseArtifact}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex-1 min-h-0">
-            <ArtifactPreview
-              artifact={artifactPanel}
-              streaming={artifactStreaming}
-              onClose={handleCloseArtifact}
-              onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
-              onSendToChat={handleSendToChat}
-              onEditRequest={handleArtifactEditRequest}
-              onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
-            />
-          </div>
+          <ArtifactPreview
+            artifact={artifactPanel}
+            streaming={artifactStreaming}
+            onClose={handleCloseArtifact}
+            onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
+            onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
+          />
         </div>
 
         {/* Desktop: side-by-side split */}
         <div className="hidden lg:contents">
-          {/* Drag overlay — covers iframes so mouse events aren't swallowed */}
           {isDraggingArtifact && (
             <div className="fixed inset-0 z-50 cursor-col-resize" />
           )}
-          {/* Drag handle */}
           <div
             onMouseDown={handleArtifactDragStart}
             className="w-1.5 h-full shrink-0 cursor-col-resize group/handle relative"
@@ -1218,9 +1134,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               streaming={artifactStreaming}
               onClose={handleCloseArtifact}
               onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
-              onSendToChat={handleSendToChat}
-              onEditRequest={handleArtifactEditRequest}
               onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
+              totalVersions={artifactPanel.version}
             />
           </div>
         </div>

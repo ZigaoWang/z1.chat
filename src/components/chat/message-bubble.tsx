@@ -475,30 +475,53 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Artifact tool invocation cards */}
+        {/* Artifact tool invocation cards — show during streaming AND after completion */}
         {toolInvocations && onOpenArtifactById && (() => {
+          const ARTIFACT_TOOLS = new Set(["create_artifact", "update_artifact", "edit_artifact"]);
           const artifactTools = toolInvocations.filter(
-            (t) => t.toolName === "create_artifact" && t.state === "output-available" && t.result
+            (t) => ARTIFACT_TOOLS.has(t.toolName)
           );
           if (artifactTools.length === 0) return null;
+
           return (
             <div className="flex flex-wrap gap-2 my-2">
               {artifactTools.map((t) => {
-                const result = t.result as { id?: string; type?: string; title?: string; error?: string };
-                if (result.error || !result.id) return null;
-                const typeLabel = result.type === "document" ? "Document" : result.type === "code" ? "Code" : result.type === "mermaid" ? "Diagram" : result.type === "html" ? "Website" : "Artifact";
+                const isComplete = t.state === "output-available";
+                const isRunning = t.state === "input-streaming" || t.state === "input-available";
+                if (!isComplete && !isRunning) return null;
+
+                // For completed tools, get info from result
+                const result = isComplete ? (t.result as { id?: string; type?: string; title?: string; error?: string }) : null;
+                if (result?.error) return null;
+
+                // For streaming tools, get info from args
+                const args = t.args as { title?: string; type?: string; content?: string; artifactId?: string };
+                const displayTitle = result?.title || args.title || (t.toolName === "update_artifact" ? "Updating..." : t.toolName === "edit_artifact" ? "Editing..." : "Creating...");
+                const displayType = result?.type || args.type || "document";
+                const typeLabel = displayType === "document" ? "Document" : displayType === "code" ? "Code" : displayType === "mermaid" ? "Diagram" : displayType === "html" ? "Website" : displayType === "svg" ? "SVG" : "Artifact";
+                const artifactId = result?.id || args.artifactId;
+
                 return (
                   <button
                     key={t.toolCallId}
-                    onClick={() => onOpenArtifactById(result.id!)}
-                    className="group/art flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 hover:border-border w-full max-w-xs"
+                    onClick={() => artifactId ? onOpenArtifactById(artifactId) : undefined}
+                    disabled={!artifactId}
+                    className="group/art flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 hover:border-border w-full max-w-xs disabled:opacity-80 disabled:cursor-default"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors">
-                      <Eye className="h-4 w-4" />
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      isRunning ? "bg-primary/10 text-primary" : "bg-primary/10 text-primary"
+                    }`}>
+                      {isRunning ? (
+                        <span className="h-4 w-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{result.title}</p>
-                      <p className="text-[11px] text-muted-foreground/50">{typeLabel}</p>
+                      <p className="text-sm font-medium truncate">{displayTitle}</p>
+                      <p className="text-[11px] text-muted-foreground/50">
+                        {isRunning ? `Generating ${typeLabel.toLowerCase()}...` : typeLabel}
+                      </p>
                     </div>
                   </button>
                 );
@@ -510,19 +533,30 @@ function MessageBubble({
         {/* Update/edit artifact indicators */}
         {toolInvocations && (() => {
           const updateTools = toolInvocations.filter(
-            (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") && t.state === "output-available" && t.result
+            (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") &&
+                   (t.state === "output-available" || t.state === "input-streaming" || t.state === "input-available")
           );
           if (updateTools.length === 0) return null;
           return (
             <div className="my-1">
               {updateTools.map((t) => {
-                const result = t.result as { title?: string; version?: number; changed?: boolean; error?: string };
-                if (result.error) return null;
+                const isRunning = t.state === "input-streaming" || t.state === "input-available";
+                const result = t.state === "output-available" ? (t.result as { title?: string; version?: number; error?: string }) : null;
+                if (result?.error) return null;
+                const args = t.args as { title?: string; artifactId?: string };
+                const displayTitle = result?.title || args.title || "artifact";
                 return (
                   <p key={t.toolCallId} className="text-xs text-muted-foreground/40 flex items-center gap-1">
-                    <Pencil className="h-3 w-3" />
-                    {t.toolName === "update_artifact" ? "Rewrote" : "Edited"} &ldquo;{result.title}&rdquo;
-                    {result.version && result.version > 1 && <span className="text-[10px]">v{result.version}</span>}
+                    {isRunning ? (
+                      <span className="h-3 w-3 rounded-full border border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+                    ) : (
+                      <Pencil className="h-3 w-3" />
+                    )}
+                    {isRunning
+                      ? (t.toolName === "update_artifact" ? "Rewriting" : "Editing")
+                      : (t.toolName === "update_artifact" ? "Rewrote" : "Edited")
+                    } &ldquo;{displayTitle}&rdquo;
+                    {result?.version && result.version > 1 && <span className="text-[10px]">v{result.version}</span>}
                   </p>
                 );
               })}
