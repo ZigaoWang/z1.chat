@@ -219,20 +219,20 @@ function getArtifactTypeLabel(type: string): string {
 }
 
 // --- Sandbox execution cards ---
-function SandboxStatus({ invocations }: { invocations: ToolInvocation[] }) {
+function SandboxStatus({ invocations, onLightbox }: { invocations: ToolInvocation[]; onLightbox: (src: string) => void }) {
   const executions = invocations.filter((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
   if (executions.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1.5 my-2">
       {executions.map((exec) => (
-        <SandboxCard key={exec.toolCallId} invocation={exec} />
+        <SandboxCard key={exec.toolCallId} invocation={exec} onLightbox={onLightbox} />
       ))}
     </div>
   );
 }
 
-function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
+function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocation; onLightbox: (src: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = exec.state !== "output-available" && exec.state !== "output-error";
   const result = !isRunning ? exec.result as SandboxToolResult : null;
@@ -248,11 +248,18 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
     ? (codeSnippet.split("\n")[0].slice(0, 60) + (codeSnippet.includes("\n") ? "..." : ""))
     : null;
 
+  // Images from this specific execution
+  const execImages: string[] = [];
+  if (!isRunning && result) {
+    const r = result as SandboxToolResult;
+    if (r.images) execImages.push(...r.images);
+  }
+
   return (
     <div className="rounded-lg border border-border/40 overflow-hidden">
       <button
-        onClick={() => hasOutput && setExpanded(!expanded)}
-        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${hasOutput ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
+        onClick={() => (hasOutput || execImages.length > 0) && setExpanded(!expanded)}
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${(hasOutput || execImages.length > 0) ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
       >
         {isRunning ? (
           <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
@@ -263,24 +270,26 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
         )}
         <span className="font-medium text-foreground/70">{label}</span>
         {langLabel && <span className="rounded bg-muted/60 px-1 py-px text-[10px] text-muted-foreground/50">{langLabel}</span>}
-        {preview && <span className="text-muted-foreground/30 font-mono truncate ml-1 hidden sm:inline">{preview}</span>}
-        {!isRunning && hasOutput && (
+        {!isRunning && (hasOutput || execImages.length > 0) && (
           <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground/30 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
         )}
       </button>
-      {isRunning && (
+      {/* Running: show code scrolling down (last lines visible) */}
+      {isRunning && codeSnippet && (
         <>
           <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>
-          {codeSnippet && (
-            <div className="border-t border-border/20 px-3 py-2 max-h-24 overflow-hidden relative">
-              <pre className="text-[11px] text-muted-foreground/40 font-mono whitespace-pre-wrap line-clamp-4">{codeSnippet}</pre>
-              <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent" />
-            </div>
-          )}
+          <div className="border-t border-border/20 px-3 py-2 max-h-32 overflow-hidden relative flex flex-col justify-end">
+            <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-card to-transparent z-10" />
+            <pre className="text-[11px] text-muted-foreground/40 font-mono whitespace-pre-wrap">{codeSnippet}</pre>
+          </div>
         </>
       )}
-      {(expanded || (!isRunning && hasError)) && hasOutput && (
-        <div className="border-t border-border/30 px-3 py-2 space-y-1">
+      {isRunning && !codeSnippet && (
+        <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>
+      )}
+      {/* Completed: output + images */}
+      {(expanded || (!isRunning && hasError)) && (hasOutput || execImages.length > 0) && (
+        <div className="border-t border-border/30 px-3 py-2 space-y-2">
           {result?.stdout && (
             <pre className="text-[11px] text-muted-foreground/60 bg-muted/20 rounded px-2.5 py-1.5 overflow-x-auto max-h-48 whitespace-pre-wrap font-mono">{result.stdout}</pre>
           )}
@@ -289,6 +298,19 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
           )}
           {result?.error && (
             <pre className="text-[11px] text-red-600/60 dark:text-red-400/60 bg-red-500/5 rounded px-2.5 py-1.5 overflow-x-auto whitespace-pre-wrap font-mono">{result.error}</pre>
+          )}
+          {execImages.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {execImages.map((base64, i) => {
+                const isJpeg = base64.startsWith("/9j/");
+                const src = `data:${isJpeg ? "image/jpeg" : "image/png"};base64,${base64}`;
+                return (
+                  <button key={i} onClick={() => onLightbox(src)} className="block overflow-hidden rounded-md border border-border/30 hover:border-border transition-colors">
+                    <img src={src} alt={`Output ${i + 1}`} className="max-w-full sm:max-w-[300px] max-h-[200px] object-contain" />
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -336,46 +358,6 @@ function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: T
             <span className="font-medium text-foreground/70 truncate">{displayTitle}</span>
             <span className="text-muted-foreground/40 shrink-0">{isRunning ? `${actionLabel}...` : actionLabel}</span>
             {version && version > 1 && <span className="text-[10px] text-muted-foreground/30 tabular-nums">v{version}</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// --- Inline images from sandbox tools (code_execute, file_download) ---
-function SandboxImages({ invocations, onLightbox }: { invocations: ToolInvocation[]; onLightbox: (src: string) => void }) {
-  const allImages: string[] = [];
-  for (const inv of invocations) {
-    if (
-      (inv.toolName === "code_execute" || inv.toolName === "file_download") &&
-      inv.state === "output-available" &&
-      inv.result
-    ) {
-      const r = inv.result as SandboxToolResult;
-      if (r.images) allImages.push(...r.images);
-    }
-  }
-  if (allImages.length === 0) return null;
-
-  return (
-    <div className="my-2 flex flex-wrap gap-2">
-      {allImages.map((base64, i) => {
-        // Detect format from base64 header or default to JPEG
-        const isJpeg = base64.startsWith("/9j/");
-        const mime = isJpeg ? "image/jpeg" : "image/png";
-        const src = `data:${mime};base64,${base64}`;
-        return (
-          <button
-            key={i}
-            onClick={() => onLightbox(src)}
-            className="block overflow-hidden rounded-lg border border-border/30 hover:border-border transition-colors"
-          >
-            <img
-              src={src}
-              alt={`Code output ${i + 1}`}
-              className="max-w-full sm:max-w-[400px] max-h-[300px] object-contain"
-            />
           </button>
         );
       })}
@@ -540,8 +522,7 @@ function MessageBubble({
           </div>
         )}
 
-        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} />}
-        {hasCodeExec && <SandboxImages invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
+        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
 
         {/* Artifact cards */}
         {artifacts.length > 0 && onOpenArtifact && (
