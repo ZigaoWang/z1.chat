@@ -35,7 +35,7 @@ function CodeBlock({
   return (
     <div className="group/code relative my-3 ml-1 overflow-hidden rounded-lg border border-border/50 bg-card">
       <div className="flex items-center justify-between border-b border-border/40 px-3 py-1.5 bg-muted/30">
-        <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
           {language || "code"}
         </span>
         <div className="flex items-center gap-1">

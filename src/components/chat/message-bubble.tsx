@@ -441,7 +441,7 @@ function MessageBubble({
             </div>
           )}
 
-          <div className="rounded-2xl rounded-br-sm bg-primary/[0.08] dark:bg-primary/[0.12] px-3.5 py-2">
+          <div className="rounded-2xl rounded-br-sm bg-primary/[0.06] dark:bg-primary/[0.10] px-3.5 py-2.5">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
           </div>
           {/* Actions */}
@@ -451,9 +451,9 @@ function MessageBubble({
             )}
             <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
               {onEdit && !isStreaming && (
-                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
+                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
               )}
-              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
                 {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
@@ -576,7 +576,7 @@ function MessageBubble({
               }
               return sources.slice(0, 5).map((src, i) => (
                 <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-border/40 px-1.5 py-0.5 text-[11px] text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/30 transition-colors">
+                  className="inline-flex items-center gap-1 rounded border border-border/40 px-1.5 py-0.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-colors">
                   <img src={`https://www.google.com/s2/favicons?domain=${getDomain(src.url)}&sz=32`} alt="" className="h-3 w-3 rounded-sm"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   <span className="max-w-[100px] truncate">{src.title || getDomain(src.url)}</span>
@@ -593,16 +593,16 @@ function MessageBubble({
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
             <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
-              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
                 {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               </button>
               {isLast && onRegenerate && (
-                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/25 hover:text-muted-foreground hover:bg-muted/50" title="Regenerate">
+                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Regenerate">
                   <RotateCcw className="h-3 w-3" />
                 </button>
               )}
             </div>
-            {modelLabel && <span className="text-[10px] text-muted-foreground/20 ml-auto">{modelLabel}</span>}
+            {modelLabel && <span className="text-[10px] text-muted-foreground/30 ml-auto">{modelLabel}</span>}
           </div>
         )}
       </div>

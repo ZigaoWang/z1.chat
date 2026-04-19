@@ -1075,13 +1075,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
       {/* Messages or Empty State */}
       {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-16">
-          <div className="w-full max-w-lg text-center">
-            <p className="text-2xl font-semibold text-foreground/90">
+        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-20">
+          <div className="w-full max-w-md text-center animate-fade-in">
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
               {greeting}
             </p>
-            <p className="mt-2 text-sm text-muted-foreground/60">
-              How can I help you today?
+            <p className="mt-1.5 text-sm text-muted-foreground/50">
+              Ask anything, create artifacts, run code, or search the web.
             </p>
           </div>
         </div>

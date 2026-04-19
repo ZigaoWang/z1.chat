@@ -230,7 +230,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             // Close sidebar on mobile after selecting a conversation
             if (window.innerWidth < 1024) onClose();
           }}
-          className={`w-full flex items-center justify-between gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors ${
+          className={`w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
             isActive ? "bg-muted" : "hover:bg-muted/50"
           }`}
         >
@@ -355,7 +355,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        <div className="shrink-0 border-t border-sidebar-border/40 px-1.5 py-1 space-y-px">
+        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2 space-y-0.5">
           {user && (
             <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/70">
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
