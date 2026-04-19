@@ -388,7 +388,7 @@ export async function POST(req: Request) {
       flushTimer = setTimeout(() => {
         flushTimer = null;
         flushTextToDB();
-      }, 2000); // Save every 2s during streaming
+      }, 1000); // Flush every 1s during streaming
     };
 
     const result = trackedStreamText({
@@ -409,8 +409,10 @@ export async function POST(req: Request) {
           scheduleFlush();
         }
       },
-      // Save progressively after each step so tool results aren't lost on timeout
       onStepFinish: async ({ text, toolCalls, toolResults }) => {
+        console.log(`[chat] onStepFinish: textLen=${text?.length || 0}, tools=${toolCalls?.length || 0}, msgId=${assistantMessageId}`);
+        // Use accumulated text if step text is empty (pure text streaming)
+        const stepText = text || accumulatedText || "";
         // Collect tool invocations from this step
         if (toolCalls) {
           for (const tc of toolCalls) {
@@ -431,7 +433,7 @@ export async function POST(req: Request) {
         // Update assistant message with latest content + tool results
         try {
           if (assistantMessageId) {
-            const content = text || "";
+            const content = stepText;
             const metadata = allToolInvocations.length > 0
               ? { toolInvocations: allToolInvocations }
               : undefined;
@@ -443,13 +445,26 @@ export async function POST(req: Request) {
           console.error("[chat] Failed to save step:", err);
         }
       },
-      onFinish: async ({ text, usage }) => {
-        // Cancel pending flush — we'll do the final save now
+      onAbort: async () => {
+        console.log(`[chat] onAbort: flushing ${accumulatedText.length} chars for msgId=${assistantMessageId}`);
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+        if (assistantMessageId && accumulatedText.length > 0) {
+          try {
+            const metadata = allToolInvocations.length > 0 ? { toolInvocations: allToolInvocations } : undefined;
+            await db.update(messages).set({ content: accumulatedText, metadata }).where(eq(messages.id, assistantMessageId));
+          } catch (err) { console.error("[chat] Failed to save on abort:", err); }
+        }
+        if (sandboxManager) sandboxManager.kill().catch(console.error);
+      },
+      onFinish: async ({ text, usage }) => {
+        console.log(`[chat] onFinish: textLen=${text?.length || 0}, accumulated=${accumulatedText.length}, msgId=${assistantMessageId}`);
+        if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+
+        // Use whichever has more content
+        const finalText = (text && text.length >= accumulatedText.length) ? text : (accumulatedText || text || "");
 
         // Final update with complete text and token counts
         try {
-          const content = text || "";
           const metadata = allToolInvocations.length > 0
             ? { toolInvocations: allToolInvocations }
             : undefined;
@@ -457,7 +472,7 @@ export async function POST(req: Request) {
           if (assistantMessageId) {
             await db.update(messages)
               .set({
-                content,
+                content: finalText,
                 metadata,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
@@ -483,14 +498,14 @@ export async function POST(req: Request) {
         }
 
         // Background tasks
-        if (text && userContent) {
-          generateConversationTitle(convId!, userContent, text, userId).catch(console.error);
+        if (finalText && userContent) {
+          generateConversationTitle(convId!, userContent, finalText, userId).catch(console.error);
         }
         if (!isEdit) {
           updateConversationSummary(convId!, userId).catch(console.error);
         }
-        if (text && userContent) {
-          extractMemories(userId, convId!, userContent, text).catch(console.error);
+        if (finalText && userContent) {
+          extractMemories(userId, convId!, userContent, finalText).catch(console.error);
         }
       },
     }, { userId, conversationId: convId!, type: "chat", model: selectedModel });
