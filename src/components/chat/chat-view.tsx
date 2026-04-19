@@ -987,7 +987,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   }, [activeId]);
 
   return (
-    <div ref={outerRef} className="flex h-full flex-1 relative">
+    <div ref={outerRef} className="flex h-full flex-1 relative overflow-hidden">
     <div
       style={artifactPanel ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.2s ease-out' } : undefined}
       className={`relative flex h-full flex-col bg-background ${artifactPanel ? "max-lg:flex-1" : "flex-1"}`}
@@ -1180,7 +1180,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             <div className="absolute inset-y-0 -left-1 -right-1" />
             <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/30" : "hover:bg-primary/20"}`} />
           </div>
-          <div style={{ width: `${artifactWidth}%` }} className="h-full shrink-0">
+          <div style={{ width: `${artifactWidth}%` }} className="h-full min-w-0 overflow-hidden">
             <ArtifactPreview
               artifact={artifactPanel}
               streaming={artifactStreaming}

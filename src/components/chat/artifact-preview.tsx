@@ -340,7 +340,7 @@ export default function ArtifactPreview({
 
     // Preview: document — live markdown
     if (type === "document") return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto p-6 max-w-3xl mx-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto px-4 py-6 sm:px-6">
         <MarkdownRenderer content={content} />
       </div>
     );
@@ -370,63 +370,63 @@ export default function ArtifactPreview({
   };
 
   return (
-    <div className="flex h-full w-full flex-col bg-background">
+    <div className="flex h-full w-full flex-col bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/40 px-3">
-        {/* Title */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium truncate">{title}</span>
-            {numVersions > 1 && onLoadVersion ? (
-              <div className="relative">
-                <button onClick={() => setVersionOpen(!versionOpen)} className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors">
-                  v{version}<ChevronDown className="h-2.5 w-2.5" />
-                </button>
-                {versionOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-50 min-w-[72px] rounded-md border border-border bg-popover shadow-md py-0.5">
-                      {Array.from({ length: numVersions }, (_, i) => i + 1).reverse().map((v) => (
-                        <button key={v} onClick={() => { onLoadVersion(v); setVersionOpen(false); }} className={`w-full px-2.5 py-1 text-left text-[11px] hover:bg-muted transition-colors ${v === version ? "text-foreground font-medium" : "text-muted-foreground"}`}>
-                          v{v}{v === version ? " (latest)" : ""}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <span className="text-[10px] text-muted-foreground/30 tabular-nums">v{version || 1}</span>
+      <div className="shrink-0 border-b border-border/40 overflow-hidden">
+        <div className="flex items-center gap-1 px-2 h-12 min-w-0 overflow-hidden">
+          {/* Title */}
+          <span className="text-sm font-medium truncate min-w-0 shrink px-1">{title}</span>
+          {numVersions > 1 && onLoadVersion ? (
+            <div className="relative shrink-0">
+              <button onClick={() => setVersionOpen(!versionOpen)} className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors">
+                v{version}<ChevronDown className="h-2.5 w-2.5" />
+              </button>
+              {versionOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
+                  <div className="absolute left-0 top-full mt-1 z-50 min-w-[72px] rounded-md border border-border bg-popover shadow-md py-0.5">
+                    {Array.from({ length: numVersions }, (_, i) => i + 1).reverse().map((v) => (
+                      <button key={v} onClick={() => { onLoadVersion(v); setVersionOpen(false); }} className={`w-full px-2.5 py-1 text-left text-[11px] hover:bg-muted transition-colors ${v === version ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                        v{v}{v === version ? " (latest)" : ""}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <span className="text-[10px] text-muted-foreground/30 tabular-nums shrink-0">v{version || 1}</span>
+          )}
+
+          <div className="flex-1 min-w-0" />
+
+          {/* Tabs */}
+          <div className="flex items-center rounded-md bg-muted/50 p-0.5 shrink-0">
+            <button onClick={() => { setTab("preview"); setEditing(false); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+              Preview
+            </button>
+            {type !== "document" && (
+              <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+                Code
+              </button>
             )}
-            {streaming && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0" />}
+            {!streaming && onContentChange && (
+              <button onClick={() => { setEditing(!editing); if (!editing) setTab("preview"); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+                Edit
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex items-center rounded-md bg-muted/50 p-0.5">
-          <button onClick={() => { setTab("preview"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-            Preview
-          </button>
-          {type !== "document" && (
-            <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-              Code
-            </button>
-          )}
-          {!streaming && onContentChange && (
-            <button onClick={() => { setEditing(!editing); if (!editing) setTab("preview"); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-              Edit
-            </button>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center">
-          {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
-          {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
-          <IconBtn onClick={handleCopy} title="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
-          <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
-          <div className="w-px h-4 bg-border/40 mx-1" />
-          <IconBtn onClick={onClose} title="Close"><X className="h-3.5 w-3.5" /></IconBtn>
+          {/* Actions — only essential buttons visible, rest hidden on narrow */}
+          <div className="flex items-center shrink-0">
+            <IconBtn onClick={handleCopy} title="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
+            <div className="hidden sm:flex items-center">
+              <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+              {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
+              {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
+            </div>
+            <IconBtn onClick={onClose} title="Close"><X className="h-3.5 w-3.5" /></IconBtn>
+          </div>
         </div>
       </div>
 
