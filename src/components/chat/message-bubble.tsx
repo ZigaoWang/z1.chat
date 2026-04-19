@@ -269,11 +269,17 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
         )}
       </button>
       {isRunning && (
-        <div className="h-px bg-muted overflow-hidden">
-          <div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" />
-        </div>
+        <>
+          <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>
+          {codeSnippet && (
+            <div className="border-t border-border/20 px-3 py-2 max-h-24 overflow-hidden relative">
+              <pre className="text-[11px] text-muted-foreground/40 font-mono whitespace-pre-wrap line-clamp-4">{codeSnippet}</pre>
+              <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent" />
+            </div>
+          )}
+        </>
       )}
-      {expanded && hasOutput && (
+      {(expanded || (!isRunning && hasError)) && hasOutput && (
         <div className="border-t border-border/30 px-3 py-2 space-y-1">
           {result?.stdout && (
             <pre className="text-[11px] text-muted-foreground/60 bg-muted/20 rounded px-2.5 py-1.5 overflow-x-auto max-h-48 whitespace-pre-wrap font-mono">{result.stdout}</pre>
@@ -493,6 +499,20 @@ function MessageBubble({
   return (
     <div className="group px-4 py-1">
       <div className="mx-auto max-w-3xl">
+        {/* Text content first — or streaming dots if nothing yet */}
+        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools && fetchInvocations.length === 0 ? (
+          <div className="flex items-center gap-1.5 py-1">
+            <div className="flex gap-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+            </div>
+          </div>
+        ) : displayContent.length > 0 ? (
+          <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
+        ) : null}
+
+        {/* Tool status cards — all grouped together right after text */}
         {hasSearches && <SearchStatus invocations={toolInvocations!} />}
 
         {fetchInvocations.length > 0 && (
@@ -520,26 +540,10 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Streaming placeholder — show when no text yet but tools are active */}
-        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools ? (
-          <div className="flex items-center gap-1.5 py-1">
-            <div className="flex gap-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
-            </div>
-          </div>
-        ) : displayContent.length > 0 ? (
-          <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
-        ) : null}
-
-        {/* Code execution cards */}
         {hasCodeExec && <SandboxStatus invocations={toolInvocations!} />}
-
-        {/* Inline images from sandbox tools */}
         {hasCodeExec && <SandboxImages invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
 
-        {/* Artifact preview cards (legacy auto-detection) */}
+        {/* Artifact cards */}
         {artifacts.length > 0 && onOpenArtifact && (
           <div className="flex flex-col gap-1.5 my-2">
             {artifacts.map((artifact) => (
@@ -560,7 +564,6 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Artifact tool cards (create, update, edit) */}
         {hasArtifactTools && onOpenArtifactById && (
           <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} />
         )}
