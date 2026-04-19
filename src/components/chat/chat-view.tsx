@@ -339,6 +339,52 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
   }, [activeId, setMessages, refreshConversations]);
 
+  // Poll for in-progress responses: if the last message is an empty assistant message,
+  // it means generation is happening in another tab. Poll until content appears.
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (!activeId || isLoading) return;
+
+    const msgs = messagesRef.current;
+    const lastMsg = msgs[msgs.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return;
+
+    // Check if content is empty (in-progress from another tab)
+    const content = lastMsg.parts
+      ?.filter((p: { type: string }) => p.type === "text")
+      .map((p: { type: string; text?: string }) => p.text || "")
+      .join("") || "";
+
+    if (content.trim().length > 0) return;
+
+    // Empty assistant message — poll for updates
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > 30) { // Stop after 60s
+        if (pollRef.current) clearInterval(pollRef.current);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/conversations/${activeId}/messages`);
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+        const lastDb = data[data.length - 1];
+        if (lastDb?.role === "assistant" && lastDb.content?.trim()) {
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          // Reload messages with the updated content
+          initialLoadDone.current = false;
+          // Trigger the load effect
+          setMessages([]);
+          setTimeout(() => { initialLoadDone.current = false; }, 50);
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  }, [activeId, isLoading, setMessages]);
+
   const handleNewChat = useCallback(() => {
     stop();
     setConversationId(null);

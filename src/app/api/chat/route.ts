@@ -363,6 +363,34 @@ export async function POST(req: Request) {
     let searchCallCount = 0;
     let sandboxCallCount = 0;
 
+    // Periodically flush accumulated text to DB so stop/refresh preserves content
+    let accumulatedText = "";
+    let lastSavedLen = 0;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushTextToDB = async () => {
+      if (!assistantMessageId || accumulatedText.length <= lastSavedLen) return;
+      lastSavedLen = accumulatedText.length;
+      try {
+        const metadata = allToolInvocations.length > 0
+          ? { toolInvocations: allToolInvocations }
+          : undefined;
+        await db.update(messages)
+          .set({ content: accumulatedText, metadata })
+          .where(eq(messages.id, assistantMessageId));
+      } catch {
+        // Non-fatal — onFinish will do final save
+      }
+    };
+
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushTextToDB();
+      }, 2000); // Save every 2s during streaming
+    };
+
     const result = trackedStreamText({
       model: openrouter(selectedModel),
       system: systemPrompt,
@@ -371,6 +399,15 @@ export async function POST(req: Request) {
       stopWhen: hasToolsDefined ? stepCountIs(10) : undefined,
       onError: (error) => {
         console.error(`[chat] Stream error with model ${selectedModel}:`, error);
+        // Flush whatever we have on error
+        if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+        flushTextToDB();
+      },
+      onChunk: ({ chunk }) => {
+        if (chunk.type === "text-delta" && chunk.text) {
+          accumulatedText += chunk.text;
+          scheduleFlush();
+        }
       },
       // Save progressively after each step so tool results aren't lost on timeout
       onStepFinish: async ({ text, toolCalls, toolResults }) => {
@@ -407,6 +444,9 @@ export async function POST(req: Request) {
         }
       },
       onFinish: async ({ text, usage }) => {
+        // Cancel pending flush — we'll do the final save now
+        if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+
         // Final update with complete text and token counts
         try {
           const content = text || "";
