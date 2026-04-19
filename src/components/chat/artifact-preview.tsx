@@ -225,7 +225,7 @@ export default function ArtifactPreview({
   const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
   const [versionOpen, setVersionOpen] = useState(false);
-  const [highlighted, setHighlighted] = useState("");
+  const [highlighted, setHighlighted] = useState(() => doHighlight(content, getHighlightLang(type, language)));
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -319,10 +319,12 @@ export default function ArtifactPreview({
       </div>
     );
 
-    // Code tab
-    if (tab === "code") return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto">
-        <pre className="p-4 overflow-x-auto w-full"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+    // Code tab (not available for documents)
+    if (tab === "code" && type !== "document") return (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
+        <div className="p-4 overflow-x-auto">
+          <pre><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+        </div>
       </div>
     );
 
@@ -338,15 +340,17 @@ export default function ArtifactPreview({
 
     // Preview: document — live markdown
     if (type === "document") return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto p-6 max-w-3xl mx-auto">
         <MarkdownRenderer content={content} />
       </div>
     );
 
     // Preview: streaming non-document — show code
     if (streaming) return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
-        <pre className="p-4 overflow-x-auto"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
+        <div className="p-4 overflow-x-auto">
+          <pre><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+        </div>
       </div>
     );
 
@@ -354,10 +358,12 @@ export default function ArtifactPreview({
     switch (type) {
       case "html": return <iframe key={iframeKey} ref={iframeRef} srcDoc={wrapForPreview(content, "html")} sandbox="allow-scripts allow-forms allow-popups allow-modals" className="flex-1 w-full bg-white" title="Preview" />;
       case "svg": return <iframe key={iframeKey} srcDoc={wrapForPreview(content, "svg")} sandbox="allow-scripts" className="flex-1 w-full bg-white" title="Preview" />;
-      case "mermaid": return <div className="flex-1 overflow-auto bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
+      case "mermaid": return <div className="flex-1 h-0 overflow-auto bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
       default: return (
-        <div className="flex-1 overflow-auto">
-          <pre className="p-4 overflow-x-auto"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlighted }} /></pre>
+        <div className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
+          <div className="p-4 overflow-x-auto">
+            <pre><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlighted }} /></pre>
+          </div>
         </div>
       );
     }
@@ -401,11 +407,13 @@ export default function ArtifactPreview({
           <button onClick={() => { setTab("preview"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
             Preview
           </button>
-          <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-            Code
-          </button>
+          {type !== "document" && (
+            <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+              Code
+            </button>
+          )}
           {!streaming && onContentChange && (
-            <button onClick={() => { setEditing(!editing); if (!editing) setTab("code"); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+            <button onClick={() => { setEditing(!editing); if (!editing) setTab("preview"); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
               Edit
             </button>
           )}

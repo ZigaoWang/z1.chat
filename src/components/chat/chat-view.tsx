@@ -140,7 +140,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  // Reset state when switching conversations (moved after stop is defined)
+  // Reset state when switching conversations
+  const stopRef = useRef(stop);
+  useEffect(() => { stopRef.current = stop; }, [stop]);
+
   useEffect(() => {
     if (isFirstMessageRef.current) {
       isFirstMessageRef.current = false;
@@ -148,7 +151,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       initialLoadDone.current = true;
       return;
     }
-    stop();
+    stopRef.current();
     setConversationId(activeId);
     initialLoadDone.current = false;
     setEditingState(null);
@@ -156,7 +159,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setArtifactPanel(null);
     setArtifactStreaming(false);
     sidebarWasOpen.current = false;
-  }, [activeId, stop]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   const messageModelMap = useRef<Map<string, string>>(new Map());
   const messagesRef = useRef(messages);
