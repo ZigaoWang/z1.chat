@@ -259,8 +259,8 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
   return (
     <div className="rounded-lg border border-border/40 overflow-hidden">
       <button
-        onClick={() => (hasOutput || execImages.length > 0) && setExpanded(!expanded)}
-        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${(hasOutput || execImages.length > 0) ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
+        onClick={() => hasOutput && setExpanded(!expanded)}
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${hasOutput ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
       >
         {isRunning ? (
           <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
@@ -271,7 +271,7 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
         )}
         <span className="font-medium text-foreground/70">{label}</span>
         {langLabel && <span className="rounded bg-muted/60 px-1 py-px text-[10px] text-muted-foreground/50">{langLabel}</span>}
-        {!isRunning && (hasOutput || execImages.length > 0) && (
+        {!isRunning && hasOutput && (
           <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground/30 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
         )}
       </button>
@@ -288,8 +288,8 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
       {isRunning && !codeSnippet && (
         <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>
       )}
-      {/* Completed: output + images */}
-      {(expanded || (!isRunning && hasError)) && (hasOutput || execImages.length > 0) && (
+      {/* Completed: text output (expandable) */}
+      {(expanded || (!isRunning && hasError)) && hasOutput && (
         <div className="border-t border-border/30 px-3 py-2 space-y-2">
           {result?.stdout && (
             <pre className="text-[11px] text-muted-foreground/60 bg-muted/20 rounded px-2.5 py-1.5 overflow-x-auto max-h-48 whitespace-pre-wrap font-mono">{result.stdout}</pre>
@@ -300,19 +300,20 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
           {result?.error && (
             <pre className="text-[11px] text-red-600/60 dark:text-red-400/60 bg-red-500/5 rounded px-2.5 py-1.5 overflow-x-auto whitespace-pre-wrap font-mono">{result.error}</pre>
           )}
-          {execImages.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {execImages.map((base64, i) => {
-                const isJpeg = base64.startsWith("/9j/");
-                const src = `data:${isJpeg ? "image/jpeg" : "image/png"};base64,${base64}`;
-                return (
-                  <button key={i} onClick={() => onLightbox(src)} className="block overflow-hidden rounded-md border border-border/30 hover:border-border transition-colors">
-                    <img src={src} alt={`Output ${i + 1}`} className="max-w-full sm:max-w-[300px] max-h-[200px] object-contain" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        </div>
+      )}
+      {/* Images always visible — never hidden behind expand */}
+      {execImages.length > 0 && (
+        <div className="px-3 py-2 flex flex-wrap gap-2">
+          {execImages.map((base64, i) => {
+            const isJpeg = base64.startsWith("/9j/");
+            const src = `data:${isJpeg ? "image/jpeg" : "image/png"};base64,${base64}`;
+            return (
+              <button key={i} onClick={(e) => { e.stopPropagation(); onLightbox(src); }} className="block overflow-hidden rounded-lg border border-border/30 hover:border-border transition-colors">
+                <img src={src} alt={`Output ${i + 1}`} className="max-w-full sm:max-w-[400px] max-h-[300px] object-contain" />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
