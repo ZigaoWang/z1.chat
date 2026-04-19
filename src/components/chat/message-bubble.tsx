@@ -53,6 +53,7 @@ interface MessageBubbleProps {
   onEdit?: (newContent: string) => void;
   onOpenArtifact?: (code: string, language: string) => void;
   onOpenArtifactById?: (id: string) => void;
+  interrupted?: boolean;
   versionCount?: number;
   currentVersion?: number;
   onVersionChange?: (index: number) => void;
@@ -319,7 +320,7 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
 }
 
 // --- Artifact tool cards (create, update, edit) ---
-function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: ToolInvocation[]; onOpenArtifactById: (id: string) => void }) {
+function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }: { invocations: ToolInvocation[]; onOpenArtifactById: (id: string) => void; parentStreaming?: boolean }) {
   const artifactTools = invocations.filter((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
   if (artifactTools.length === 0) return null;
 
@@ -327,8 +328,10 @@ function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: T
     <div className="flex flex-col gap-1.5 my-2">
       {artifactTools.map((t) => {
         const isComplete = t.state === "output-available";
-        const isRunning = t.state === "input-streaming" || t.state === "input-available";
-        if (!isComplete && !isRunning) return null;
+        const isToolStreaming = t.state === "input-streaming" || t.state === "input-available";
+        const isRunning = isToolStreaming && !!parentStreaming;
+        const wasStopped = isToolStreaming && !parentStreaming;
+        if (!isComplete && !isRunning && !wasStopped) return null;
 
         const result = isComplete ? (t.result as { id?: string; type?: string; title?: string; version?: number; error?: string }) : null;
         if (result?.error) return null;
@@ -340,7 +343,9 @@ function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: T
         const typeLabel = getArtifactTypeLabel(displayType);
         const actionLabel = isRunning
           ? (t.toolName === "create_artifact" ? "Creating" : t.toolName === "update_artifact" ? "Rewriting" : "Editing")
-          : (t.toolName === "create_artifact" ? typeLabel : t.toolName === "update_artifact" ? `Rewrote` : `Edited`);
+          : wasStopped
+          ? "Stopped"
+          : (t.toolName === "create_artifact" ? typeLabel : t.toolName === "update_artifact" ? "Rewrote" : "Edited");
         const version = result?.version;
 
         return (
@@ -391,7 +396,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
 
 function MessageBubble({
   role, content, isStreaming, model, images, files, toolInvocations,
-  isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, versionCount, currentVersion, onVersionChange,
+  isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, interrupted, versionCount, currentVersion, onVersionChange,
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { copied, copy } = useCopy();
@@ -491,9 +496,14 @@ function MessageBubble({
             </div>
           </div>
         ) : displayContent.length > 0 ? (
-          <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
-        ) : !isStreaming && !hasSearches && !hasCodeExec && !hasArtifactTools && content.length === 0 ? (
-          <p className="text-sm text-muted-foreground/40 italic">Response interrupted</p>
+          <>
+            <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
+            {interrupted && (
+              <p className="text-xs text-muted-foreground/40 mt-2 italic">Stopped generating</p>
+            )}
+          </>
+        ) : !isStreaming && content.length === 0 ? (
+          <p className="text-xs text-muted-foreground/40 italic">{interrupted ? "Stopped generating" : "Response interrupted"}</p>
         ) : null}
 
         {/* Tool status cards — all grouped together right after text */}
@@ -548,7 +558,7 @@ function MessageBubble({
         )}
 
         {hasArtifactTools && onOpenArtifactById && (
-          <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} />
+          <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
         )}
 
         {/* Sources inline after content */}

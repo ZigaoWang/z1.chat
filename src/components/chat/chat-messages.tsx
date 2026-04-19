@@ -29,6 +29,7 @@ export interface EditBranch {
 interface ChatMessagesProps {
   messages: Message[];
   isStreaming: boolean;
+  wasInterrupted?: boolean;
   onRegenerate?: () => void;
   onEditMessage?: (messageIndex: number, newContent: string) => void;
   onOpenArtifact?: (code: string, language: string) => void;
@@ -108,7 +109,7 @@ function ThinkingIndicator() {
 }
 
 function ChatMessages({
-  messages, isStreaming, onRegenerate, onEditMessage, onOpenArtifact, onOpenArtifactById, regenerationHistory, editBranches, onViewingOldBranch,
+  messages, isStreaming, wasInterrupted, onRegenerate, onEditMessage, onOpenArtifact, onOpenArtifactById, regenerationHistory, editBranches, onViewingOldBranch,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -246,6 +247,7 @@ function ChatMessages({
                 images={cur.images} files={cur.files} toolInvocations={cur.toolInvocations}
                 isStreaming={isStreaming && slotIdx === slots.length - 1 && sel === vc - 1}
                 isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
+                interrupted={isLA && !isStreaming && !!wasInterrupted}
                 onOpenArtifact={onOpenArtifact}
                 onOpenArtifactById={onOpenArtifactById}
                 versionCount={vc} currentVersion={sel}
@@ -260,6 +262,7 @@ function ChatMessages({
               images={msg.images} files={msg.files} toolInvocations={msg.toolInvocations}
               isStreaming={isStreaming && slotIdx === slots.length - 1 && msg.role === "assistant"}
               isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
+              interrupted={isLA && !isStreaming && !!wasInterrupted}
               onOpenArtifact={onOpenArtifact}
               onOpenArtifactById={onOpenArtifactById}
               onEdit={msg.role === "user" && onEditMessage && slot.originalIndex !== undefined

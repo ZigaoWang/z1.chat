@@ -45,6 +45,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const [viewingOldBranch, setViewingOldBranch] = useState(false);
   const [artifactPanel, setArtifactPanel] = useState<ArtifactData | null>(null);
   const [artifactStreaming, setArtifactStreaming] = useState(false);
+  const [wasInterrupted, setWasInterrupted] = useState(false);
   const [artifactWidth, setArtifactWidth] = useState(50);
   const [isDraggingArtifact, setIsDraggingArtifact] = useState(false);
   const savedInputRef = useRef("");
@@ -411,6 +412,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       const text = (overrideText ?? input).trim();
       if (!text || isLoading || viewingOldBranch) return;
       setChatError(null);
+      setWasInterrupted(false);
 
       const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
       const displayImages: string[] = [];
@@ -989,6 +991,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   // Stop and save partial content to DB so refresh preserves it
   const handleStop = useCallback(() => {
     stop();
+    setWasInterrupted(true);
     const lastMsg = messagesRef.current[messagesRef.current.length - 1];
     if (lastMsg?.role === "assistant" && conversationIdRef.current) {
       const content = lastMsg.parts
@@ -1084,6 +1087,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             toolInvocations: getToolInvocations(m),
           }))}
           isStreaming={isLoading}
+          wasInterrupted={wasInterrupted}
           onRegenerate={handleRegenerate}
           onEditMessage={handleStartEdit}
           onOpenArtifact={handleOpenArtifact}
