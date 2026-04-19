@@ -297,37 +297,37 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="flex h-11 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
           <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger onClick={() => {
                 createConversation();
                 if (window.innerWidth < 1024) onClose();
               }}
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
-                <Plus className="h-3.5 w-3.5" />
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                <Plus className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">New chat</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger onClick={onClose}
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
-                <PanelLeftClose className="h-3.5 w-3.5" />
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                <PanelLeftClose className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>
             </Tooltip>
           </div>
         </div>
 
-        <div className="px-1.5 py-1">
+        <div className="px-2 py-1.5">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/30" />
+            <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/30" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="h-7 w-full rounded-md border-0 bg-muted/40 pl-7 pr-2 text-xs outline-none placeholder:text-muted-foreground/25 focus:bg-muted/60 transition-colors" />
+              className="h-8 w-full rounded-lg border-0 bg-muted/50 pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground/30 focus:bg-muted/70 focus:ring-1 focus:ring-ring/20 transition-all" />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin">
           {isLoading && conversations.length === 0 ? (
             <div className="space-y-1.5 px-1 pt-2">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -340,11 +340,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="mt-1.5 text-xs text-muted-foreground/25">{searchQuery ? "No results" : "No conversations"}</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {grouped.map((group) => (
                 <div key={group.label}>
-                  <div className="px-1.5 pb-0.5">
-                    <span className="text-[10px] font-medium text-muted-foreground/30 uppercase tracking-wider">{group.label}</span>
+                  <div className="px-2 pb-1">
+                    <span className="text-[10px] font-medium text-muted-foreground/35 uppercase tracking-wider">{group.label}</span>
                   </div>
                   <div className="space-y-px">
                     {group.conversations.map(renderConversation)}
@@ -375,12 +375,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
           <ThemeToggle />
           <Link href="/settings"
-            className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
             <Settings className="h-3.5 w-3.5" /> Settings
           </Link>
           {user?.role === "admin" && (
             <Link href="/admin"
-              className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
               <Shield className="h-3.5 w-3.5" /> Admin
             </Link>
           )}

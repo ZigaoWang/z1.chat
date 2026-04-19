@@ -413,7 +413,7 @@ function MessageBubble({
     const displayContent = content.replace(/<attached_file\s[^>]*>[\s\S]*?<\/attached_file>\s*/g, "").replace(/<attached_file\s[^>]*\/>\s*/g, "").trim();
 
     return (
-      <div className="group flex justify-end px-4 py-1">
+      <div className="group flex justify-end px-4 py-1.5">
         <div className="max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
@@ -484,7 +484,7 @@ function MessageBubble({
   const { cleanContent: displayContent, artifacts } = extractArtifacts(content);
 
   return (
-    <div className="group px-4 py-1">
+    <div className="group px-4 py-1.5">
       <div className="mx-auto max-w-3xl">
         {/* Text content first — or streaming dots / interrupted notice */}
         {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools && fetchInvocations.length === 0 ? (

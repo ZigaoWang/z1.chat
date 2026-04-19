@@ -156,19 +156,25 @@ pre code { color: #24292e; }
     -moz-osx-font-smoothing: grayscale;
   }
 
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  /* Scrollbars — subtle, only visible on hover */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: oklch(0.5 0 0 / 8%); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(0.5 0 0 / 18%); }
+  ::-webkit-scrollbar-thumb { background: oklch(0.5 0 0 / 0%); border-radius: 4px; transition: background 0.2s; }
+  :hover::-webkit-scrollbar-thumb { background: oklch(0.5 0 0 / 10%); }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.5 0 0 / 20%); }
 
-  .scrollbar-thin::-webkit-scrollbar { width: 2px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: oklch(0.5 0 0 / 6%); }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: oklch(0.5 0 0 / 12%); }
+  .scrollbar-thin::-webkit-scrollbar { width: 3px; }
 
-  ::selection { background: oklch(0.45 0.18 270 / 12%); }
-  .dark ::selection { background: oklch(0.65 0.2 270 / 18%); }
+  ::selection { background: oklch(0.45 0.18 270 / 15%); }
+  .dark ::selection { background: oklch(0.65 0.2 270 / 20%); }
 
   pre code.hljs { background: transparent; padding: 0; margin: 0; }
+
+  /* Focus ring — consistent across all interactive elements */
+  :focus-visible { @apply outline-2 outline-offset-2 outline-ring/50; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring/50;
+  }
 }
 
 @keyframes fadeIn {

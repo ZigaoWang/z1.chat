@@ -33,7 +33,7 @@ function CodeBlock({
   const showPreview = onOpenArtifact && isArtifact(language, typeof children === "string" ? children : codeText);
 
   return (
-    <div className="group/code relative my-3 ml-1 overflow-hidden rounded-lg border border-border/50 bg-card">
+    <div className="group/code relative my-3 overflow-hidden rounded-lg border border-border/40 bg-card">
       <div className="flex items-center justify-between border-b border-border/40 px-3 py-1.5 bg-muted/30">
         <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
           {language || "code"}
@@ -82,7 +82,7 @@ function makeComponents(onOpenArtifact?: (code: string, language: string) => voi
       const isInline = !className;
       if (isInline) {
         return (
-          <code className="rounded bg-muted px-1 py-0.5 text-[13px] font-mono font-medium" {...props}>
+          <code className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[13px] font-mono" {...props}>
             {children}
           </code>
         );

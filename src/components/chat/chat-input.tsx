@@ -104,7 +104,7 @@ export default function ChatInput({
       <div className="mx-auto w-full max-w-3xl">
         {/* Editing banner */}
         {editing && (
-          <div className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-xl border border-b-0 border-border/60 bg-muted/30 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-2xl border border-b-0 border-border/60 bg-muted/30 text-xs text-muted-foreground">
             <Pencil className="h-3 w-3" />
             <span>Editing message</span>
             <button onClick={onCancelEdit} className="ml-auto p-0.5 rounded hover:bg-muted hover:text-foreground transition-colors">
@@ -113,7 +113,7 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className={`border border-border/60 bg-background transition-colors focus-within:border-border focus-within:ring-1 focus-within:ring-ring/10 ${editing ? "rounded-b-xl" : "rounded-xl"}`}>
+        <div className={`border border-border/60 bg-background transition-all focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
           {/* File previews */}
           {(files.length > 0 || pasteUploading) && !editing && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
@@ -176,7 +176,7 @@ export default function ChatInput({
                 }
               }}
               disabled={editing ? !isEditChanged : !canSubmit}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                 isLoading && !editing ? "bg-foreground text-background hover:bg-foreground/80" :
                 (editing ? isEditChanged : value.trim()) ? "bg-foreground text-background hover:bg-foreground/80" :
                 "bg-muted text-muted-foreground/25"

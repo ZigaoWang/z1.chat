@@ -1023,7 +1023,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   return (
     <div ref={outerRef} className="flex h-full flex-1 relative overflow-hidden">
     <div
-      style={artifactPanel ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.2s ease-out' } : undefined}
+      style={artifactPanel ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)' } : undefined}
       className={`relative flex h-full flex-col bg-background ${artifactPanel ? "max-lg:flex-1" : "flex-1"}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -1210,10 +1210,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           )}
           <div
             onMouseDown={handleArtifactDragStart}
-            className="w-1.5 h-full shrink-0 cursor-col-resize group/handle relative"
+            className="w-1 h-full shrink-0 cursor-col-resize group/handle relative"
           >
-            <div className="absolute inset-y-0 -left-1 -right-1" />
-            <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/30" : "hover:bg-primary/20"}`} />
+            <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
+            <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/40" : "bg-border/30 hover:bg-primary/25"}`} />
           </div>
           <div style={{ width: `${artifactWidth}%` }} className="h-full min-w-0 overflow-hidden">
             <ArtifactPreview
