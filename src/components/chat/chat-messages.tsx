@@ -12,7 +12,12 @@ interface Message {
   images?: string[];
   files?: { name: string; type: string; url: string; size?: number }[];
   toolInvocations?: ToolInvocation[];
+  segments?: MessageSegment[];
 }
+
+export type MessageSegment =
+  | { type: "text"; content: string }
+  | { type: "tool"; invocation: ToolInvocation };
 
 export interface VersionEntry {
   id: string;
@@ -260,6 +265,7 @@ function ChatMessages({
           return (
             <MessageBubble key={msg.id} role={msg.role} content={msg.content} model={msg.model}
               images={msg.images} files={msg.files} toolInvocations={msg.toolInvocations}
+              segments={msg.segments}
               isStreaming={isStreaming && slotIdx === slots.length - 1 && msg.role === "assistant"}
               isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
               interrupted={isLA && !isStreaming && !!wasInterrupted}

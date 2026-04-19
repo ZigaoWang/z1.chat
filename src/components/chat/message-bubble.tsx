@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import MarkdownRenderer from "./markdown-renderer";
 import { extractArtifacts } from "./artifact-preview";
+import type { MessageSegment } from "./chat-messages";
 
 export interface ToolInvocation {
   toolCallId: string;
@@ -54,6 +55,7 @@ interface MessageBubbleProps {
   onOpenArtifact?: (code: string, language: string) => void;
   onOpenArtifactById?: (id: string) => void;
   interrupted?: boolean;
+  segments?: MessageSegment[];
   versionCount?: number;
   currentVersion?: number;
   onVersionChange?: (index: number) => void;
@@ -397,7 +399,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
 
 function MessageBubble({
   role, content, isStreaming, model, images, files, toolInvocations,
-  isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, interrupted, versionCount, currentVersion, onVersionChange,
+  isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, interrupted, segments, versionCount, currentVersion, onVersionChange,
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { copied, copy } = useCopy();
@@ -472,23 +474,39 @@ function MessageBubble({
 
   // ── Assistant message — left-aligned, no icon ──
   const modelLabel = model ? model.split("/").pop() : null;
-  const hasSearches = toolInvocations && toolInvocations.some((t) => t.toolName === "web_search");
-  const searchesDone = hasSearches && toolInvocations!.every(
-    (t) => t.toolName !== "web_search" || t.state === "output-available" || t.state === "output-error"
-  );
-  const hasFetches = toolInvocations && toolInvocations.some((t) => t.toolName === "fetch_page");
-  const fetchInvocations = hasFetches ? toolInvocations!.filter((t) => t.toolName === "fetch_page") : [];
-  const hasCodeExec = toolInvocations && toolInvocations.some((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
-  const hasArtifactTools = toolInvocations && toolInvocations.some((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
-
-  // Extract <artifact> tags from content
   const { cleanContent: displayContent, artifacts } = extractArtifacts(content);
+
+  // Helper to render a single tool invocation inline
+  const renderToolInline = (t: ToolInvocation) => {
+    if (t.toolName === "web_search") return <SearchStatus key={t.toolCallId} invocations={[t]} />;
+    if (t.toolName === "fetch_page") {
+      const isActive = t.state !== "output-available" && t.state !== "output-error";
+      const url = t.args?.url as string | undefined;
+      const domain = url ? getDomain(url) : "page";
+      return (
+        <div key={t.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs">
+            {isActive ? <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /> : <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
+            <span className="font-medium text-foreground/70 truncate">{isActive ? `Reading ${domain}` : `Read ${domain}`}</span>
+          </div>
+          {isActive && <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>}
+        </div>
+      );
+    }
+    if (SANDBOX_TOOL_NAMES.has(t.toolName)) return <div key={t.toolCallId} className="mt-3"><SandboxCard invocation={t} onLightbox={setLightboxSrc} /></div>;
+    if (ARTIFACT_TOOL_NAMES.has(t.toolName)) return <div key={t.toolCallId} className="mt-3"><ArtifactToolCards invocations={[t]} onOpenArtifactById={onOpenArtifactById!} parentStreaming={isStreaming} /></div>;
+    return null;
+  };
+
+  // Use ordered segments when available (live streaming), fall back to old layout (restored)
+  const hasSegments = segments && segments.length > 0;
+  const hasAnyContent = displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) || (segments && segments.length > 0);
 
   return (
     <div className="group px-4 py-1.5">
       <div className="mx-auto max-w-3xl">
-        {/* Text content first — or streaming dots / interrupted notice */}
-        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools && fetchInvocations.length === 0 ? (
+        {/* Streaming placeholder — only when nothing to show yet */}
+        {isStreaming && !hasAnyContent && (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
@@ -496,64 +514,73 @@ function MessageBubble({
               <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
             </div>
           </div>
-        ) : displayContent.length > 0 ? (
-          <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
-        ) : null}
+        )}
 
-        {/* Tool status cards — all grouped together right after text */}
-        {hasSearches && <SearchStatus invocations={toolInvocations!} />}
-
-        {fetchInvocations.length > 0 && (
-          <div className="flex flex-col gap-1.5 mt-3">
-            {fetchInvocations.map((f) => {
-              const isActive = f.state !== "output-available" && f.state !== "output-error";
-              const url = f.args?.url as string | undefined;
-              const domain = url ? getDomain(url) : "page";
-              return (
-                <div key={f.toolCallId} className="rounded-lg border border-border/40 overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 text-xs">
-                    {isActive ? (
-                      <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-                    ) : (
-                      <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+        {/* Ordered segments — renders text and tools in chronological order */}
+        {hasSegments ? (
+          <>
+            {segments!.map((seg, i) => {
+              if (seg.type === "text") {
+                const { cleanContent: segClean, artifacts: segArtifacts } = extractArtifacts(seg.content);
+                return (
+                  <div key={i}>
+                    {segClean && <MarkdownRenderer content={segClean} onOpenArtifact={onOpenArtifact} />}
+                    {segArtifacts.length > 0 && onOpenArtifact && (
+                      <div className="flex flex-col gap-1.5 mt-3">
+                        {segArtifacts.map((art) => (
+                          <button key={art.id} onClick={() => onOpenArtifact(art.code, art.type === "image/svg+xml" ? "svg" : "html")}
+                            className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30">
+                            <Eye className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                            <span className="font-medium text-foreground/70 truncate">{art.title}</span>
+                          </button>
+                        ))}
+                      </div>
                     )}
-                    <span className="font-medium text-foreground/70 truncate">
-                      {isActive ? `Reading ${domain}` : `Read ${domain}`}
-                    </span>
                   </div>
-                  {isActive && <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>}
+                );
+              }
+              return renderToolInline(seg.invocation);
+            })}
+          </>
+        ) : displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) ? (
+          <>
+            {/* Fallback: old layout for restored messages */}
+            {displayContent.length > 0 && <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />}
+
+            {toolInvocations && toolInvocations.filter(t => t.toolName === "web_search").length > 0 && (
+              <SearchStatus invocations={toolInvocations} />
+            )}
+            {toolInvocations && toolInvocations.filter(t => t.toolName === "fetch_page").map(f => {
+              const isActive = f.state !== "output-available" && f.state !== "output-error";
+              const domain = (f.args?.url as string) ? getDomain(f.args.url as string) : "page";
+              return (
+                <div key={f.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs">
+                    {isActive ? <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /> : <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
+                    <span className="font-medium text-foreground/70 truncate">{isActive ? `Reading ${domain}` : `Read ${domain}`}</span>
+                  </div>
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
-
-        {/* Artifact cards */}
-        {artifacts.length > 0 && onOpenArtifact && (
-          <div className="flex flex-col gap-1.5 mt-3">
-            {artifacts.map((artifact) => (
-              <button
-                key={artifact.id}
-                onClick={() => onOpenArtifact(artifact.code, artifact.type === "image/svg+xml" ? "svg" : "html")}
-                className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30"
-              >
-                {isStreaming ? (
-                  <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-                ) : (
-                  <Eye className="h-3 w-3 shrink-0 text-muted-foreground/40" />
-                )}
-                <span className="font-medium text-foreground/70 truncate">{artifact.title}</span>
-                <span className="text-muted-foreground/40 shrink-0">{isStreaming ? "Generating..." : "Click to preview"}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {hasArtifactTools && onOpenArtifactById && (
-          <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
-        )}
+            {toolInvocations && toolInvocations.some(t => SANDBOX_TOOL_NAMES.has(t.toolName)) && (
+              <SandboxStatus invocations={toolInvocations} onLightbox={setLightboxSrc} />
+            )}
+            {artifacts.length > 0 && onOpenArtifact && (
+              <div className="flex flex-col gap-1.5 mt-3">
+                {artifacts.map((art) => (
+                  <button key={art.id} onClick={() => onOpenArtifact(art.code, art.type === "image/svg+xml" ? "svg" : "html")}
+                    className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30">
+                    <Eye className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                    <span className="font-medium text-foreground/70 truncate">{art.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {toolInvocations && toolInvocations.some(t => ARTIFACT_TOOL_NAMES.has(t.toolName)) && onOpenArtifactById && (
+              <ArtifactToolCards invocations={toolInvocations} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
+            )}
+          </>
+        ) : null}
 
         {/* Interrupted notice */}
         {!isStreaming && interrupted && (
@@ -565,27 +592,28 @@ function MessageBubble({
         )}
 
         {/* Sources inline after content */}
-        {searchesDone && content.length > 0 && !isStreaming && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(() => {
-              const sources: SearchResult[] = [];
-              for (const s of toolInvocations!) {
-                if (s.toolName === "web_search" && s.state === "output-available" && s.result) {
-                  const r = s.result as SearchToolResult;
-                  if (r.results) for (const src of r.results) { if (!sources.some((x) => x.url === src.url)) sources.push(src); }
-                }
-              }
-              return sources.slice(0, 5).map((src, i) => (
+        {toolInvocations && !isStreaming && (() => {
+          const searches = toolInvocations.filter(t => t.toolName === "web_search" && t.state === "output-available" && t.result);
+          if (searches.length === 0 || content.length === 0) return null;
+          const sources: SearchResult[] = [];
+          for (const s of searches) {
+            const r = s.result as SearchToolResult;
+            if (r.results) for (const src of r.results) { if (!sources.some(x => x.url === src.url)) sources.push(src); }
+          }
+          if (sources.length === 0) return null;
+          return (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {sources.slice(0, 5).map((src, i) => (
                 <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 rounded border border-border/40 px-1.5 py-0.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-colors">
                   <img src={`https://www.google.com/s2/favicons?domain=${getDomain(src.url)}&sz=32`} alt="" className="h-3 w-3 rounded-sm"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   <span className="max-w-[100px] truncate">{src.title || getDomain(src.url)}</span>
                 </a>
-              ));
-            })()}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Actions */}
         {!isStreaming && content.length > 0 && (

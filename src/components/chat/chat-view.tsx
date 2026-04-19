@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
 import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from "./artifact-preview";
+import type { MessageSegment } from "./chat-messages";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -497,6 +498,51 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         .replace(/<file name="[^"]*">[\s\S]*?<\/file>\s*/g, "")
         .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
         .trim();
+    },
+    []
+  );
+
+  // Build ordered segments from message parts for chronological rendering
+  const getMessageSegments = useCallback(
+    (msg: (typeof messages)[0]): MessageSegment[] | undefined => {
+      if (!msg.parts || msg.role !== "assistant") return undefined;
+      const segments: MessageSegment[] = [];
+      let textBuffer = "";
+
+      const flushText = () => {
+        if (textBuffer.trim()) {
+          // Clean the text the same way getMessageContent does
+          const cleaned = textBuffer
+            .replace(/<file name="[^"]*">[\s\S]*?<\/file>\s*/g, "")
+            .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+            .trim();
+          if (cleaned) segments.push({ type: "text", content: cleaned });
+        }
+        textBuffer = "";
+      };
+
+      for (const p of msg.parts) {
+        if (p.type === "text") {
+          textBuffer += (p as { text: string }).text;
+        } else if (p.type.startsWith("tool-") || p.type === "dynamic-tool") {
+          flushText();
+          const part = p as any;
+          segments.push({
+            type: "tool",
+            invocation: {
+              toolCallId: part.toolCallId as string,
+              toolName: (part.type === "dynamic-tool" ? part.toolName : part.type.replace(/^tool-/, "")) as string,
+              state: part.state as string,
+              args: part.input ?? {},
+              result: part.output ?? undefined,
+            },
+          });
+        }
+        // Skip other part types (step-start, reasoning, etc.)
+      }
+      flushText();
+
+      return segments.length > 0 ? segments : undefined;
     },
     []
   );
@@ -1097,6 +1143,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             images: messageAttachments[m.id]?.images,
             files: messageAttachments[m.id]?.files,
             toolInvocations: getToolInvocations(m),
+            segments: getMessageSegments(m),
           }))}
           isStreaming={isLoading}
           wasInterrupted={wasInterrupted}
