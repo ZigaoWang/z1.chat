@@ -72,7 +72,7 @@ function CodeBlock({
 
 // Hoisted to module level — stable references, won't defeat memo
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const remarkPlugins: any[] = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]];
+const remarkPlugins: any[] = [remarkGfm, remarkMath];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rehypePlugins: any[] = [rehypeHighlight, rehypeKatex];
 
