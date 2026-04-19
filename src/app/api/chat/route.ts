@@ -342,8 +342,23 @@ export async function POST(req: Request) {
     });
     const modelMessages = await convertToModelMessages(cleanedMessages);
 
-    // Track assistant message for progressive saving
+    // Create assistant message immediately so other tabs can see it
     let assistantMessageId: string | null = null;
+    try {
+      const [saved] = await db.insert(messages).values({
+        conversationId: convId!,
+        role: "assistant",
+        content: "",
+        model: selectedModel,
+        parentId: assistantParentId,
+        branchIndex: assistantBranchIndex,
+      }).returning({ id: messages.id });
+      assistantMessageId = saved.id;
+    } catch (err) {
+      console.error("[chat] Failed to create assistant message:", err);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allToolInvocations: Array<Record<string, any>> = [];
     let searchCallCount = 0;
     let sandboxCallCount = 0;
@@ -376,25 +391,13 @@ export async function POST(req: Request) {
           }
         }
 
-        // Upsert assistant message — create on first step, update on subsequent
+        // Update assistant message with latest content + tool results
         try {
-          const content = text || "";
-          const metadata = allToolInvocations.length > 0
-            ? { toolInvocations: allToolInvocations }
-            : undefined;
-
-          if (!assistantMessageId) {
-            const [saved] = await db.insert(messages).values({
-              conversationId: convId!,
-              role: "assistant",
-              content,
-              model: selectedModel,
-              parentId: assistantParentId,
-              branchIndex: assistantBranchIndex,
-              metadata,
-            }).returning({ id: messages.id });
-            assistantMessageId = saved.id;
-          } else {
+          if (assistantMessageId) {
+            const content = text || "";
+            const metadata = allToolInvocations.length > 0
+              ? { toolInvocations: allToolInvocations }
+              : undefined;
             await db.update(messages)
               .set({ content, metadata })
               .where(eq(messages.id, assistantMessageId));
@@ -404,7 +407,7 @@ export async function POST(req: Request) {
         }
       },
       onFinish: async ({ text, usage }) => {
-        // Final save with complete text and token counts
+        // Final update with complete text and token counts
         try {
           const content = text || "";
           const metadata = allToolInvocations.length > 0
@@ -420,19 +423,6 @@ export async function POST(req: Request) {
                 outputTokens: usage.outputTokens,
               })
               .where(eq(messages.id, assistantMessageId));
-          } else {
-            // No steps fired (pure text response) — save directly
-            await db.insert(messages).values({
-              conversationId: convId!,
-              role: "assistant",
-              content,
-              model: selectedModel,
-              parentId: assistantParentId,
-              branchIndex: assistantBranchIndex,
-              inputTokens: usage.inputTokens,
-              outputTokens: usage.outputTokens,
-              metadata,
-            });
           }
         } catch (err) {
           console.error("[chat] Failed to save final message:", err);

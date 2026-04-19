@@ -481,7 +481,7 @@ function MessageBubble({
   return (
     <div className="group px-4 py-1">
       <div className="mx-auto max-w-3xl">
-        {/* Text content first — or streaming dots if nothing yet */}
+        {/* Text content first — or streaming dots / interrupted notice */}
         {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools && fetchInvocations.length === 0 ? (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
@@ -492,6 +492,8 @@ function MessageBubble({
           </div>
         ) : displayContent.length > 0 ? (
           <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
+        ) : !isStreaming && !hasSearches && !hasCodeExec && !hasArtifactTools && content.length === 0 ? (
+          <p className="text-sm text-muted-foreground/40 italic">Response interrupted</p>
         ) : null}
 
         {/* Tool status cards — all grouped together right after text */}
