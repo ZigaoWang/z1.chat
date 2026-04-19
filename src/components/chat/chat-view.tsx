@@ -988,7 +988,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     handledToolCallsRef.current.clear();
   }, [activeId]);
 
-  // Stop and save partial content to DB so refresh preserves it
+  // Stop and save partial content + tool invocations to DB
   const handleStop = useCallback(() => {
     stop();
     setWasInterrupted(true);
@@ -998,13 +998,25 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         ?.filter((p: { type: string }) => p.type === "text")
         .map((p: { type: string; text?: string }) => p.text || "")
         .join("") || "";
-      if (content.trim()) {
-        fetch(`/api/conversations/${conversationIdRef.current}/messages`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: content.trim() }),
-        }).catch(() => {});
-      }
+
+      // Collect tool invocations from message parts
+      const toolInvocations = lastMsg.parts
+        ?.filter((p: any) => p.type?.startsWith("tool-") || p.type === "dynamic-tool")
+        .map((p: any) => ({
+          toolCallId: p.toolCallId as string,
+          toolName: (p.type === "dynamic-tool" ? p.toolName : p.type.replace(/^tool-/, "")) as string,
+          args: p.input ?? {},
+          result: p.output ?? undefined,
+        })) || [];
+
+      fetch(`/api/conversations/${conversationIdRef.current}/messages`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: content.trim() || "",
+          toolInvocations: toolInvocations.length > 0 ? toolInvocations : undefined,
+        }),
+      }).catch(() => {});
     }
   }, [stop]);
 

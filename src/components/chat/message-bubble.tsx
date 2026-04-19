@@ -496,14 +496,7 @@ function MessageBubble({
             </div>
           </div>
         ) : displayContent.length > 0 ? (
-          <>
-            <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
-            {interrupted && (
-              <p className="text-xs text-muted-foreground/40 mt-2 italic">Stopped generating</p>
-            )}
-          </>
-        ) : !isStreaming && content.length === 0 ? (
-          <p className="text-xs text-muted-foreground/40 italic">{interrupted ? "Stopped generating" : "Response interrupted"}</p>
+          <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
         ) : null}
 
         {/* Tool status cards — all grouped together right after text */}
@@ -559,6 +552,11 @@ function MessageBubble({
 
         {hasArtifactTools && onOpenArtifactById && (
           <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
+        )}
+
+        {/* Interrupted notice — shows after everything when generation was stopped */}
+        {!isStreaming && interrupted && (
+          <p className="text-xs text-muted-foreground/40 mt-2 italic">Stopped generating</p>
         )}
 
         {/* Sources inline after content */}
