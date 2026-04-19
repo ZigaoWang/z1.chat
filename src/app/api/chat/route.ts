@@ -16,7 +16,7 @@ import { join, basename } from "path";
 import { tmpdir } from "os";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const TEMP_DIR = join(tmpdir(), "one-uploads");
 const SAFE_TEMP_FILENAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.\w+$/;
@@ -342,6 +342,12 @@ export async function POST(req: Request) {
     });
     const modelMessages = await convertToModelMessages(cleanedMessages);
 
+    // Track assistant message for progressive saving
+    let assistantMessageId: string | null = null;
+    const allToolInvocations: Array<Record<string, any>> = [];
+    let searchCallCount = 0;
+    let sandboxCallCount = 0;
+
     const result = trackedStreamText({
       model: openrouter(selectedModel),
       system: systemPrompt,
@@ -351,91 +357,110 @@ export async function POST(req: Request) {
       onError: (error) => {
         console.error(`[chat] Stream error with model ${selectedModel}:`, error);
       },
-      onFinish: async ({ text, usage, steps }) => {
-        if (!text || text.trim().length === 0) {
-          console.warn(`[chat] Empty response from model ${selectedModel} for conversation ${convId}`);
-        }
-
-        // Collect tool invocations from all steps for persistence
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const toolInvocations: Array<Record<string, any>> = [];
-        let searchCallCount = 0;
-        let sandboxCallCount = 0;
-        if (steps) {
-          for (const step of steps) {
-            if (step.toolCalls) {
-              for (const tc of step.toolCalls) {
-                if (tc.toolName === "web_search") searchCallCount++;
-                if (SANDBOX_TOOL_NAMES.has(tc.toolName)) sandboxCallCount++;
-                const result = step.toolResults?.find(
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (tr: any) => tr.toolCallId === tc.toolCallId
-                );
-                toolInvocations.push({
-                  toolCallId: tc.toolCallId,
-                  toolName: tc.toolName,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  args: (tc as any).input ?? {},
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  result: result ? (result as any).output : undefined,
-                });
-              }
-            }
+      // Save progressively after each step so tool results aren't lost on timeout
+      onStepFinish: async ({ text, toolCalls, toolResults }) => {
+        // Collect tool invocations from this step
+        if (toolCalls) {
+          for (const tc of toolCalls) {
+            if (tc.toolName === "web_search") searchCallCount++;
+            if (SANDBOX_TOOL_NAMES.has(tc.toolName)) sandboxCallCount++;
+            const tr = toolResults?.find(
+              (r: any) => r.toolCallId === tc.toolCallId
+            );
+            allToolInvocations.push({
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              args: (tc as any).input ?? {},
+              result: tr ? (tr as any).output : undefined,
+            });
           }
         }
 
-        // Log search tool usage
-        if (searchCallCount > 0) {
-          for (let i = 0; i < searchCallCount; i++) {
-            logSearchUsage(userId, convId!).catch(console.error);
+        // Upsert assistant message — create on first step, update on subsequent
+        try {
+          const content = text || "";
+          const metadata = allToolInvocations.length > 0
+            ? { toolInvocations: allToolInvocations }
+            : undefined;
+
+          if (!assistantMessageId) {
+            const [saved] = await db.insert(messages).values({
+              conversationId: convId!,
+              role: "assistant",
+              content,
+              model: selectedModel,
+              parentId: assistantParentId,
+              branchIndex: assistantBranchIndex,
+              metadata,
+            }).returning({ id: messages.id });
+            assistantMessageId = saved.id;
+          } else {
+            await db.update(messages)
+              .set({ content, metadata })
+              .where(eq(messages.id, assistantMessageId));
           }
+        } catch (err) {
+          console.error("[chat] Failed to save step:", err);
+        }
+      },
+      onFinish: async ({ text, usage }) => {
+        // Final save with complete text and token counts
+        try {
+          const content = text || "";
+          const metadata = allToolInvocations.length > 0
+            ? { toolInvocations: allToolInvocations }
+            : undefined;
+
+          if (assistantMessageId) {
+            await db.update(messages)
+              .set({
+                content,
+                metadata,
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+              })
+              .where(eq(messages.id, assistantMessageId));
+          } else {
+            // No steps fired (pure text response) — save directly
+            await db.insert(messages).values({
+              conversationId: convId!,
+              role: "assistant",
+              content,
+              model: selectedModel,
+              parentId: assistantParentId,
+              branchIndex: assistantBranchIndex,
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              metadata,
+            });
+          }
+        } catch (err) {
+          console.error("[chat] Failed to save final message:", err);
         }
 
-        // Log sandbox tool usage (code_execute, shell_exec, file_upload, file_download)
-        if (sandboxCallCount > 0) {
-          for (let i = 0; i < sandboxCallCount; i++) {
-            logSandboxUsage(userId, convId!).catch(console.error);
-          }
+        // Log search usage
+        for (let i = 0; i < searchCallCount; i++) {
+          logSearchUsage(userId, convId!).catch(console.error);
+        }
+        // Log sandbox usage
+        for (let i = 0; i < sandboxCallCount; i++) {
+          logSandboxUsage(userId, convId!).catch(console.error);
         }
 
-        // Kill sandbox after response is complete
+        // Kill sandbox
         if (sandboxManager) {
           sandboxManager.kill().catch(console.error);
         }
 
-        // Save assistant message with tool invocations
-        await db.insert(messages).values({
-          conversationId: convId!,
-          role: "assistant",
-          content: text,
-          model: selectedModel,
-          parentId: assistantParentId,
-          branchIndex: assistantBranchIndex,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          metadata: toolInvocations.length > 0
-            ? { toolInvocations }
-            : undefined,
-        });
-
-        // Background: Generate/update title on every exchange
+        // Background tasks
         if (text && userContent) {
-          generateConversationTitle(convId!, userContent, text, userId).catch(
-            console.error
-          );
+          generateConversationTitle(convId!, userContent, text, userId).catch(console.error);
         }
-
-        // Background: Update conversation summary (Layer 1)
-        // Skip for edits — summary would mix branches
         if (!isEdit) {
           updateConversationSummary(convId!, userId).catch(console.error);
         }
-
-        // Background: Extract user memories (Layer 2)
         if (text && userContent) {
-          extractMemories(userId, convId!, userContent, text).catch(
-            console.error
-          );
+          extractMemories(userId, convId!, userContent, text).catch(console.error);
         }
       },
     }, { userId, conversationId: convId!, type: "chat", model: selectedModel });
