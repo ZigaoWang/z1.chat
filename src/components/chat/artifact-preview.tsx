@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { X, Code2, Eye, ExternalLink, Copy, Check, RefreshCw, Download, Pencil, ChevronDown } from "lucide-react";
+import {
+  X, Code2, Eye, ExternalLink, Copy, Check,
+  RefreshCw, Download, Pencil, ChevronDown,
+} from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 import xml from "highlight.js/lib/languages/xml";
@@ -9,9 +12,8 @@ import css from "highlight.js/lib/languages/css";
 import javascript from "highlight.js/lib/languages/javascript";
 import python from "highlight.js/lib/languages/python";
 import typescript from "highlight.js/lib/languages/typescript";
-import MarkdownRenderer from "./markdown-renderer";
-
 import plaintext from "highlight.js/lib/languages/plaintext";
+import MarkdownRenderer from "./markdown-renderer";
 
 hljs.registerLanguage("xml", xml);
 hljs.registerLanguage("css", css);
@@ -51,7 +53,6 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
 
   const re = new RegExp(ARTIFACT_RE.source, "g");
   let match: RegExpExecArray | null;
-
   while ((match = re.exec(content)) !== null) {
     const fullTag = match[0];
     const type = match[1];
@@ -60,16 +61,13 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
     const title = titleMatch?.[1] || "Artifact";
     const idMatch = fullTag.match(/id="([^"]*)"/);
     const id = idMatch?.[1] || `artifact-${artifacts.length}`;
-    if (type === "text/html" || type === "image/svg+xml") {
-      artifacts.push({ id, type, title, code });
-    }
+    if (type === "text/html" || type === "image/svg+xml") artifacts.push({ id, type, title, code });
   }
 
   cleanContent = cleanContent.replace(re, (fullMatch) => {
     const typeMatch = fullMatch.match(/type="([^"]*)"/);
     const type = typeMatch?.[1] || "";
-    if (type === "text/html" || type === "image/svg+xml") return "";
-    return fullMatch;
+    return (type === "text/html" || type === "image/svg+xml") ? "" : fullMatch;
   });
 
   const partialArtifactRe = /<artifact\s+[^>]*?type="(text\/html|image\/svg\+xml)"[^>]*?>([\s\S]*)$/;
@@ -84,9 +82,7 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
       const title = titleMatch?.[1] || "Generating...";
       const idMatch = fullTagPortion.match(/id="([^"]*)"/);
       const id = idMatch?.[1] || `partial-artifact-${artifacts.length}`;
-      if (code.length > 0 || type) {
-        artifacts.push({ id, type, title, code });
-      }
+      if (code.length > 0 || type) artifacts.push({ id, type, title, code });
       cleanContent = cleanContent.slice(0, cleanContent.indexOf(tagStart[0])).trim();
     }
   }
@@ -94,35 +90,18 @@ export function extractArtifacts(content: string): { cleanContent: string; artif
   const codeBlockRe = /```html\n([\s\S]*?)```/g;
   const codeBlockRe2 = new RegExp(codeBlockRe.source, "g");
   let codeMatch: RegExpExecArray | null;
-
   while ((codeMatch = codeBlockRe2.exec(cleanContent)) !== null) {
     const code = codeMatch[1].trim();
-    if (isArtifact("html", code)) {
-      artifacts.push({
-        id: `codeblock-${artifacts.length}`,
-        type: "text/html",
-        title: extractHtmlTitle(code) || "Website",
-        code,
-      });
-    }
+    if (isArtifact("html", code)) artifacts.push({ id: `codeblock-${artifacts.length}`, type: "text/html", title: extractHtmlTitle(code) || "Website", code });
   }
-
-  cleanContent = cleanContent.replace(codeBlockRe, (fullMatch, innerCode: string) => {
-    if (isArtifact("html", innerCode.trim())) return "";
-    return fullMatch;
-  });
+  cleanContent = cleanContent.replace(codeBlockRe, (fullMatch, innerCode: string) => isArtifact("html", innerCode.trim()) ? "" : fullMatch);
 
   const partialCodeBlockRe = /```html\n([\s\S]+)$/;
   const partialCodeMatch = cleanContent.match(partialCodeBlockRe);
   if (partialCodeMatch) {
     const code = partialCodeMatch[1].trim();
     if (code.length > 50 && isArtifact("html", code)) {
-      artifacts.push({
-        id: `partial-codeblock-${artifacts.length}`,
-        type: "text/html",
-        title: extractHtmlTitle(code) || "Generating...",
-        code,
-      });
+      artifacts.push({ id: `partial-codeblock-${artifacts.length}`, type: "text/html", title: extractHtmlTitle(code) || "Generating...", code });
       cleanContent = cleanContent.slice(0, cleanContent.lastIndexOf("```html")).trim();
     }
   }
@@ -152,40 +131,35 @@ function getDownloadExtension(type: string, language?: string | null): string {
     case "html": return ".html";
     case "svg": return ".svg";
     case "mermaid": return ".mmd";
-    case "code": {
-      const extMap: Record<string, string> = {
-        python: ".py", typescript: ".ts", javascript: ".js", java: ".java",
-        go: ".go", rust: ".rs", cpp: ".cpp", c: ".c", ruby: ".rb",
-        php: ".php", swift: ".swift", kotlin: ".kt", css: ".css",
-      };
-      return extMap[language || ""] || ".txt";
-    }
+    case "code": return ({ python: ".py", typescript: ".ts", javascript: ".js", java: ".java", go: ".go", rust: ".rs", cpp: ".cpp", c: ".c", ruby: ".rb", php: ".php", swift: ".swift", kotlin: ".kt", css: ".css" } as Record<string, string>)[language || ""] || ".txt";
     default: return ".txt";
   }
 }
 
 function getHighlightLang(type: string, language?: string | null): string {
-  if (type === "html") return "xml";
-  if (type === "svg") return "xml";
+  if (type === "html" || type === "svg") return "xml";
   if (type === "mermaid") return "plaintext";
   return language || "plaintext";
 }
 
-function highlightCode(code: string, lang: string): string {
+function doHighlight(code: string, lang: string): string {
   try {
     const safeLang = hljs.getLanguage(lang) ? lang : "plaintext";
-    const result = hljs.highlight(code, { language: safeLang, ignoreIllegals: true });
-    return DOMPurify.sanitize(result.value, { USE_PROFILES: { html: true } });
+    return DOMPurify.sanitize(hljs.highlight(code, { language: safeLang, ignoreIllegals: true }).value, { USE_PROFILES: { html: true } });
   } catch {
     return DOMPurify.sanitize(code, { USE_PROFILES: { html: true } });
   }
 }
 
-// --- Mermaid renderer ---
+function escapeHtml(text: string): string {
+  return DOMPurify.sanitize(text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+}
+
+// --- Mermaid ---
 
 function MermaidPreview({ code }: { code: string }) {
-  const [svg, setSvg] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [svg, setSvg] = useState("");
+  const [error, setError] = useState("");
   const renderIdRef = useRef(0);
 
   useEffect(() => {
@@ -199,41 +173,32 @@ function MermaidPreview({ code }: { code: string }) {
         const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, code);
         if (id === renderIdRef.current) setSvg(rendered);
       } catch (err) {
-        if (id === renderIdRef.current) setError(err instanceof Error ? err.message : "Failed to render diagram");
+        if (id === renderIdRef.current) setError(err instanceof Error ? err.message : "Render failed");
       }
     }, 500);
-    return () => { clearTimeout(timer); };
+    return () => clearTimeout(timer);
   }, [code]);
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full p-8 text-sm text-red-500/60">
-        <pre className="whitespace-pre-wrap">{error}</pre>
-      </div>
-    );
-  }
+  if (error) return <div className="flex items-center justify-center h-full p-8 text-sm text-destructive/60"><pre className="whitespace-pre-wrap">{error}</pre></div>;
+  if (!svg) return <div className="flex items-center justify-center h-full p-8"><div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /></div>;
+  return <div className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }} />;
+}
 
-  if (!svg) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-      </div>
-    );
-  }
+// --- Icon button helper ---
 
+function IconBtn({ onClick, title, children, className }: { onClick: () => void; title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className="flex items-center justify-center min-h-full p-8"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }}
-    />
+    <button onClick={onClick} title={title} className={`flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground ${className || ""}`}>
+      {children}
+    </button>
   );
 }
 
-// --- Main component ---
+// --- Main ---
 
 export interface ArtifactData {
   id?: string;
-  type: string; // document | code | html | svg | mermaid
+  type: string;
   title: string;
   content: string;
   language?: string | null;
@@ -250,76 +215,68 @@ interface ArtifactPreviewProps {
 }
 
 export default function ArtifactPreview({
-  artifact,
-  streaming,
-  onClose,
-  onContentChange,
-  onLoadVersion,
-  totalVersions,
+  artifact, streaming, onClose, onContentChange, onLoadVersion, totalVersions,
 }: ArtifactPreviewProps) {
   const { type, title, content, language, version } = artifact;
+
   const [tab, setTab] = useState<"preview" | "code">(streaming && type !== "document" ? "code" : "preview");
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
   const [versionOpen, setVersionOpen] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [highlighted, setHighlighted] = useState("");
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const stickToBottom = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevContentRef = useRef(content);
-
-  // Switch to code view during streaming (except documents), preview when done
   const prevStreamingRef = useRef(streaming);
+
+  const hLang = useMemo(() => getHighlightLang(type, language), [type, language]);
+  const canOpenNew = type === "html" || type === "svg";
+  const numVersions = totalVersions || version || 1;
+
+  // Tab switching
   useEffect(() => {
-    if (streaming && !prevStreamingRef.current) {
-      // Documents render nicely in preview during streaming
-      if (type !== "document") setTab("code");
-    } else if (!streaming && prevStreamingRef.current) {
-      setTab("preview");
-    }
+    if (streaming && !prevStreamingRef.current && type !== "document") setTab("code");
+    else if (!streaming && prevStreamingRef.current) setTab("preview");
     prevStreamingRef.current = streaming;
   }, [streaming, type]);
 
-  // Sync editContent when content changes externally (only if not editing)
+  // Sync edit content
   useEffect(() => {
-    if (!editing && content !== prevContentRef.current) {
-      setEditContent(content);
-    }
+    if (!editing && content !== prevContentRef.current) setEditContent(content);
     prevContentRef.current = content;
   }, [content, editing]);
 
-  // Highlighted code — instant when not streaming, debounced when streaming
-  const [highlightedCode, setHighlightedCode] = useState("");
-  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hLang = useMemo(() => getHighlightLang(type, language), [type, language]);
-
+  // Syntax highlighting
   useEffect(() => {
-    if (highlightTimer.current) clearTimeout(highlightTimer.current);
-    if (!streaming) {
-      setHighlightedCode(highlightCode(content, hLang));
-      return;
-    }
-    // During streaming, debounce syntax highlighting (it's expensive)
-    highlightTimer.current = setTimeout(() => {
-      setHighlightedCode(highlightCode(content, hLang));
-    }, 500);
-    return () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); };
+    if (hlTimer.current) clearTimeout(hlTimer.current);
+    if (!streaming) { setHighlighted(doHighlight(content, hLang)); return; }
+    hlTimer.current = setTimeout(() => setHighlighted(doHighlight(content, hLang)), 500);
+    return () => { if (hlTimer.current) clearTimeout(hlTimer.current); };
   }, [content, streaming, hLang]);
 
-  // Auto-scroll while streaming (trigger on raw content, not just highlighted)
+  // Auto-scroll
   useEffect(() => {
     if (!streaming) return;
     const el = scrollRef.current;
-    if (!el || !stickToBottom.current) return;
-    el.scrollTop = el.scrollHeight;
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
   }, [content, streaming]);
+
+  // Escape to close
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -333,273 +290,144 @@ export default function ArtifactPreview({
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}${ext}`;
-    a.click();
+    Object.assign(document.createElement("a"), { href: url, download: `${slug}${ext}` }).click();
     URL.revokeObjectURL(url);
   }, [content, type, language, title]);
 
   const handleOpenNew = useCallback(() => {
-    if (type === "html" || type === "svg") {
-      const html = wrapForPreview(content, type);
-      const w = window.open("", "_blank");
-      if (w) { w.document.open(); w.document.write(html); w.document.close(); }
-    }
-  }, [content, type]);
+    if (!canOpenNew) return;
+    const w = window.open("", "_blank");
+    if (w) { const h = wrapForPreview(content, type); w.document.open(); w.document.write(h); w.document.close(); }
+  }, [content, type, canOpenNew]);
 
-  // Debounced save for user editing
-  const handleEditChange = useCallback((newContent: string) => {
-    setEditContent(newContent);
+  const handleEditChange = useCallback((val: string) => {
+    setEditContent(val);
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      onContentChange?.(newContent);
-    }, 1500);
+    saveTimer.current = setTimeout(() => onContentChange?.(val), 1500);
   }, [onContentChange]);
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  // Code display: highlighted when ready, escaped raw as fallback during streaming
+  const codeHtml = useMemo(() => (streaming && !highlighted) ? escapeHtml(content) : highlighted, [streaming, highlighted, content]);
 
-  // Version count to display
-  const displayVersions = totalVersions || version || 1;
-
-  // Preview content by type
-  const renderPreview = () => {
-    if (streaming && !content) {
-      return (
-        <div className="flex-1 flex items-center justify-center bg-card">
-          <div className="text-center">
-            <div className="flex justify-center gap-1 mb-3">
-              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_infinite]" />
-              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-              <span className="h-2 w-2 rounded-full bg-primary/40 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
-            </div>
-            <p className="text-sm text-muted-foreground/50">Generating {title}...</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Documents: render markdown directly even during streaming
-    if (type === "document") {
-      return (
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
-          {streaming && (
-            <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              <span>Writing...</span>
-            </div>
-          )}
-          <MarkdownRenderer content={content} />
-        </div>
-      );
-    }
-
-    if (streaming) {
-      // Show raw content immediately; highlighted code replaces it once ready
-      const displayHtml = highlightedCode || DOMPurify.sanitize(
-        content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      );
-      return (
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0 bg-card">
-          <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            <span>Generating...</span>
-          </div>
-          <pre className="p-4 overflow-x-auto">
-            <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: displayHtml }} />
-          </pre>
-        </div>
-      );
-    }
-
-    switch (type) {
-      case "html":
-        return (
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            srcDoc={wrapForPreview(content, "html")}
-            sandbox="allow-scripts allow-forms allow-popups allow-modals"
-            className="flex-1 w-full bg-white"
-            title="HTML preview"
-          />
-        );
-      case "svg":
-        return (
-          <iframe
-            key={iframeKey}
-            srcDoc={wrapForPreview(content, "svg")}
-            sandbox="allow-scripts"
-            className="flex-1 w-full bg-white"
-            title="SVG preview"
-          />
-        );
-      case "document":
-        return (
-          <div className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
-            <MarkdownRenderer content={content} />
-          </div>
-        );
-      case "mermaid":
-        return (
-          <div className="flex-1 overflow-auto bg-white dark:bg-card">
-            <MermaidPreview code={content} />
-          </div>
-        );
-      case "code":
-      default:
-        return (
-          <div className="flex-1 overflow-auto">
-            <pre className="p-4 overflow-x-auto">
-              <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
-            </pre>
-          </div>
-        );
-    }
-  };
-
-  const renderCodeView = () => {
-    // During streaming, show raw escaped content immediately if highlighted isn't ready yet
-    const displayHtml = (streaming && !highlightedCode)
-      ? DOMPurify.sanitize(content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
-      : highlightedCode;
-    return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
-        {streaming && (
-          <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-card/90 backdrop-blur-sm border-b border-border/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            <span>Generating...</span>
-          </div>
-        )}
-        <pre className="p-4 overflow-x-auto">
-          <code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: displayHtml }} />
-        </pre>
-      </div>
-    );
-  };
-
-  const renderEditMode = () => (
-    <div className="flex-1 flex flex-col min-h-0">
-      <textarea
-        value={editContent}
-        onChange={(e) => handleEditChange(e.target.value)}
-        className="flex-1 w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed font-mono outline-none"
-        spellCheck={type === "document"}
-      />
-    </div>
-  );
-
-  const canPreviewInNewTab = type === "html" || type === "svg";
+  // --- Render ---
 
   const renderContent = () => {
-    if (editing) return renderEditMode();
-    if (tab === "code") return renderCodeView();
-    return renderPreview();
+    // Edit mode
+    if (editing) return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <textarea value={editContent} onChange={(e) => handleEditChange(e.target.value)} className="flex-1 w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed font-mono outline-none" spellCheck={type === "document"} />
+      </div>
+    );
+
+    // Code tab
+    if (tab === "code") return (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto">
+        <pre className="p-4 overflow-x-auto w-full"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+      </div>
+    );
+
+    // Preview tab — waiting for content
+    if (streaming && !content) return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+          <span className="h-4 w-4 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/40 animate-spin" />
+          Generating...
+        </div>
+      </div>
+    );
+
+    // Preview: document — live markdown
+    if (type === "document") return (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
+        <MarkdownRenderer content={content} />
+      </div>
+    );
+
+    // Preview: streaming non-document — show code
+    if (streaming) return (
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto min-w-0">
+        <pre className="p-4 overflow-x-auto"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: codeHtml }} /></pre>
+      </div>
+    );
+
+    // Preview: finished
+    switch (type) {
+      case "html": return <iframe key={iframeKey} ref={iframeRef} srcDoc={wrapForPreview(content, "html")} sandbox="allow-scripts allow-forms allow-popups allow-modals" className="flex-1 w-full bg-white" title="Preview" />;
+      case "svg": return <iframe key={iframeKey} srcDoc={wrapForPreview(content, "svg")} sandbox="allow-scripts" className="flex-1 w-full bg-white" title="Preview" />;
+      case "mermaid": return <div className="flex-1 overflow-auto bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
+      default: return (
+        <div className="flex-1 overflow-auto">
+          <pre className="p-4 overflow-x-auto"><code className="text-[13px] leading-relaxed font-mono hljs" dangerouslySetInnerHTML={{ __html: highlighted }} /></pre>
+        </div>
+      );
+    }
   };
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-border/40 bg-background animate-slide-in-right">
+    <div className="flex h-full w-full flex-col bg-background">
       {/* Header */}
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-3 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-xs font-medium text-foreground/80 max-w-[160px] truncate">{title}</span>
-
-          {/* Tab switcher */}
-          <div className="flex items-center gap-0.5 ml-2 rounded-lg bg-muted/40 p-0.5">
-            <button
-              onClick={() => { setTab("preview"); setEditing(false); }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Eye className="h-3 w-3" />
-              Preview
-            </button>
-            <button
-              onClick={() => { setTab("code"); setEditing(false); }}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Code2 className="h-3 w-3" />
-              Code
-            </button>
-            {!streaming && onContentChange && (
-              <button
-                onClick={() => { setEditing(!editing); if (!editing) setTab("code"); }}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                  editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Pencil className="h-3 w-3" />
-                Edit
-              </button>
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/40 px-3">
+        {/* Title */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate">{title}</span>
+            {numVersions > 1 && onLoadVersion ? (
+              <div className="relative">
+                <button onClick={() => setVersionOpen(!versionOpen)} className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors">
+                  v{version}<ChevronDown className="h-2.5 w-2.5" />
+                </button>
+                {versionOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
+                    <div className="absolute left-0 top-full mt-1 z-50 min-w-[72px] rounded-md border border-border bg-popover shadow-md py-0.5">
+                      {Array.from({ length: numVersions }, (_, i) => i + 1).reverse().map((v) => (
+                        <button key={v} onClick={() => { onLoadVersion(v); setVersionOpen(false); }} className={`w-full px-2.5 py-1 text-left text-[11px] hover:bg-muted transition-colors ${v === version ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                          v{v}{v === version ? " (latest)" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <span className="text-[10px] text-muted-foreground/30 tabular-nums">v{version || 1}</span>
             )}
+            {streaming && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0" />}
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          {/* Version selector */}
-          {displayVersions > 1 && onLoadVersion && (
-            <div className="relative">
-              <button
-                onClick={() => setVersionOpen(!versionOpen)}
-                className="flex items-center gap-0.5 h-7 rounded-md border border-border/40 bg-transparent px-1.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
-              >
-                v{version || 1}
-                <ChevronDown className="h-3 w-3" />
-              </button>
-              {versionOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[80px] rounded-lg border border-border bg-popover shadow-lg py-1">
-                    {Array.from({ length: displayVersions }, (_, i) => i + 1).reverse().map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => { onLoadVersion(v); setVersionOpen(false); }}
-                        className={`w-full px-3 py-1.5 text-left text-[11px] hover:bg-muted transition-colors ${
-                          v === version ? "text-foreground font-medium" : "text-muted-foreground"
-                        }`}
-                      >
-                        v{v}{v === version ? " (current)" : ""}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+        {/* Tabs */}
+        <div className="flex items-center rounded-md bg-muted/50 p-0.5">
+          <button onClick={() => { setTab("preview"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+            Preview
+          </button>
+          <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+            Code
+          </button>
+          {!streaming && onContentChange && (
+            <button onClick={() => { setEditing(!editing); if (!editing) setTab("code"); }} className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+              Edit
+            </button>
           )}
-          {displayVersions === 1 && (
-            <span className="text-[10px] text-muted-foreground/40 tabular-nums px-1">v1</span>
-          )}
+        </div>
 
-          <button onClick={handleDownload} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Download">
-            <Download className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={handleCopy} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Copy">
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-          </button>
-          {!streaming && canPreviewInNewTab && (
-            <button onClick={handleOpenNew} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Open in new tab">
-              <ExternalLink className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {!streaming && tab === "preview" && (type === "html" || type === "svg") && (
-            <button onClick={() => setIframeKey((k) => k + 1)} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Refresh">
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <div className="w-px h-4 bg-border/40 mx-0.5" />
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Close">
-            <X className="h-3.5 w-3.5" />
-          </button>
+        {/* Actions */}
+        <div className="flex items-center">
+          {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
+          {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
+          <IconBtn onClick={handleCopy} title="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
+          <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+          <div className="w-px h-4 bg-border/40 mx-1" />
+          <IconBtn onClick={onClose} title="Close"><X className="h-3.5 w-3.5" /></IconBtn>
         </div>
       </div>
+
+      {/* Streaming progress */}
+      {streaming && (
+        <div className="h-0.5 bg-muted overflow-hidden shrink-0">
+          <div className="h-full w-1/3 bg-primary/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+        </div>
+      )}
 
       {/* Content */}
       {renderContent()}

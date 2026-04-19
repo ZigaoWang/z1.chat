@@ -129,15 +129,11 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
           onClick={() => sources.length > 0 && setExpanded(!expanded)}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${sources.length > 0 ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
         >
-          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-            isSearching ? "bg-blue-500/10 text-blue-500" : "bg-emerald-500/10 text-emerald-500"
-          }`}>
-            {isSearching ? (
-              <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
-            ) : (
-              <Check className="h-3 w-3" />
-            )}
-          </div>
+          {isSearching ? (
+            <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+          ) : (
+            <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+          )}
           <span className="font-medium text-foreground/70 truncate">{label}</span>
           {!isSearching && sources.length > 0 && (
             <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground/30 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
@@ -145,7 +141,7 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
         </button>
         {isSearching && (
           <div className="h-px bg-muted overflow-hidden">
-            <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+            <div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" />
           </div>
         )}
         {expanded && sources.length > 0 && (
@@ -211,17 +207,6 @@ function getLanguageLabel(args: Record<string, unknown>): string {
   return labels[lang] || lang;
 }
 
-function getArtifactTypeIcon(type: string): string {
-  switch (type) {
-    case "html": return "globe";
-    case "svg": return "image";
-    case "mermaid": return "diagram";
-    case "code": return "code";
-    case "document": return "doc";
-    default: return "doc";
-  }
-}
-
 function getArtifactTypeLabel(type: string): string {
   switch (type) {
     case "html": return "Website";
@@ -269,15 +254,13 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
         onClick={() => hasOutput && setExpanded(!expanded)}
         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${hasOutput ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
       >
-        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-          isRunning ? "bg-blue-500/10 text-blue-500" : hasError ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-500"
-        }`}>
+        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md`}>
           {isRunning ? (
-            <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
+            <span className="h-3 w-3 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
           ) : hasError ? (
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3 text-destructive/60" />
           ) : (
-            <Check className="h-3 w-3" />
+            <Check className="h-3 w-3 text-muted-foreground/40" />
           )}
         </div>
         <span className="font-medium text-foreground/70">{label}</span>
@@ -289,7 +272,7 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
       </button>
       {isRunning && (
         <div className="h-px bg-muted overflow-hidden">
-          <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+          <div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" />
         </div>
       )}
       {expanded && hasOutput && (
@@ -340,24 +323,16 @@ function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: T
             key={t.toolCallId}
             onClick={() => artifactId && onOpenArtifactById(artifactId)}
             disabled={!artifactId}
-            className="group/art flex items-center gap-2.5 rounded-lg border border-border/40 px-3 py-2.5 text-left transition-all hover:bg-muted/30 hover:border-border/60 disabled:cursor-default"
+            className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30 disabled:cursor-default"
           >
-            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-              isRunning ? "bg-primary/10 text-primary" : "bg-primary/8 text-primary/80 group-hover/art:bg-primary/15"
-            }`}>
-              {isRunning ? (
-                <span className="h-3.5 w-3.5 rounded-full border-[1.5px] border-primary/30 border-t-primary animate-spin" />
-              ) : (
-                <Eye className="h-3.5 w-3.5" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-foreground/80 truncate">{displayTitle}</p>
-              <p className="text-[11px] text-muted-foreground/40">
-                {isRunning ? `${actionLabel}...` : actionLabel}
-                {version && version > 1 && !isRunning && <span className="ml-1">v{version}</span>}
-              </p>
-            </div>
+            {isRunning ? (
+              <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+            ) : (
+              <Eye className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+            )}
+            <span className="font-medium text-foreground/70 truncate">{displayTitle}</span>
+            <span className="text-muted-foreground/40 shrink-0">{isRunning ? `${actionLabel}...` : actionLabel}</span>
+            {version && version > 1 && <span className="text-[10px] text-muted-foreground/30 tabular-nums">v{version}</span>}
           </button>
         );
       })}
@@ -511,9 +486,7 @@ function MessageBubble({
     (t) => t.toolName !== "web_search" || t.state === "output-available" || t.state === "output-error"
   );
   const hasFetches = toolInvocations && toolInvocations.some((t) => t.toolName === "fetch_page");
-  const activeFetch = hasFetches && toolInvocations!.find(
-    (t) => t.toolName === "fetch_page" && t.state !== "output-available" && t.state !== "output-error"
-  );
+  const fetchInvocations = hasFetches ? toolInvocations!.filter((t) => t.toolName === "fetch_page") : [];
   const hasCodeExec = toolInvocations && toolInvocations.some((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
   const hasArtifactTools = toolInvocations && toolInvocations.some((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
 
@@ -525,19 +498,28 @@ function MessageBubble({
       <div className="mx-auto max-w-3xl">
         {hasSearches && <SearchStatus invocations={toolInvocations!} />}
 
-        {activeFetch && (
-          <div className="my-2 rounded-lg border border-border/40 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 text-xs">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-500">
-                <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
-              </div>
-              <span className="font-medium text-foreground/70 truncate">
-                Reading {(activeFetch.args?.url as string) ? getDomain(activeFetch.args.url as string) : "page"}
-              </span>
-            </div>
-            <div className="h-px bg-muted overflow-hidden">
-              <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
-            </div>
+        {fetchInvocations.length > 0 && (
+          <div className="flex flex-col gap-1.5 my-2">
+            {fetchInvocations.map((f) => {
+              const isActive = f.state !== "output-available" && f.state !== "output-error";
+              const url = f.args?.url as string | undefined;
+              const domain = url ? getDomain(url) : "page";
+              return (
+                <div key={f.toolCallId} className="rounded-lg border border-border/40 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs">
+                    {isActive ? (
+                      <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+                    ) : (
+                      <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                    )}
+                    <span className="font-medium text-foreground/70 truncate">
+                      {isActive ? `Reading ${domain}` : `Read ${domain}`}
+                    </span>
+                  </div>
+                  {isActive && <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -567,21 +549,15 @@ function MessageBubble({
               <button
                 key={artifact.id}
                 onClick={() => onOpenArtifact(artifact.code, artifact.type === "image/svg+xml" ? "svg" : "html")}
-                className="group/art flex items-center gap-2.5 rounded-lg border border-border/40 px-3 py-2.5 text-left transition-all hover:bg-muted/30 hover:border-border/60"
+                className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary/80 group-hover/art:bg-primary/15 transition-colors">
-                  {isStreaming ? (
-                    <span className="h-3.5 w-3.5 rounded-full border-[1.5px] border-primary/30 border-t-primary animate-spin" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-foreground/80 truncate">{artifact.title}</p>
-                  <p className="text-[11px] text-muted-foreground/40">
-                    {isStreaming ? "Generating..." : "Click to preview"}
-                  </p>
-                </div>
+                {isStreaming ? (
+                  <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+                ) : (
+                  <Eye className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                )}
+                <span className="font-medium text-foreground/70 truncate">{artifact.title}</span>
+                <span className="text-muted-foreground/40 shrink-0">{isStreaming ? "Generating..." : "Click to preview"}</span>
               </button>
             ))}
           </div>
