@@ -445,7 +445,7 @@ function MessageBubble({
           )}
 
           <div className="rounded-2xl rounded-br-sm bg-primary/[0.06] dark:bg-primary/[0.10] px-3.5 py-2.5">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+            <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
           </div>
           {/* Actions */}
           <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
@@ -541,6 +541,14 @@ function MessageBubble({
               }
               return renderToolInline(seg.invocation);
             })}
+            {/* Trailing dots — shows the AI is still working after tools/text */}
+            {isStreaming && (
+              <div className="flex items-center gap-1 mt-4 py-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+              </div>
+            )}
           </>
         ) : displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) ? (
           <>
