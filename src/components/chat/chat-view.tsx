@@ -986,6 +986,25 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     handledToolCallsRef.current.clear();
   }, [activeId]);
 
+  // Stop and save partial content to DB so refresh preserves it
+  const handleStop = useCallback(() => {
+    stop();
+    const lastMsg = messagesRef.current[messagesRef.current.length - 1];
+    if (lastMsg?.role === "assistant" && conversationIdRef.current) {
+      const content = lastMsg.parts
+        ?.filter((p: { type: string }) => p.type === "text")
+        .map((p: { type: string; text?: string }) => p.text || "")
+        .join("") || "";
+      if (content.trim()) {
+        fetch(`/api/conversations/${conversationIdRef.current}/messages`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: content.trim() }),
+        }).catch(() => {});
+      }
+    }
+  }, [stop]);
+
   return (
     <div ref={outerRef} className="flex h-full flex-1 relative overflow-hidden">
     <div
@@ -1141,7 +1160,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         value={input}
         onChange={setInput}
         onSubmit={() => handleSendMessage()}
-        onStop={stop}
+        onStop={handleStop}
         isLoading={isLoading}
         disabled={viewingOldBranch}
         placeholder={viewingOldBranch ? "Switch to the latest version to continue chatting" : undefined}

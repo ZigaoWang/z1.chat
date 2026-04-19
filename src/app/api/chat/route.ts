@@ -410,8 +410,6 @@ export async function POST(req: Request) {
         }
       },
       onStepFinish: async ({ text, toolCalls, toolResults }) => {
-        console.log(`[chat] onStepFinish: textLen=${text?.length || 0}, tools=${toolCalls?.length || 0}, msgId=${assistantMessageId}`);
-        // Use accumulated text if step text is empty (pure text streaming)
         const stepText = text || accumulatedText || "";
         // Collect tool invocations from this step
         if (toolCalls) {
@@ -446,7 +444,6 @@ export async function POST(req: Request) {
         }
       },
       onAbort: async () => {
-        console.log(`[chat] onAbort: flushing ${accumulatedText.length} chars for msgId=${assistantMessageId}`);
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
         if (assistantMessageId && accumulatedText.length > 0) {
           try {
@@ -457,7 +454,6 @@ export async function POST(req: Request) {
         if (sandboxManager) sandboxManager.kill().catch(console.error);
       },
       onFinish: async ({ text, usage }) => {
-        console.log(`[chat] onFinish: textLen=${text?.length || 0}, accumulated=${accumulatedText.length}, msgId=${assistantMessageId}`);
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
 
         // Use whichever has more content
