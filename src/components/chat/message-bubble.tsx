@@ -12,12 +12,10 @@ import {
   X,
   Copy,
   Eye,
-  Globe,
   FileText,
   FileCode,
   FileSpreadsheet,
   File,
-  Code,
 } from "lucide-react";
 import MarkdownRenderer from "./markdown-renderer";
 import { extractArtifacts } from "./artifact-preview";
@@ -120,33 +118,50 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
     }
   }
 
+  const label = isSearching
+    ? (activeQuery ? `Searching "${activeQuery}"` : "Searching the web")
+    : `Found ${sources.length} source${sources.length !== 1 ? "s" : ""}`;
+
   return (
-    <div className="mb-2 text-xs text-muted-foreground/50">
-      {isSearching ? (
-        <span>{activeQuery ? `Searching for "${activeQuery}"` : "Searching the web"}...</span>
-      ) : (
+    <div className="my-2">
+      <div className="rounded-lg border border-border/40 overflow-hidden">
         <button
           onClick={() => sources.length > 0 && setExpanded(!expanded)}
-          className={`inline-flex items-center gap-1 ${sources.length > 0 ? "hover:text-muted-foreground cursor-pointer" : ""}`}
+          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${sources.length > 0 ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
         >
-          <span>Used {sources.length} source{sources.length !== 1 ? "s" : ""}</span>
-          {sources.length > 0 && <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />}
+          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+            isSearching ? "bg-blue-500/10 text-blue-500" : "bg-emerald-500/10 text-emerald-500"
+          }`}>
+            {isSearching ? (
+              <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )}
+          </div>
+          <span className="font-medium text-foreground/70 truncate">{label}</span>
+          {!isSearching && sources.length > 0 && (
+            <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground/30 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
+          )}
         </button>
-      )}
-
-      {expanded && sources.length > 0 && (
-        <div className="mt-1.5 space-y-0.5 pl-0.5">
-          {sources.map((src, i) => (
-            <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 py-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-              <img src={`https://www.google.com/s2/favicons?domain=${getDomain(src.url)}&sz=32`} alt="" className="h-3 w-3 rounded-sm shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              <span className="truncate">{src.title || getDomain(src.url)}</span>
-              <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover:opacity-100" />
-            </a>
-          ))}
-        </div>
-      )}
+        {isSearching && (
+          <div className="h-px bg-muted overflow-hidden">
+            <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+          </div>
+        )}
+        {expanded && sources.length > 0 && (
+          <div className="border-t border-border/30 px-3 py-2 space-y-0.5">
+            {sources.map((src, i) => (
+              <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 py-1 rounded px-1 -mx-1 text-xs text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors">
+                <img src={`https://www.google.com/s2/favicons?domain=${getDomain(src.url)}&sz=32`} alt="" className="h-3.5 w-3.5 rounded-sm shrink-0"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                <span className="truncate">{src.title || getDomain(src.url)}</span>
+                <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-40" />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -166,14 +181,15 @@ interface SandboxToolResult {
 }
 
 const SANDBOX_TOOL_NAMES = new Set(["code_execute", "shell_exec", "file_upload", "file_download"]);
+const ARTIFACT_TOOL_NAMES = new Set(["create_artifact", "update_artifact", "edit_artifact"]);
 
-function getSandboxLabel(toolName: string, isRunning: boolean): string {
+function getToolLabel(toolName: string, isRunning: boolean): string {
   if (isRunning) {
     switch (toolName) {
-      case "shell_exec": return "Running command...";
-      case "file_upload": return "Uploading file...";
-      case "file_download": return "Reading file...";
-      default: return "Running code...";
+      case "shell_exec": return "Running command";
+      case "file_upload": return "Uploading file";
+      case "file_download": return "Reading file";
+      default: return "Running code";
     }
   }
   switch (toolName) {
@@ -184,84 +200,167 @@ function getSandboxLabel(toolName: string, isRunning: boolean): string {
   }
 }
 
-// --- Sandbox status (code_execute, shell_exec, file_upload, file_download) ---
+function getLanguageLabel(args: Record<string, unknown>): string {
+  const lang = args.language as string | undefined;
+  if (!lang) return "";
+  const labels: Record<string, string> = {
+    python: "Python", javascript: "JavaScript", typescript: "TypeScript",
+    bash: "Bash", sh: "Shell", ruby: "Ruby", go: "Go", rust: "Rust",
+    java: "Java", cpp: "C++", c: "C", r: "R",
+  };
+  return labels[lang] || lang;
+}
+
+function getArtifactTypeIcon(type: string): string {
+  switch (type) {
+    case "html": return "globe";
+    case "svg": return "image";
+    case "mermaid": return "diagram";
+    case "code": return "code";
+    case "document": return "doc";
+    default: return "doc";
+  }
+}
+
+function getArtifactTypeLabel(type: string): string {
+  switch (type) {
+    case "html": return "Website";
+    case "svg": return "SVG";
+    case "mermaid": return "Diagram";
+    case "code": return "Code";
+    case "document": return "Document";
+    default: return "Artifact";
+  }
+}
+
+// --- Sandbox execution cards ---
 function SandboxStatus({ invocations }: { invocations: ToolInvocation[] }) {
-  const [expanded, setExpanded] = useState(false);
   const executions = invocations.filter((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
   if (executions.length === 0) return null;
 
-  const activeExec = executions.find((s) => s.state !== "output-available" && s.state !== "output-error");
-  const isRunning = !!activeExec;
+  return (
+    <div className="flex flex-col gap-1.5 my-2">
+      {executions.map((exec) => (
+        <SandboxCard key={exec.toolCallId} invocation={exec} />
+      ))}
+    </div>
+  );
+}
 
-  // Collect output from completed executions
-  const outputs: { stdout: string; stderr: string; error: string | null; toolName: string }[] = [];
-  for (const e of executions) {
-    if (e.state === "output-available" && e.result) {
-      const r = e.result as SandboxToolResult;
-      outputs.push({
-        stdout: r.stdout || "",
-        stderr: r.stderr || "",
-        error: r.error || null,
-        toolName: e.toolName,
-      });
-    }
-  }
-
-  const hasOutput = outputs.some((o) => o.stdout || o.stderr);
-
-  // Determine label
-  const label = isRunning
-    ? getSandboxLabel(activeExec!.toolName, true)
-    : (() => {
-        const uniqueTools = [...new Set(executions.map((e) => e.toolName))];
-        if (uniqueTools.length === 1) {
-          const suffix = executions.length > 1 ? ` (${executions.length}x)` : "";
-          return getSandboxLabel(uniqueTools[0], false) + suffix;
-        }
-        return `Ran ${executions.length} sandbox operations`;
-      })();
+function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
+  const [expanded, setExpanded] = useState(false);
+  const isRunning = exec.state !== "output-available" && exec.state !== "output-error";
+  const result = !isRunning ? exec.result as SandboxToolResult : null;
+  const hasError = !!result?.error || exec.state === "output-error";
+  const hasOutput = !!(result?.stdout || result?.stderr || result?.error);
+  const langLabel = getLanguageLabel(exec.args);
+  const label = getToolLabel(exec.toolName, isRunning);
+  const command = exec.args.command as string | undefined;
+  const codeSnippet = exec.args.code as string | undefined;
+  const preview = command
+    ? (command.length > 60 ? command.slice(0, 60) + "..." : command)
+    : codeSnippet
+    ? (codeSnippet.split("\n")[0].slice(0, 60) + (codeSnippet.includes("\n") ? "..." : ""))
+    : null;
 
   return (
-    <div className="mb-2 text-xs text-muted-foreground/50">
-      {isRunning ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-          {label}
-        </span>
-      ) : (
-        <button
-          onClick={() => hasOutput && setExpanded(!expanded)}
-          className={`inline-flex items-center gap-1 ${hasOutput ? "hover:text-muted-foreground cursor-pointer" : ""}`}
-        >
-          <Code className="h-3 w-3" />
-          <span>{label}</span>
-          {hasOutput && <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />}
-        </button>
-      )}
-
-      {expanded && hasOutput && (
-        <div className="mt-1.5 pl-0.5 space-y-1">
-          {outputs.map((o, i) => (
-            <div key={i}>
-              {o.stdout && (
-                <pre className="text-[11px] text-muted-foreground/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto max-h-40 whitespace-pre-wrap">
-                  {o.stdout}
-                </pre>
-              )}
-              {o.stderr && (
-                <pre className="text-[11px] text-amber-500/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto max-h-20 whitespace-pre-wrap">
-                  {o.stderr}
-                </pre>
-              )}
-              {o.error && (
-                <pre className="text-[11px] text-red-500/60 bg-muted/30 rounded px-2 py-1 overflow-x-auto whitespace-pre-wrap">
-                  {o.error}
-                </pre>
-              )}
-            </div>
-          ))}
+    <div className="rounded-lg border border-border/40 overflow-hidden">
+      <button
+        onClick={() => hasOutput && setExpanded(!expanded)}
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${hasOutput ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
+      >
+        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+          isRunning ? "bg-blue-500/10 text-blue-500" : hasError ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-500"
+        }`}>
+          {isRunning ? (
+            <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
+          ) : hasError ? (
+            <X className="h-3 w-3" />
+          ) : (
+            <Check className="h-3 w-3" />
+          )}
+        </div>
+        <span className="font-medium text-foreground/70">{label}</span>
+        {langLabel && <span className="rounded bg-muted/60 px-1 py-px text-[10px] text-muted-foreground/50">{langLabel}</span>}
+        {preview && <span className="text-muted-foreground/30 font-mono truncate ml-1 hidden sm:inline">{preview}</span>}
+        {!isRunning && hasOutput && (
+          <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground/30 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
+        )}
+      </button>
+      {isRunning && (
+        <div className="h-px bg-muted overflow-hidden">
+          <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
         </div>
       )}
+      {expanded && hasOutput && (
+        <div className="border-t border-border/30 px-3 py-2 space-y-1">
+          {result?.stdout && (
+            <pre className="text-[11px] text-muted-foreground/60 bg-muted/20 rounded px-2.5 py-1.5 overflow-x-auto max-h-48 whitespace-pre-wrap font-mono">{result.stdout}</pre>
+          )}
+          {result?.stderr && (
+            <pre className="text-[11px] text-amber-600/60 dark:text-amber-400/60 bg-amber-500/5 rounded px-2.5 py-1.5 overflow-x-auto max-h-24 whitespace-pre-wrap font-mono">{result.stderr}</pre>
+          )}
+          {result?.error && (
+            <pre className="text-[11px] text-red-600/60 dark:text-red-400/60 bg-red-500/5 rounded px-2.5 py-1.5 overflow-x-auto whitespace-pre-wrap font-mono">{result.error}</pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Artifact tool cards (create, update, edit) ---
+function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: ToolInvocation[]; onOpenArtifactById: (id: string) => void }) {
+  const artifactTools = invocations.filter((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
+  if (artifactTools.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 my-2">
+      {artifactTools.map((t) => {
+        const isComplete = t.state === "output-available";
+        const isRunning = t.state === "input-streaming" || t.state === "input-available";
+        if (!isComplete && !isRunning) return null;
+
+        const result = isComplete ? (t.result as { id?: string; type?: string; title?: string; version?: number; error?: string }) : null;
+        if (result?.error) return null;
+
+        const args = t.args as { title?: string; type?: string; artifactId?: string };
+        const artifactId = result?.id || args.artifactId;
+        const displayTitle = result?.title || args.title || "Untitled";
+        const displayType = result?.type || args.type || "document";
+        const typeLabel = getArtifactTypeLabel(displayType);
+        const isUpdate = t.toolName === "update_artifact" || t.toolName === "edit_artifact";
+        const actionLabel = isRunning
+          ? (t.toolName === "create_artifact" ? "Creating" : t.toolName === "update_artifact" ? "Rewriting" : "Editing")
+          : (t.toolName === "create_artifact" ? typeLabel : t.toolName === "update_artifact" ? `Rewrote` : `Edited`);
+        const version = result?.version;
+
+        return (
+          <button
+            key={t.toolCallId}
+            onClick={() => artifactId && onOpenArtifactById(artifactId)}
+            disabled={!artifactId}
+            className="group/art flex items-center gap-2.5 rounded-lg border border-border/40 px-3 py-2.5 text-left transition-all hover:bg-muted/30 hover:border-border/60 disabled:cursor-default"
+          >
+            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+              isRunning ? "bg-primary/10 text-primary" : "bg-primary/8 text-primary/80 group-hover/art:bg-primary/15"
+            }`}>
+              {isRunning ? (
+                <span className="h-3.5 w-3.5 rounded-full border-[1.5px] border-primary/30 border-t-primary animate-spin" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-foreground/80 truncate">{displayTitle}</p>
+              <p className="text-[11px] text-muted-foreground/40">
+                {isRunning ? `${actionLabel}...` : actionLabel}
+                {version && version > 1 && !isRunning && <span className="ml-1">v{version}</span>}
+              </p>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -416,6 +515,7 @@ function MessageBubble({
     (t) => t.toolName === "fetch_page" && t.state !== "output-available" && t.state !== "output-error"
   );
   const hasCodeExec = toolInvocations && toolInvocations.some((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
+  const hasArtifactTools = toolInvocations && toolInvocations.some((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
 
   // Extract <artifact> tags from content
   const { cleanContent: displayContent, artifacts } = extractArtifacts(content);
@@ -424,15 +524,25 @@ function MessageBubble({
     <div className="group px-4 py-1">
       <div className="mx-auto max-w-3xl">
         {hasSearches && <SearchStatus invocations={toolInvocations!} />}
-        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} />}
 
         {activeFetch && (
-          <div className="mb-2 text-xs text-muted-foreground/50">
-            <span>Reading {(activeFetch.args?.url as string) ? getDomain(activeFetch.args.url as string) : "page"}...</span>
+          <div className="my-2 rounded-lg border border-border/40 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 text-xs">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-500">
+                <span className="h-3 w-3 rounded-full border-[1.5px] border-current/30 border-t-current animate-spin" />
+              </div>
+              <span className="font-medium text-foreground/70 truncate">
+                Reading {(activeFetch.args?.url as string) ? getDomain(activeFetch.args.url as string) : "page"}
+              </span>
+            </div>
+            <div className="h-px bg-muted overflow-hidden">
+              <div className="h-full w-1/3 bg-blue-500/40 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+            </div>
           </div>
         )}
 
-        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec ? (
+        {/* Streaming placeholder — show when no text yet but tools are active */}
+        {isStreaming && displayContent.length === 0 && !hasSearches && !hasCodeExec && !hasArtifactTools ? (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
@@ -444,125 +554,43 @@ function MessageBubble({
           <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />
         ) : null}
 
+        {/* Code execution cards */}
+        {hasCodeExec && <SandboxStatus invocations={toolInvocations!} />}
+
         {/* Inline images from sandbox tools */}
         {hasCodeExec && <SandboxImages invocations={toolInvocations!} onLightbox={setLightboxSrc} />}
 
         {/* Artifact preview cards (legacy auto-detection) */}
         {artifacts.length > 0 && onOpenArtifact && (
-          <div className="flex flex-wrap gap-2 my-2">
+          <div className="flex flex-col gap-1.5 my-2">
             {artifacts.map((artifact) => (
               <button
                 key={artifact.id}
                 onClick={() => onOpenArtifact(artifact.code, artifact.type === "image/svg+xml" ? "svg" : "html")}
-                className="group/art flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 hover:border-border w-full max-w-xs"
+                className="group/art flex items-center gap-2.5 rounded-lg border border-border/40 px-3 py-2.5 text-left transition-all hover:bg-muted/30 hover:border-border/60"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground group-hover/art:bg-primary/10 group-hover/art:text-primary transition-colors">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary/80 group-hover/art:bg-primary/15 transition-colors">
                   {isStreaming ? (
-                    <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                    <span className="h-3.5 w-3.5 rounded-full border-[1.5px] border-primary/30 border-t-primary animate-spin" />
                   ) : (
-                    <Globe className="h-4 w-4" />
+                    <Eye className="h-3.5 w-3.5" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{artifact.title}</p>
-                  <p className="text-[11px] text-muted-foreground/50">
+                  <p className="text-[13px] font-medium text-foreground/80 truncate">{artifact.title}</p>
+                  <p className="text-[11px] text-muted-foreground/40">
                     {isStreaming ? "Generating..." : "Click to preview"}
                   </p>
                 </div>
-                <Eye className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover/art:text-muted-foreground transition-colors" />
               </button>
             ))}
           </div>
         )}
 
-        {/* Artifact tool invocation cards — show during streaming AND after completion */}
-        {toolInvocations && onOpenArtifactById && (() => {
-          const ARTIFACT_TOOLS = new Set(["create_artifact", "update_artifact", "edit_artifact"]);
-          const artifactTools = toolInvocations.filter(
-            (t) => ARTIFACT_TOOLS.has(t.toolName)
-          );
-          if (artifactTools.length === 0) return null;
-
-          return (
-            <div className="flex flex-wrap gap-2 my-2">
-              {artifactTools.map((t) => {
-                const isComplete = t.state === "output-available";
-                const isRunning = t.state === "input-streaming" || t.state === "input-available";
-                if (!isComplete && !isRunning) return null;
-
-                // For completed tools, get info from result
-                const result = isComplete ? (t.result as { id?: string; type?: string; title?: string; error?: string }) : null;
-                if (result?.error) return null;
-
-                // For streaming tools, get info from args
-                const args = t.args as { title?: string; type?: string; content?: string; artifactId?: string };
-                const displayTitle = result?.title || args.title || (t.toolName === "update_artifact" ? "Updating..." : t.toolName === "edit_artifact" ? "Editing..." : "Creating...");
-                const displayType = result?.type || args.type || "document";
-                const typeLabel = displayType === "document" ? "Document" : displayType === "code" ? "Code" : displayType === "mermaid" ? "Diagram" : displayType === "html" ? "Website" : displayType === "svg" ? "SVG" : "Artifact";
-                const artifactId = result?.id || args.artifactId;
-
-                return (
-                  <button
-                    key={t.toolCallId}
-                    onClick={() => artifactId ? onOpenArtifactById(artifactId) : undefined}
-                    disabled={!artifactId}
-                    className="group/art flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 hover:border-border w-full max-w-xs disabled:opacity-80 disabled:cursor-default"
-                  >
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      isRunning ? "bg-primary/10 text-primary" : "bg-primary/10 text-primary"
-                    }`}>
-                      {isRunning ? (
-                        <span className="h-4 w-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{displayTitle}</p>
-                      <p className="text-[11px] text-muted-foreground/50">
-                        {isRunning ? `Generating ${typeLabel.toLowerCase()}...` : typeLabel}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        {/* Update/edit artifact indicators */}
-        {toolInvocations && (() => {
-          const updateTools = toolInvocations.filter(
-            (t) => (t.toolName === "update_artifact" || t.toolName === "edit_artifact") &&
-                   (t.state === "output-available" || t.state === "input-streaming" || t.state === "input-available")
-          );
-          if (updateTools.length === 0) return null;
-          return (
-            <div className="my-1">
-              {updateTools.map((t) => {
-                const isRunning = t.state === "input-streaming" || t.state === "input-available";
-                const result = t.state === "output-available" ? (t.result as { title?: string; version?: number; error?: string }) : null;
-                if (result?.error) return null;
-                const args = t.args as { title?: string; artifactId?: string };
-                const displayTitle = result?.title || args.title || "artifact";
-                return (
-                  <p key={t.toolCallId} className="text-xs text-muted-foreground/40 flex items-center gap-1">
-                    {isRunning ? (
-                      <span className="h-3 w-3 rounded-full border border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-                    ) : (
-                      <Pencil className="h-3 w-3" />
-                    )}
-                    {isRunning
-                      ? (t.toolName === "update_artifact" ? "Rewriting" : "Editing")
-                      : (t.toolName === "update_artifact" ? "Rewrote" : "Edited")
-                    } &ldquo;{displayTitle}&rdquo;
-                    {result?.version && result.version > 1 && <span className="text-[10px]">v{result.version}</span>}
-                  </p>
-                );
-              })}
-            </div>
-          );
-        })()}
+        {/* Artifact tool cards (create, update, edit) */}
+        {hasArtifactTools && onOpenArtifactById && (
+          <ArtifactToolCards invocations={toolInvocations!} onOpenArtifactById={onOpenArtifactById} />
+        )}
 
         {/* Sources inline after content */}
         {searchesDone && content.length > 0 && !isStreaming && (

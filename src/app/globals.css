@@ -185,3 +185,8 @@ pre code { color: #24292e; }
 }
 .animate-fade-in { animation: fadeIn 0.2s ease-out both; }
 .animate-slide-in-right { animation: slideInRight 0.2s ease-out both; }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
