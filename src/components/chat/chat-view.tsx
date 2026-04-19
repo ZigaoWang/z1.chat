@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, AlertCircle, RotateCcw, X, Eye } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw, Eye } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";

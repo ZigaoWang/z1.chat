@@ -254,15 +254,13 @@ function SandboxCard({ invocation: exec }: { invocation: ToolInvocation }) {
         onClick={() => hasOutput && setExpanded(!expanded)}
         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${hasOutput ? "hover:bg-muted/30 cursor-pointer" : "cursor-default"}`}
       >
-        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md`}>
-          {isRunning ? (
-            <span className="h-3 w-3 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
-          ) : hasError ? (
-            <X className="h-3 w-3 text-destructive/60" />
-          ) : (
-            <Check className="h-3 w-3 text-muted-foreground/40" />
-          )}
-        </div>
+        {isRunning ? (
+          <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+        ) : hasError ? (
+          <X className="h-3 w-3 shrink-0 text-destructive/60" />
+        ) : (
+          <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+        )}
         <span className="font-medium text-foreground/70">{label}</span>
         {langLabel && <span className="rounded bg-muted/60 px-1 py-px text-[10px] text-muted-foreground/50">{langLabel}</span>}
         {preview && <span className="text-muted-foreground/30 font-mono truncate ml-1 hidden sm:inline">{preview}</span>}
@@ -312,7 +310,6 @@ function ArtifactToolCards({ invocations, onOpenArtifactById }: { invocations: T
         const displayTitle = result?.title || args.title || "Untitled";
         const displayType = result?.type || args.type || "document";
         const typeLabel = getArtifactTypeLabel(displayType);
-        const isUpdate = t.toolName === "update_artifact" || t.toolName === "edit_artifact";
         const actionLabel = isRunning
           ? (t.toolName === "create_artifact" ? "Creating" : t.toolName === "update_artifact" ? "Rewriting" : "Editing")
           : (t.toolName === "create_artifact" ? typeLabel : t.toolName === "update_artifact" ? `Rewrote` : `Edited`);

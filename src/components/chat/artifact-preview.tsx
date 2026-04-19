@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
-  X, Code2, Eye, ExternalLink, Copy, Check,
-  RefreshCw, Download, Pencil, ChevronDown,
+  X, ExternalLink, Copy, Check,
+  RefreshCw, Download, ChevronDown,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
