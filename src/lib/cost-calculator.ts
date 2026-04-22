@@ -1,11 +1,10 @@
 import { Decimal } from "decimal.js";
 import { getCachedModels, getModelPricing } from "./models-cache";
+import { USD_TO_CNY } from "./currency";
 
 // Tavily basic search = 1 credit = $0.008
 const SEARCH_COST_USD = process.env.SEARCH_COST_USD || "0.008";
 const COST_MARKUP = process.env.COST_MARKUP || "1.1";
-// USD to CNY conversion rate for user-facing charges
-const USD_TO_CNY = process.env.USD_TO_CNY || "7.2";
 
 /**
  * Calculate raw cost for an AI call using arbitrary-precision arithmetic.

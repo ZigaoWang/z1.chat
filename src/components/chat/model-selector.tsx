@@ -13,6 +13,7 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import { useModels } from "@/hooks/use-models";
+import { USD_TO_CNY } from "@/lib/currency";
 
 interface ModelSelectorProps {
   value: string;
@@ -90,7 +91,8 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
 
   const formatPrice = (price: number) => {
     if (price === 0) return "Free";
-    return `$${(price * 1_000_000).toFixed(2)}/M`;
+    const cny = price * 1_000_000 * USD_TO_CNY;
+    return `\u00A5${cny.toFixed(2)}/M`;
   };
 
   const ModelBadges = ({ model }: { model: { isFree: boolean; supportsVision?: boolean } }) => (
