@@ -4,9 +4,6 @@ import { db } from "@/lib/db";
 import { paymentOrders } from "@/lib/db/schema";
 import { createPaymentUrl, generateOutTradeNo, expireStaleOrders } from "@/lib/zpay";
 
-// CNY to USD credit conversion rate
-const CNY_TO_USD_RATE = 0.14;
-
 export async function POST(req: NextRequest) {
   try {
     const userId = await getCurrentUserId();
@@ -25,7 +22,8 @@ export async function POST(req: NextRequest) {
 
     // Round to 2 decimal places
     const amountStr = cny.toFixed(2);
-    const creditAmount = (cny * CNY_TO_USD_RATE).toFixed(10);
+    // Credits = CNY 1:1
+    const creditAmount = amountStr;
 
     const outTradeNo = generateOutTradeNo();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

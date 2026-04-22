@@ -541,12 +541,12 @@ function UserRow({
               className="text-right hover:text-primary transition-colors"
               title="Click to edit balance"
             >
-              ${u.creditBalance.toFixed(2)}
+              {"\u00A5"}{u.creditBalance.toFixed(2)}
             </button>
           )}
         </td>
         <td className="px-4 py-3 text-right text-muted-foreground">
-          ${u.totalCharged.toFixed(4)}
+          {"\u00A5"}{u.totalCharged.toFixed(4)}
         </td>
       </tr>
       {expanded && (
@@ -598,7 +598,7 @@ function UserRow({
                         ${log.costUsd.toFixed(6)}
                       </td>
                       <td className="py-1.5 text-right tabular-nums">
-                        ${log.userCostUsd.toFixed(6)}
+                        {"\u00A5"}{log.userCostUsd.toFixed(6)}
                       </td>
                     </tr>
                   ))}

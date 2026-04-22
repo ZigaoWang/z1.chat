@@ -620,11 +620,11 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
                   <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">This Month</p>
-                  <p className="text-lg font-semibold mt-1">${usage.monthCost.toFixed(4)}</p>
+                  <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.monthCost.toFixed(4)}</p>
                 </div>
                 <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
                   <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">All Time</p>
-                  <p className="text-lg font-semibold mt-1">${usage.totalCost.toFixed(4)}</p>
+                  <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.totalCost.toFixed(4)}</p>
                 </div>
               </div>
 
@@ -644,7 +644,7 @@ export default function SettingsPage() {
                         <tr key={b.type}>
                           <td className="px-4 py-2 capitalize">{b.type.replace(/_/g, " ")}</td>
                           <td className="px-4 py-2 text-right text-muted-foreground">{b.count}</td>
-                          <td className="px-4 py-2 text-right">${b.totalCost.toFixed(4)}</td>
+                          <td className="px-4 py-2 text-right">{"\u00A5"}{b.totalCost.toFixed(4)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -668,7 +668,7 @@ export default function SettingsPage() {
                           <span className="text-muted-foreground/30 truncate">{log.model.split("/").pop()}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-medium">${log.costUsd.toFixed(5)}</span>
+                          <span className="font-medium">{"\u00A5"}{log.costUsd.toFixed(5)}</span>
                         </div>
                       </div>
                     ))}
@@ -696,7 +696,7 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-xs text-muted-foreground/50">Current Balance</p>
                   <p className="text-2xl font-semibold mt-0.5">
-                    ${(settings?.creditBalance ?? 0).toFixed(2)}
+                    {"\u00A5"}{(settings?.creditBalance ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <CreditCard className="h-8 w-8 text-muted-foreground/15" />
@@ -755,14 +755,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Credits preview */}
-              {activeAmount && activeAmount >= 1 && (
-                <div className="mx-4 mt-1 mb-2 rounded-lg bg-muted/20 px-3 py-2 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground/50">You will receive</span>
-                  <span className="text-xs font-semibold">${(activeAmount * 0.14).toFixed(2)} credits</span>
-                </div>
-              )}
-
               {/* Payment method */}
               <div className="px-4 py-3 border-t border-border/30">
                 <p className="text-[11px] text-muted-foreground/50 mb-2">Payment method</p>
@@ -817,7 +809,7 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                         <span>{"\u00A5"}{order.amount}</span>
-                        <span className="text-muted-foreground/40">+${parseFloat(order.creditAmount).toFixed(2)}</span>
+                        <span className="text-muted-foreground/40">+{"\u00A5"}{parseFloat(order.creditAmount).toFixed(2)}</span>
                       </div>
                       <span className="text-muted-foreground/40">
                         {new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

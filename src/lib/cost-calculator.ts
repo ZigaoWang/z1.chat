@@ -4,11 +4,13 @@ import { getCachedModels, getModelPricing } from "./models-cache";
 // Tavily basic search = 1 credit = $0.008
 const SEARCH_COST_USD = process.env.SEARCH_COST_USD || "0.008";
 const COST_MARKUP = process.env.COST_MARKUP || "1.1";
+// USD to CNY conversion rate for user-facing charges
+const USD_TO_CNY = process.env.USD_TO_CNY || "7.2";
 
 /**
  * Calculate raw cost for an AI call using arbitrary-precision arithmetic.
  * OpenRouter pricing is per-token (prompt/completion fields are cost per token).
- * Returns a decimal string for lossless DB storage.
+ * Returns a decimal string in USD for lossless DB storage.
  */
 export async function calculateCost(
   modelId: string,
@@ -29,12 +31,12 @@ export async function calculateCost(
 }
 
 /**
- * Apply markup to raw cost to get the user-facing charge.
- * All usage types are charged — raw cost * COST_MARKUP (default 1.1x).
+ * Apply markup and convert to CNY for user-facing charge.
+ * raw USD cost * COST_MARKUP * USD_TO_CNY = CNY amount deducted from balance.
  * Takes and returns decimal strings.
  */
 export function calculateUserCost(rawCost: string): string {
-  return new Decimal(rawCost).times(COST_MARKUP).toString();
+  return new Decimal(rawCost).times(COST_MARKUP).times(USD_TO_CNY).toString();
 }
 
 export function getSearchCost(): string {
