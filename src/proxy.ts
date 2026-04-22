@@ -10,6 +10,8 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/api/invite/")) return true;
+  if (pathname.startsWith("/api/payment/notify")) return true;
+  if (pathname.startsWith("/api/payment/return")) return true;
   if (pathname.startsWith("/_next/")) return true;
   if (pathname.startsWith("/favicon")) return true;
   // Allow models API without auth (used on login page indirectly)

@@ -247,6 +247,36 @@ export const inviteTokens = pgTable(
   (table) => [index("invite_tokens_token_idx").on(table.token)]
 );
 
+// Payment Orders
+export const paymentOrders = pgTable(
+  "payment_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    outTradeNo: text("out_trade_no").notNull().unique(),
+    tradeNo: text("trade_no"), // ZPay internal order number
+    amount: numeric("amount", { precision: 10, scale: 2 }).notNull(), // CNY
+    creditAmount: numeric("credit_amount", { precision: 20, scale: 10 }).notNull(), // USD credits to add
+    status: text("status").notNull().default("pending"), // pending, paid, failed
+    type: text("type").notNull().default("alipay"), // alipay, wxpay
+    name: text("name").notNull(), // product name
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("payment_orders_user_id_idx").on(table.userId),
+    index("payment_orders_out_trade_no_idx").on(table.outTradeNo),
+    index("payment_orders_status_idx").on(table.status),
+  ]
+);
+
 // API Keys (BYOK)
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -321,6 +351,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   usageLogs: many(usageLogs),
   artifacts: many(artifacts),
+  paymentOrders: many(paymentOrders),
 }));
 
 export const conversationsRelations = relations(
@@ -421,6 +452,13 @@ export const artifactVersionsRelations = relations(artifactVersions, ({ one }) =
   }),
 }));
 
+export const paymentOrdersRelations = relations(paymentOrders, ({ one }) => ({
+  user: one(users, {
+    fields: [paymentOrders.userId],
+    references: [users.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -436,6 +474,7 @@ export type UsageLog = typeof usageLogs.$inferSelect;
 export type InviteToken = typeof inviteTokens.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
 export type ArtifactVersion = typeof artifactVersions.$inferSelect;
+export type PaymentOrder = typeof paymentOrders.$inferSelect;
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";
