@@ -1,24 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useI18n } from "@/hooks/use-i18n";
 
 export default function SignupPage() {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Invite Only</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("auth.inviteOnly")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Registration is invite-only. You need an invite link to create an account.
+          {t("auth.inviteOnlyDesc")}
         </p>
       </div>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        {t("auth.alreadyHaveAccount")}{" "}
         <Link
           href="/login"
           className="font-medium text-foreground hover:underline"
         >
-          Sign in
+          {t("auth.signIn")}
         </Link>
       </p>
     </div>

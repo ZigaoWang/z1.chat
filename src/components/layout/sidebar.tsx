@@ -5,6 +5,7 @@ import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
 import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, User, Shield } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/hooks/use-i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "./theme-toggle";
 import { APP_NAME } from "@/lib/constants";
@@ -21,7 +22,7 @@ interface DateGroup {
   conversations: Conversation[];
 }
 
-function groupConversationsByDate(conversations: Conversation[]): DateGroup[] {
+function groupConversationsByDate(conversations: Conversation[], labels: { today: string; yesterday: string; prev7: string; prev30: string; older: string }): DateGroup[] {
   const groups: DateGroup[] = [];
   const today: Conversation[] = [];
   const yesterday: Conversation[] = [];
@@ -39,11 +40,11 @@ function groupConversationsByDate(conversations: Conversation[]): DateGroup[] {
     else if (isAfter(date, thirtyDaysAgo)) prev30.push(conv);
     else older.push(conv);
   }
-  if (today.length > 0) groups.push({ label: "Today", conversations: today });
-  if (yesterday.length > 0) groups.push({ label: "Yesterday", conversations: yesterday });
-  if (prev7.length > 0) groups.push({ label: "Previous 7 Days", conversations: prev7 });
-  if (prev30.length > 0) groups.push({ label: "Previous 30 Days", conversations: prev30 });
-  if (older.length > 0) groups.push({ label: "Older", conversations: older });
+  if (today.length > 0) groups.push({ label: labels.today, conversations: today });
+  if (yesterday.length > 0) groups.push({ label: labels.yesterday, conversations: yesterday });
+  if (prev7.length > 0) groups.push({ label: labels.prev7, conversations: prev7 });
+  if (prev30.length > 0) groups.push({ label: labels.prev30, conversations: prev30 });
+  if (older.length > 0) groups.push({ label: labels.older, conversations: older });
   return groups;
 }
 
@@ -65,7 +66,7 @@ function TypewriterTitle({ text, isActive }: { text: string; isActive: boolean }
     prevText.current = text;
 
     // Only animate if title actually changed (not just first render)
-    if (!oldText || oldText === "New conversation" || oldText === text) {
+    if (!oldText || oldText === "New conversation" || oldText === "新对话" || oldText === text) {
       setDisplay(text);
       return;
     }
@@ -99,6 +100,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery, isLoading,
   } = useConversations();
   const { user, signOut } = useAuth();
+  const { t } = useI18n();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -181,12 +183,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     document.addEventListener("mouseup", handleUp);
   }, [onClose]);
 
-  const grouped = useMemo(() => groupConversationsByDate(conversations), [conversations]);
+  const grouped = useMemo(() => groupConversationsByDate(conversations, {
+    today: t("sidebar.today"),
+    yesterday: t("sidebar.yesterday"),
+    prev7: t("sidebar.prev7"),
+    prev30: t("sidebar.prev30"),
+    older: t("sidebar.older"),
+  }), [conversations, t]);
 
   const saveEdit = async () => {
     if (editingId && editTitle.trim()) {
       await renameConversation(editingId, editTitle.trim());
-      toast.success("Renamed");
+      toast.success(t("sidebar.renamed"));
     }
     setEditingId(null);
   };
@@ -194,8 +202,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const confirmDelete = useCallback(async (id: string) => {
     await deleteConversation(id);
     setDeletingId(null);
-    toast.success("Deleted");
-  }, [deleteConversation]);
+    toast.success(t("sidebar.deleted"));
+  }, [deleteConversation, t]);
 
   const renderConversation = (conv: Conversation) => {
     const isActive = activeId === conv.id;
@@ -203,7 +211,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     if (deletingId === conv.id) {
       return (
         <div key={conv.id} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground">
-          <span className="flex-1 truncate text-destructive">Delete this chat?</span>
+          <span className="flex-1 truncate text-destructive">{t("sidebar.deleteChat")}</span>
           <button onClick={() => confirmDelete(conv.id)} className="rounded p-0.5 text-destructive hover:bg-destructive/10"><Check className="h-3.5 w-3.5" /></button>
           <button onClick={() => setDeletingId(null)} className="rounded p-0.5 text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
         </div>
@@ -235,7 +243,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           }`}
         >
           <div className="min-w-0 flex-1">
-            <TypewriterTitle text={conv.title || "New conversation"} isActive={isActive} />
+            <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
           </div>
           <span
             className="shrink-0 flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
@@ -251,19 +259,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               onClick={() => { setMenuOpenId(null); regenerateTitle(conv.id); }}
               className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-foreground/80 hover:bg-muted transition-colors"
             >
-              <Sparkles className="h-3 w-3" /> Generate title
+              <Sparkles className="h-3 w-3" /> {t("sidebar.generateTitle")}
             </button>
             <button
               onClick={() => { setMenuOpenId(null); setEditingId(conv.id); setEditTitle(conv.title || ""); }}
               className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-foreground/80 hover:bg-muted transition-colors"
             >
-              <Pencil className="h-3 w-3" /> Rename
+              <Pencil className="h-3 w-3" /> {t("sidebar.rename")}
             </button>
             <button
               onClick={() => { setMenuOpenId(null); setDeletingId(conv.id); }}
               className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/5 transition-colors"
             >
-              <Trash2 className="h-3 w-3" /> Delete
+              <Trash2 className="h-3 w-3" /> {t("sidebar.delete")}
             </button>
           </div>
         )}
@@ -306,14 +314,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
                 <Plus className="h-4 w-4" />
               </TooltipTrigger>
-              <TooltipContent side="bottom">New chat</TooltipContent>
+              <TooltipContent side="bottom">{t("sidebar.newChat")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger onClick={onClose}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
                 <PanelLeftClose className="h-4 w-4" />
               </TooltipTrigger>
-              <TooltipContent side="bottom">Close sidebar</TooltipContent>
+              <TooltipContent side="bottom">{t("sidebar.closeSidebar")}</TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -322,7 +330,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/30" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
+              placeholder={t("sidebar.search")}
               className="h-8 w-full rounded-lg border-0 bg-muted/50 pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground/30 focus:bg-muted/70 focus:ring-1 focus:ring-ring/20 transition-all" />
           </div>
         </div>
@@ -337,7 +345,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-3">
               <MessageSquare className="h-5 w-5 text-muted-foreground/15" />
-              <p className="mt-1.5 text-xs text-muted-foreground/25">{searchQuery ? "No results" : "No conversations"}</p>
+              <p className="mt-1.5 text-xs text-muted-foreground/25">{searchQuery ? t("sidebar.noResults") : t("sidebar.noConversations")}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -369,19 +377,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 >
                   <LogOut className="h-3 w-3" />
                 </TooltipTrigger>
-                <TooltipContent side="top">Sign out</TooltipContent>
+                <TooltipContent side="top">{t("sidebar.signOut")}</TooltipContent>
               </Tooltip>
             </div>
           )}
           <ThemeToggle />
           <Link href="/settings"
             className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
-            <Settings className="h-3.5 w-3.5" /> Settings
+            <Settings className="h-3.5 w-3.5" /> {t("sidebar.settings")}
           </Link>
           {user?.role === "admin" && (
             <Link href="/admin"
               className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
-              <Shield className="h-3.5 w-3.5" /> Admin
+              <Shield className="h-3.5 w-3.5" /> {t("sidebar.admin")}
             </Link>
           )}
         </div>

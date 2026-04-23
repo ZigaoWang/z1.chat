@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface Memory {
   id: string;
@@ -72,12 +73,12 @@ interface UsageData {
   }>;
 }
 
-const categoryLabel: Record<string, string> = {
-  personal: "Personal Info",
-  preferences: "Preferences",
-  projects: "Projects",
-  style: "Communication Style",
-  facts: "Facts",
+const categoryLabelKey: Record<string, string> = {
+  personal: "memory.personal",
+  preferences: "memory.preferences",
+  projects: "memory.projects",
+  style: "memory.style",
+  facts: "memory.facts",
 };
 
 const categoryIcon: Record<string, React.ElementType> = {
@@ -91,6 +92,7 @@ const categoryIcon: Record<string, React.ElementType> = {
 const CATEGORY_ORDER = ["personal", "projects", "preferences", "style", "facts"];
 
 export default function SettingsPage() {
+  const { t, locale, setLocale } = useI18n();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [editingMemory, setEditingMemory] = useState<string | null>(null);
@@ -123,14 +125,14 @@ export default function SettingsPage() {
         setSettings(data);
         setCustomInstructions(data?.preferences?.customInstructions || "");
       })
-      .catch(() => toast.error("Failed to load settings"));
+      .catch(() => toast.error(t("settings.failedToLoad")));
 
     fetch("/api/memories")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setMemories(data);
       })
-      .catch(() => toast.error("Failed to load memories"));
+      .catch(() => toast.error(t("memory.failedToLoad")));
 
     fetch("/api/usage")
       .then((r) => r.json())
@@ -151,7 +153,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const payment = searchParams.get("payment");
     if (payment === "success") {
-      toast.success("Payment successful! Credits have been added.");
+      toast.success(t("credits.creditsAdded"));
       // Refresh settings to get updated balance
       fetch("/api/settings")
         .then((r) => r.json())
@@ -164,9 +166,9 @@ export default function SettingsPage() {
         })
         .catch(() => {});
     } else if (payment === "error") {
-      toast.error("Payment verification failed.");
+      toast.error(t("credits.paymentError"));
     } else if (payment === "pending") {
-      toast.info("Payment is being processed. Credits will be added shortly.");
+      toast.info(t("credits.paymentPending"));
     }
   }, [searchParams]);
 
@@ -185,13 +187,13 @@ export default function SettingsPage() {
           setSettings((prev) =>
             prev ? { ...prev, preferences: data.preferences } : prev
           );
-          toast.success("Saved");
+          toast.success(t("settings.saved"));
         }
       } catch {
-        toast.error("Failed to save preference");
+        toast.error(t("settings.failedToSave"));
       }
     },
-    []
+    [t]
   );
 
   const saveCustomInstructions = useCallback(async () => {
@@ -208,12 +210,12 @@ export default function SettingsPage() {
       });
       if (res.ok) {
         setMemories((prev) => prev.filter((m) => m.id !== id));
-        toast.success("Memory deleted");
+        toast.success(t("memory.deleted"));
       }
     } catch {
-      toast.error("Failed to delete memory");
+      toast.error(t("memory.failedToDelete"));
     }
-  }, []);
+  }, [t]);
 
   const clearAllMemories = useCallback(async () => {
     try {
@@ -225,12 +227,12 @@ export default function SettingsPage() {
       if (res.ok) {
         setMemories([]);
         setShowClearConfirm(false);
-        toast.success("All memories cleared");
+        toast.success(t("memory.allCleared"));
       }
     } catch {
-      toast.error("Failed to clear memories");
+      toast.error(t("memory.failedToClear"));
     }
-  }, []);
+  }, [t]);
 
   const saveMemoryEdit = useCallback(
     async (id: string) => {
@@ -246,10 +248,10 @@ export default function SettingsPage() {
             prev.map((m) => (m.id === id ? { ...m, content: updated.content, updatedAt: updated.updatedAt } : m))
           );
           setEditingMemory(null);
-          toast.success("Memory updated");
+        toast.success(t("sidebar.renamed"));
         }
       } catch {
-        toast.error("Failed to update memory");
+        toast.error(t("memory.failedToUpdate"));
       }
     },
     [editContent]
@@ -259,7 +261,7 @@ export default function SettingsPage() {
 
   const handleTopUp = useCallback(async () => {
     if (!activeAmount || activeAmount < 1) {
-      toast.error("Please select or enter an amount (min \u00A51)");
+      toast.error(t("credits.selectAnAmount"));
       return;
     }
     setTopUpLoading(true);
@@ -271,16 +273,16 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to create payment");
+        toast.error(data.error || t("credits.paymentError"));
         return;
       }
       window.location.href = data.paymentUrl;
     } catch {
-      toast.error("Failed to create payment");
+      toast.error(t("credits.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
-  }, [activeAmount]);
+  }, [activeAmount, t]);
 
   const groupedMemories = useMemo(() => {
     const groups: Record<string, Memory[]> = {};
@@ -306,11 +308,12 @@ export default function SettingsPage() {
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const isZh = locale === "zh";
 
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (diffDays === 0) return isZh ? "今天" : "Today";
+    if (diffDays === 1) return isZh ? "昨天" : "Yesterday";
+    if (diffDays < 7) return isZh ? `${diffDays} 天前` : `${diffDays} days ago`;
+    return d.toLocaleDateString(isZh ? "zh-CN" : "en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
   return (
@@ -324,21 +327,21 @@ export default function SettingsPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{t("settings.title")}</h1>
         </div>
 
         {/* Profile Section */}
         <section className="mb-8">
-          <SectionHeader icon={User} title="Profile" />
+          <SectionHeader icon={User} title={t("settings.profile")} />
           <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">Name</span>
+              <span className="text-xs">{t("settings.name")}</span>
               <span className="text-xs text-muted-foreground">
                 {settings?.name || "Developer"}
               </span>
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">Email</span>
+              <span className="text-xs">{t("settings.email")}</span>
               <span className="text-xs text-muted-foreground">
                 {settings?.email || "\u2014"}
               </span>
@@ -348,30 +351,54 @@ export default function SettingsPage() {
 
         {/* Appearance */}
         <section className="mb-8">
-          <SectionHeader icon={Palette} title="Appearance" />
+          <SectionHeader icon={Palette} title={t("settings.appearance")} />
           <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">Theme</span>
+              <span className="text-xs">{t("settings.theme")}</span>
               <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
                 {([
-                  { value: "light", icon: Sun, label: "Light" },
-                  { value: "dark", icon: Moon, label: "Dark" },
-                  { value: "system", icon: Monitor, label: "System" },
-                ] as const).map((t) => (
+                  { value: "light", icon: Sun, labelKey: "settings.light" as const },
+                  { value: "dark", icon: Moon, labelKey: "settings.dark" as const },
+                  { value: "system", icon: Monitor, labelKey: "settings.system" as const },
+                ] as const).map((opt) => (
                   <button
-                    key={t.value}
+                    key={opt.value}
                     onClick={() => {
-                      setTheme(t.value);
-                      updatePreference("theme", t.value);
+                      setTheme(opt.value);
+                      updatePreference("theme", opt.value);
                     }}
                     className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      themeMounted && theme === t.value
+                      themeMounted && theme === opt.value
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <t.icon className="h-3 w-3" />
-                    {t.label}
+                    <opt.icon className="h-3 w-3" />
+                    {t(opt.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <span className="text-xs">{t("settings.language")}</span>
+              <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
+                {([
+                  { value: "en" as const, label: "English" },
+                  { value: "zh" as const, label: "中文" },
+                ]).map((lang) => (
+                  <button
+                    key={lang.value}
+                    onClick={() => {
+                      setLocale(lang.value);
+                      updatePreference("language", lang.value === "zh" ? "Chinese" : "English");
+                    }}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
+                      locale === lang.value
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {lang.label}
                   </button>
                 ))}
               </div>
@@ -381,26 +408,30 @@ export default function SettingsPage() {
 
         {/* AI Preferences */}
         <section className="mb-8">
-          <SectionHeader icon={Sparkles} title="AI Preferences" />
+          <SectionHeader icon={Sparkles} title={t("settings.aiPreferences")} />
           <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
             {/* Response Style */}
             <div className="flex items-center justify-between px-4 py-3.5">
               <div>
-                <span className="text-xs">Response Style</span>
-                <p className="text-[11px] text-muted-foreground/50 mt-0.5">How detailed should responses be</p>
+                <span className="text-xs">{t("settings.responseStyle")}</span>
+                <p className="text-[11px] text-muted-foreground/50 mt-0.5">{t("settings.responseStyleDesc")}</p>
               </div>
               <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
-                {(["concise", "balanced", "detailed"] as const).map((s) => (
+                {([
+                  { value: "concise", labelKey: "settings.concise" as const },
+                  { value: "balanced", labelKey: "settings.balanced" as const },
+                  { value: "detailed", labelKey: "settings.detailed" as const },
+                ] as const).map((s) => (
                   <button
-                    key={s}
-                    onClick={() => updatePreference("responseStyle", s)}
+                    key={s.value}
+                    onClick={() => updatePreference("responseStyle", s.value)}
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      settings?.preferences?.responseStyle === s
+                      settings?.preferences?.responseStyle === s.value
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                    {t(s.labelKey)}
                   </button>
                 ))}
               </div>
@@ -409,17 +440,20 @@ export default function SettingsPage() {
             {/* Language */}
             <div className="flex items-center justify-between px-4 py-3.5">
               <div>
-                <span className="text-xs">Language</span>
-                <p className="text-[11px] text-muted-foreground/50 mt-0.5">Preferred response language</p>
+                <span className="text-xs">{t("settings.language")}</span>
+                <p className="text-[11px] text-muted-foreground/50 mt-0.5">{t("settings.languageDesc")}</p>
               </div>
               <select
                 value={settings?.preferences?.language || ""}
-                onChange={(e) =>
-                  updatePreference("language", e.target.value || null)
-                }
+                onChange={(e) => {
+                  const val = e.target.value || null;
+                  updatePreference("language", val);
+                  if (val === "Chinese") setLocale("zh");
+                  else setLocale("en");
+                }}
                 className="rounded-lg border border-border/40 bg-muted/20 px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all"
               >
-                <option value="">Auto-detect</option>
+                <option value="">{t("settings.autoDetect")}</option>
                 <option value="English">English</option>
                 <option value="Chinese">{"\u4E2D\u6587"}</option>
                 <option value="Spanish">{"\u0045\u0073\u0070\u0061\u00F1\u006F\u006C"}</option>
@@ -434,9 +468,9 @@ export default function SettingsPage() {
             <div className="px-4 py-3.5">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <span className="text-xs">Custom Instructions</span>
+                  <span className="text-xs">{t("settings.customInstructions")}</span>
                   <p className="text-[11px] text-muted-foreground/50 mt-0.5">
-                    Tell the AI about yourself or how you&apos;d like it to respond
+                    {t("settings.customInstructionsDesc")}
                   </p>
                 </div>
                 {!instructionsSaved && (
@@ -444,7 +478,7 @@ export default function SettingsPage() {
                     onClick={saveCustomInstructions}
                     className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
-                    Save
+                    {t("settings.save")}
                   </button>
                 )}
               </div>
@@ -457,7 +491,7 @@ export default function SettingsPage() {
                 onBlur={() => {
                   if (!instructionsSaved) saveCustomInstructions();
                 }}
-                placeholder="e.g., I'm a senior developer working on a React project. Prefer TypeScript examples with modern patterns..."
+                placeholder={t("settings.customInstructionsPlaceholder")}
                 rows={4}
                 className="w-full rounded-lg border border-border/40 bg-muted/10 px-3 py-2 text-xs leading-relaxed resize-none outline-none placeholder:text-muted-foreground/30 focus:ring-1 focus:ring-primary/20 focus:border-primary/20 transition-all"
               />
@@ -468,14 +502,14 @@ export default function SettingsPage() {
         {/* Memory */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <SectionHeader icon={Brain} title="Memory" count={memories.length} />
+            <SectionHeader icon={Brain} title={t("memory.title")} count={memories.length} />
             {memories.length > 0 && !showClearConfirm && (
               <button
                 onClick={() => setShowClearConfirm(true)}
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted-foreground/50 transition-colors hover:text-destructive hover:bg-destructive/8"
               >
                 <Trash2 className="h-3 w-3" />
-                Clear all
+                {t("memory.clearAll")}
               </button>
             )}
           </div>
@@ -485,7 +519,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <span className="text-xs text-destructive">
-                  Delete all {memories.length} memories?
+                  {t("memory.deleteAll").replace("{count}", String(memories.length))}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -493,13 +527,13 @@ export default function SettingsPage() {
                   onClick={clearAllMemories}
                   className="rounded-lg bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
                 >
-                  Delete
+                  {t("memory.delete")}
                 </button>
                 <button
                   onClick={() => setShowClearConfirm(false)}
                   className="rounded-lg px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                 >
-                  Cancel
+                  {t("memory.cancel")}
                 </button>
               </div>
             </div>
@@ -509,8 +543,7 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
               <Brain className="mx-auto h-8 w-8 text-muted-foreground/15" />
               <p className="mt-2 text-xs text-muted-foreground/40">
-                No memories yet. Start chatting and I&apos;ll remember important
-                details about you.
+                {t("memory.noMemories")}
               </p>
             </div>
           ) : (
@@ -522,7 +555,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-1.5 mb-2 px-1">
                       <Icon className="h-3.5 w-3.5 text-muted-foreground/40" />
                       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                        {categoryLabel[category] || category}
+                        {categoryLabelKey[category] ? t(categoryLabelKey[category] as "memory.personal") : category}
                       </h3>
                       <span className="text-[11px] text-muted-foreground/30">
                         ({catMemories.length})
@@ -613,17 +646,17 @@ export default function SettingsPage() {
 
         {/* Usage */}
         <section className="mb-8">
-          <SectionHeader icon={Activity} title="Usage" />
+          <SectionHeader icon={Activity} title={t("usage.title")} />
           {usage ? (
             <div className="space-y-3">
               {/* Cost cards */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
-                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">This Month</p>
+                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">{t("usage.thisMonth")}</p>
                   <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.monthCost.toFixed(4)}</p>
                 </div>
                 <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
-                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">All Time</p>
+                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">{t("usage.allTime")}</p>
                   <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.totalCost.toFixed(4)}</p>
                 </div>
               </div>
@@ -634,15 +667,15 @@ export default function SettingsPage() {
                   <table className="w-full text-xs min-w-[300px]">
                     <thead>
                       <tr className="border-b border-border/30 text-muted-foreground/50">
-                        <th className="text-left px-4 py-2 font-medium">Type</th>
-                        <th className="text-right px-4 py-2 font-medium">Calls</th>
-                        <th className="text-right px-4 py-2 font-medium">Cost</th>
+                        <th className="text-left px-4 py-2 font-medium">{t("usage.type")}</th>
+                        <th className="text-right px-4 py-2 font-medium">{t("usage.calls")}</th>
+                        <th className="text-right px-4 py-2 font-medium">{t("usage.cost")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {usage.breakdown.map((b) => (
                         <tr key={b.type}>
-                          <td className="px-4 py-2 capitalize">{b.type.replace(/_/g, " ")}</td>
+                          <td className="px-4 py-2">{t(`usage.type.${b.type}` as "usage.type.chat") || b.type.replace(/_/g, " ")}</td>
                           <td className="px-4 py-2 text-right text-muted-foreground">{b.count}</td>
                           <td className="px-4 py-2 text-right">{"\u00A5"}{b.totalCost.toFixed(4)}</td>
                         </tr>
@@ -657,14 +690,14 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
                   <div className="px-4 py-2 border-b border-border/30">
                     <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                      Recent Activity
+                      {t("usage.recentActivity")}
                     </span>
                   </div>
                   <div className="divide-y divide-border/20 max-h-64 overflow-y-auto">
                     {usage.recent.slice(0, 20).map((log) => (
                       <div key={log.id} className="flex items-center justify-between px-4 py-2 text-xs min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="capitalize text-muted-foreground shrink-0">{log.type.replace(/_/g, " ")}</span>
+                          <span className="text-muted-foreground shrink-0">{t(`usage.type.${log.type}` as "usage.type.chat") || log.type.replace(/_/g, " ")}</span>
                           <span className="text-muted-foreground/30 truncate">{log.model.split("/").pop()}</span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -680,7 +713,7 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
               <Activity className="mx-auto h-8 w-8 text-muted-foreground/15" />
               <p className="mt-2 text-xs text-muted-foreground/40">
-                No usage data yet. Start chatting to see costs here.
+                {t("usage.noUsage")}
               </p>
             </div>
           )}
@@ -688,13 +721,13 @@ export default function SettingsPage() {
 
         {/* Credits & Top Up */}
         <section className="mb-8">
-          <SectionHeader icon={CreditCard} title="Credits" />
+          <SectionHeader icon={CreditCard} title={t("credits.title")} />
           <div className="space-y-3">
             {/* Balance card */}
             <div className="rounded-xl border border-border/40 bg-card shadow-sm">
               <div className="flex items-center justify-between px-4 py-4">
                 <div>
-                  <p className="text-xs text-muted-foreground/50">Current Balance</p>
+                  <p className="text-xs text-muted-foreground/50">{t("credits.currentBalance")}</p>
                   <p className="text-2xl font-semibold mt-0.5">
                     {"\u00A5"}{(settings?.creditBalance ?? 0).toFixed(2)}
                   </p>
@@ -707,13 +740,13 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-border/30">
                 <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                  Top Up
+                  {t("credits.topUp")}
                 </span>
               </div>
 
               {/* Amount selection */}
               <div className="px-4 pt-3 pb-2">
-                <p className="text-[11px] text-muted-foreground/50 mb-2">Select amount</p>
+                <p className="text-[11px] text-muted-foreground/50 mb-2">{t("credits.selectAmount")}</p>
                 <div className="flex flex-wrap gap-2">
                   {[5, 10, 30, 50, 100].map((amt) => (
                     <button
@@ -736,7 +769,7 @@ export default function SettingsPage() {
 
               {/* Custom amount input */}
               <div className="px-4 py-2">
-                <p className="text-[11px] text-muted-foreground/50 mb-1.5">Or enter custom amount</p>
+                <p className="text-[11px] text-muted-foreground/50 mb-1.5">{t("credits.customAmount")}</p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/50">{"\u00A5"}</span>
                   <input
@@ -744,7 +777,7 @@ export default function SettingsPage() {
                     min="1"
                     max="10000"
                     step="0.01"
-                    placeholder="Enter amount"
+                    placeholder={t("credits.enterAmount")}
                     value={customAmount}
                     onChange={(e) => {
                       setCustomAmount(e.target.value);
@@ -757,7 +790,7 @@ export default function SettingsPage() {
 
               {/* Payment method */}
               <div className="px-4 py-3 border-t border-border/30">
-                <p className="text-[11px] text-muted-foreground/50 mb-2">Payment method</p>
+                <p className="text-[11px] text-muted-foreground/50 mb-2">{t("credits.paymentMethod")}</p>
                 <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 flex items-center gap-3">
                   {/* Alipay logo */}
                   <svg viewBox="0 0 1024 1024" className="h-6 w-6 shrink-0" fill="none">
@@ -784,12 +817,12 @@ export default function SettingsPage() {
                   {topUpLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Processing...
+                      {t("credits.processing")}
                     </>
                   ) : activeAmount && activeAmount >= 1 ? (
-                    <>Pay {"\u00A5"}{activeAmount.toFixed(2)}</>
+                    <>{t("credits.pay")} {"\u00A5"}{activeAmount.toFixed(2)}</>
                   ) : (
-                    "Select an amount"
+                    t("credits.selectAnAmount")
                   )}
                 </button>
               </div>
@@ -800,7 +833,7 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
                 <div className="px-4 py-2 border-b border-border/30">
                   <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                    Payment History
+                    {t("credits.paymentHistory")}
                   </span>
                 </div>
                 <div className="divide-y divide-border/20 max-h-48 overflow-y-auto">
@@ -812,7 +845,7 @@ export default function SettingsPage() {
                         <span className="text-muted-foreground/40">+{"\u00A5"}{parseFloat(order.creditAmount).toFixed(2)}</span>
                       </div>
                       <span className="text-muted-foreground/40">
-                        {new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {new Date(order.createdAt).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
                   ))}

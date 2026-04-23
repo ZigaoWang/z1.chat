@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Paperclip, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useI18n } from "@/hooks/use-i18n";
 
 import type { ProcessedFile } from "@/lib/file-processor/types";
 import { MAX_FILES_PER_MESSAGE } from "@/lib/constants";
@@ -106,13 +107,14 @@ export async function uploadFiles(
 export default function FileUpload({ onFilesUploaded, disabled }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { t } = useI18n();
   const [progress, setProgress] = useState(0); // overall progress 0-100
 
   const handleFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
       if (files.length > MAX_FILES_PER_MESSAGE) {
-        toast.error(`Too many files. Maximum is ${MAX_FILES_PER_MESSAGE} per message.`);
+        toast.error(t("upload.tooManyFiles", { max: MAX_FILES_PER_MESSAGE }));
         return;
       }
       setUploading(true);
@@ -151,7 +153,7 @@ export default function FileUpload({ onFilesUploaded, disabled }: FileUploadProp
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled || uploading}
         className="relative flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:text-muted-foreground hover:bg-muted disabled:opacity-30"
-        title="Attach file"
+        title={t("upload.attachFile")}
       >
         {uploading ? (
           <>

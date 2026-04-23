@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { ThemeProvider } from "next-themes";
 import { ConversationProvider } from "@/hooks/use-conversations";
 import { AuthProvider } from "@/hooks/use-auth";
+import { I18nProvider } from "@/hooks/use-i18n";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -11,12 +12,14 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <TooltipProvider delay={300}>
-        <AuthProvider>
-          <ConversationProvider>
-            {children}
-            <Toaster position="bottom-right" richColors />
-          </ConversationProvider>
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <ConversationProvider>
+              {children}
+              <Toaster position="bottom-right" richColors />
+            </ConversationProvider>
+          </AuthProvider>
+        </I18nProvider>
       </TooltipProvider>
     </ThemeProvider>
   );

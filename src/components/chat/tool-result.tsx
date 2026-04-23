@@ -2,6 +2,7 @@
 
 import { useState, memo } from "react";
 import { Globe, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface SearchResult {
   title: string;
@@ -21,6 +22,7 @@ interface ToolResultProps {
 
 function ToolResult({ toolName, args, result }: ToolResultProps) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useI18n();
 
   if (toolName === "web_search") {
     return (
@@ -31,7 +33,7 @@ function ToolResult({ toolName, args, result }: ToolResultProps) {
         >
           <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className="text-[13px] font-medium text-muted-foreground">
-            Searched: {String(args.query)}
+            {t("tool.searched", { query: String(args.query) })}
           </span>
           <span className="ml-auto text-muted-foreground/40">
             {expanded ? (
@@ -79,7 +81,7 @@ function ToolResult({ toolName, args, result }: ToolResultProps) {
     <div className="my-3 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5">
       <div className="flex items-center gap-2">
         <span className="text-[12px] font-medium text-muted-foreground">
-          Tool: {toolName}
+          {t("tool.toolPrefix", { name: toolName })}
         </span>
       </div>
     </div>

@@ -8,6 +8,7 @@ import rehypeKatex from "rehype-katex";
 import { memo, useState, useCallback, useRef } from "react";
 import { Check, Copy, Eye } from "lucide-react";
 import { isArtifact } from "./artifact-preview";
+import { useI18n } from "@/hooks/use-i18n";
 
 function CodeBlock({
   className,
@@ -20,6 +21,7 @@ function CodeBlock({
 }) {
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
+  const { t } = useI18n();
   const language = className?.replace("language-", "").replace("hljs ", "") || "";
 
   const handleCopy = useCallback(async () => {
@@ -44,7 +46,7 @@ function CodeBlock({
               onClick={() => onOpenArtifact!(codeRef.current?.textContent || "", language)}
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors hover:text-foreground hover:bg-muted"
             >
-              <Eye className="h-3 w-3" />Preview
+              <Eye className="h-3 w-3" />{t("common.preview")}
             </button>
           )}
           <button
@@ -52,9 +54,9 @@ function CodeBlock({
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors sm:opacity-0 sm:group-hover/code:opacity-100 hover:text-foreground hover:bg-muted"
           >
             {copied ? (
-              <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></>
+              <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">{t("common.copied")}</span></>
             ) : (
-              <><Copy className="h-3 w-3" />Copy</>
+              <><Copy className="h-3 w-3" />{t("common.copy")}</>
             )}
           </button>
         </div>

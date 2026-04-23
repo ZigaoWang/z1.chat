@@ -3,6 +3,7 @@
 import { useRef, useEffect, KeyboardEvent, useCallback, useState } from "react";
 import { ArrowUp, Square, X, FileText, Image as ImageIcon, Pencil, Loader2 } from "lucide-react";
 import FileUpload, { type UploadedFile, uploadFiles } from "./file-upload";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface EditingState {
   messageIndex: number;
@@ -32,6 +33,7 @@ export default function ChatInput({
   placeholder = "Ask anything...", files, onFilesChange, onEditLastMessage,
   editing, onCancelEdit, onSubmitEdit,
 }: ChatInputProps) {
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
   const [pasteUploading, setPasteUploading] = useState(false);
@@ -106,7 +108,7 @@ export default function ChatInput({
         {editing && (
           <div className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-2xl border border-b-0 border-border/60 bg-muted/30 text-xs text-muted-foreground">
             <Pencil className="h-3 w-3" />
-            <span>Editing message</span>
+            <span>{t("chat.editingMessage")}</span>
             <button onClick={onCancelEdit} className="ml-auto p-0.5 rounded hover:bg-muted hover:text-foreground transition-colors">
               <X className="h-3 w-3" />
             </button>
@@ -127,7 +129,7 @@ export default function ChatInput({
               {pasteUploading && (
                 <div className="flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground animate-pulse">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Uploading...</span>
+                  <span>{t("chat.uploading")}</span>
                 </div>
               )}
             </div>
@@ -142,7 +144,7 @@ export default function ChatInput({
             onCompositionStart={() => { composingRef.current = true; }}
             onCompositionEnd={() => { composingRef.current = false; }}
             onPaste={handlePaste}
-            placeholder={editing ? "Edit your message..." : placeholder}
+            placeholder={editing ? t("chat.editMessage") : placeholder}
             disabled={disabled}
             rows={1}
             className="block w-full resize-none bg-transparent px-3.5 py-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/30 disabled:opacity-50"
@@ -157,7 +159,7 @@ export default function ChatInput({
                 onClick={onCancelEdit}
                 className="px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
               >
-                Cancel
+                {t("chat.cancel")}
               </button>
             ) : (
               <div className="flex items-center justify-center">

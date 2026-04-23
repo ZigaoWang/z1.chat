@@ -20,6 +20,7 @@ import {
 import MarkdownRenderer from "./markdown-renderer";
 import { extractArtifacts } from "./artifact-preview";
 import type { MessageSegment } from "./chat-messages";
+import { useI18n } from "@/hooks/use-i18n";
 
 export interface ToolInvocation {
   toolCallId: string;
@@ -102,7 +103,8 @@ function useCopy() {
 // --- Search status (clean, no spinning globe) ---
 function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
   const [expanded, setExpanded] = useState(false);
-  const searches = invocations.filter((t) => t.toolName === "web_search");
+  const { t } = useI18n();
+  const searches = invocations.filter((ti) => ti.toolName === "web_search");
   if (searches.length === 0) return null;
 
   const activeSearch = searches.find((s) => s.state !== "output-available" && s.state !== "output-error");
@@ -122,8 +124,8 @@ function SearchStatus({ invocations }: { invocations: ToolInvocation[] }) {
   }
 
   const label = isSearching
-    ? (activeQuery ? `Searching "${activeQuery}"` : "Searching the web")
-    : `Found ${sources.length} source${sources.length !== 1 ? "s" : ""}`;
+    ? (activeQuery ? t("tool.searching", { query: activeQuery }) : t("tool.searchingWeb"))
+    : t("tool.foundSources", { count: sources.length });
 
   return (
     <div className="mt-3">
@@ -182,20 +184,20 @@ interface SandboxToolResult {
 const SANDBOX_TOOL_NAMES = new Set(["code_execute", "shell_exec", "file_upload", "file_download"]);
 const ARTIFACT_TOOL_NAMES = new Set(["create_artifact", "update_artifact", "edit_artifact"]);
 
-function getToolLabel(toolName: string, isRunning: boolean): string {
+function getToolLabel(toolName: string, isRunning: boolean, t: (key: string) => string): string {
   if (isRunning) {
     switch (toolName) {
-      case "shell_exec": return "Running command";
-      case "file_upload": return "Uploading file";
-      case "file_download": return "Reading file";
-      default: return "Running code";
+      case "shell_exec": return t("tool.runningCommand");
+      case "file_upload": return t("tool.uploadingFile");
+      case "file_download": return t("tool.readingFile");
+      default: return t("tool.runningCode");
     }
   }
   switch (toolName) {
-    case "shell_exec": return "Ran command";
-    case "file_upload": return "Uploaded file";
-    case "file_download": return "Read file";
-    default: return "Ran code";
+    case "shell_exec": return t("tool.ranCommand");
+    case "file_upload": return t("tool.uploadedFile");
+    case "file_download": return t("tool.readFile");
+    default: return t("tool.ranCode");
   }
 }
 
@@ -210,20 +212,20 @@ function getLanguageLabel(args: Record<string, unknown>): string {
   return labels[lang] || lang;
 }
 
-function getArtifactTypeLabel(type: string): string {
+function getArtifactTypeLabel(type: string, t: (key: string) => string): string {
   switch (type) {
-    case "html": return "Website";
+    case "html": return t("artifact.website");
     case "svg": return "SVG";
-    case "mermaid": return "Diagram";
-    case "code": return "Code";
-    case "document": return "Document";
-    default: return "Artifact";
+    case "mermaid": return t("artifact.diagram");
+    case "code": return t("artifact.code");
+    case "document": return t("artifact.document");
+    default: return t("artifact.artifact");
   }
 }
 
 // --- Sandbox execution cards ---
 function SandboxStatus({ invocations, onLightbox }: { invocations: ToolInvocation[]; onLightbox: (src: string) => void }) {
-  const executions = invocations.filter((t) => SANDBOX_TOOL_NAMES.has(t.toolName));
+  const executions = invocations.filter((ti) => SANDBOX_TOOL_NAMES.has(ti.toolName));
   if (executions.length === 0) return null;
 
   return (
@@ -237,12 +239,13 @@ function SandboxStatus({ invocations, onLightbox }: { invocations: ToolInvocatio
 
 function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocation; onLightbox: (src: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useI18n();
   const isRunning = exec.state !== "output-available" && exec.state !== "output-error";
   const result = !isRunning ? exec.result as SandboxToolResult : null;
   const hasError = !!result?.error || exec.state === "output-error";
   const hasOutput = !!(result?.stdout || result?.stderr || result?.error);
   const langLabel = getLanguageLabel(exec.args);
-  const label = getToolLabel(exec.toolName, isRunning);
+  const label = getToolLabel(exec.toolName, isRunning, t as (key: string) => string);
   const command = exec.args.command as string | undefined;
   const codeSnippet = exec.args.code as string | undefined;
   const preview = command
@@ -324,36 +327,37 @@ function SandboxCard({ invocation: exec, onLightbox }: { invocation: ToolInvocat
 
 // --- Artifact tool cards (create, update, edit) ---
 function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }: { invocations: ToolInvocation[]; onOpenArtifactById: (id: string) => void; parentStreaming?: boolean }) {
-  const artifactTools = invocations.filter((t) => ARTIFACT_TOOL_NAMES.has(t.toolName));
+  const { t } = useI18n();
+  const artifactTools = invocations.filter((ti) => ARTIFACT_TOOL_NAMES.has(ti.toolName));
   if (artifactTools.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1.5 mt-3">
-      {artifactTools.map((t) => {
-        const isComplete = t.state === "output-available";
-        const isToolStreaming = t.state === "input-streaming" || t.state === "input-available";
+      {artifactTools.map((ti) => {
+        const isComplete = ti.state === "output-available";
+        const isToolStreaming = ti.state === "input-streaming" || ti.state === "input-available";
         const isRunning = isToolStreaming && !!parentStreaming;
         const wasStopped = isToolStreaming && !parentStreaming;
         if (!isComplete && !isRunning && !wasStopped) return null;
 
-        const result = isComplete ? (t.result as { id?: string; type?: string; title?: string; version?: number; error?: string }) : null;
+        const result = isComplete ? (ti.result as { id?: string; type?: string; title?: string; version?: number; error?: string }) : null;
         if (result?.error) return null;
 
-        const args = t.args as { title?: string; type?: string; artifactId?: string };
+        const args = ti.args as { title?: string; type?: string; artifactId?: string };
         const artifactId = result?.id || args.artifactId;
-        const displayTitle = result?.title || args.title || "Untitled";
+        const displayTitle = result?.title || args.title || t("artifact.untitled");
         const displayType = result?.type || args.type || "document";
-        const typeLabel = getArtifactTypeLabel(displayType);
+        const typeLabel = getArtifactTypeLabel(displayType, t as (key: string) => string);
         const actionLabel = isRunning
-          ? (t.toolName === "create_artifact" ? "Creating" : t.toolName === "update_artifact" ? "Rewriting" : "Editing")
+          ? (ti.toolName === "create_artifact" ? t("artifact.creating") : ti.toolName === "update_artifact" ? t("artifact.rewriting") : t("artifact.editing"))
           : wasStopped
-          ? "Stopped"
-          : (t.toolName === "create_artifact" ? typeLabel : t.toolName === "update_artifact" ? "Rewrote" : "Edited");
+          ? t("artifact.stopped")
+          : (ti.toolName === "create_artifact" ? typeLabel : ti.toolName === "update_artifact" ? t("artifact.rewrote") : t("artifact.edited"));
         const version = result?.version;
 
         return (
           <button
-            key={t.toolCallId}
+            key={ti.toolCallId}
             onClick={() => artifactId && onOpenArtifactById(artifactId)}
             disabled={!artifactId}
             className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30 disabled:cursor-default"
@@ -403,6 +407,7 @@ function MessageBubble({
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { copied, copy } = useCopy();
+  const { t } = useI18n();
 
   if (role === "system") return null;
   const hasVersions = versionCount !== undefined && versionCount > 1;
@@ -454,9 +459,9 @@ function MessageBubble({
             )}
             <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
               {onEdit && !isStreaming && (
-                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Edit"><Pencil className="h-3 w-3" /></button>
+                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.edit")}><Pencil className="h-3 w-3" /></button>
               )}
-              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
                 {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
@@ -477,24 +482,24 @@ function MessageBubble({
   const { cleanContent: displayContent, artifacts } = extractArtifacts(content);
 
   // Helper to render a single tool invocation inline
-  const renderToolInline = (t: ToolInvocation) => {
-    if (t.toolName === "web_search") return <SearchStatus key={t.toolCallId} invocations={[t]} />;
-    if (t.toolName === "fetch_page") {
-      const isActive = t.state !== "output-available" && t.state !== "output-error";
-      const url = t.args?.url as string | undefined;
+  const renderToolInline = (inv: ToolInvocation) => {
+    if (inv.toolName === "web_search") return <SearchStatus key={inv.toolCallId} invocations={[inv]} />;
+    if (inv.toolName === "fetch_page") {
+      const isActive = inv.state !== "output-available" && inv.state !== "output-error";
+      const url = inv.args?.url as string | undefined;
       const domain = url ? getDomain(url) : "page";
       return (
-        <div key={t.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
+        <div key={inv.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 text-xs">
             {isActive ? <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /> : <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
-            <span className="font-medium text-foreground/70 truncate">{isActive ? `Reading ${domain}` : `Read ${domain}`}</span>
+            <span className="font-medium text-foreground/70 truncate">{isActive ? t("tool.reading", { domain }) : t("tool.read", { domain })}</span>
           </div>
           {isActive && <div className="h-px bg-muted overflow-hidden"><div className="h-full w-1/3 bg-primary/30 animate-[shimmer_1.5s_ease-in-out_infinite]" /></div>}
         </div>
       );
     }
-    if (SANDBOX_TOOL_NAMES.has(t.toolName)) return <div key={t.toolCallId} className="mt-3"><SandboxCard invocation={t} onLightbox={setLightboxSrc} /></div>;
-    if (ARTIFACT_TOOL_NAMES.has(t.toolName)) return <div key={t.toolCallId} className="mt-3"><ArtifactToolCards invocations={[t]} onOpenArtifactById={onOpenArtifactById!} parentStreaming={isStreaming} /></div>;
+    if (SANDBOX_TOOL_NAMES.has(inv.toolName)) return <div key={inv.toolCallId} className="mt-3"><SandboxCard invocation={inv} onLightbox={setLightboxSrc} /></div>;
+    if (ARTIFACT_TOOL_NAMES.has(inv.toolName)) return <div key={inv.toolCallId} className="mt-3"><ArtifactToolCards invocations={[inv]} onOpenArtifactById={onOpenArtifactById!} parentStreaming={isStreaming} /></div>;
     return null;
   };
 
@@ -555,22 +560,22 @@ function MessageBubble({
             {/* Fallback: old layout for restored messages */}
             {displayContent.length > 0 && <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />}
 
-            {toolInvocations && toolInvocations.filter(t => t.toolName === "web_search").length > 0 && (
+            {toolInvocations && toolInvocations.filter(ti => ti.toolName === "web_search").length > 0 && (
               <SearchStatus invocations={toolInvocations} />
             )}
-            {toolInvocations && toolInvocations.filter(t => t.toolName === "fetch_page").map(f => {
+            {toolInvocations && toolInvocations.filter(ti => ti.toolName === "fetch_page").map(f => {
               const isActive = f.state !== "output-available" && f.state !== "output-error";
               const domain = (f.args?.url as string) ? getDomain(f.args.url as string) : "page";
               return (
                 <div key={f.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2 text-xs">
                     {isActive ? <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /> : <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
-                    <span className="font-medium text-foreground/70 truncate">{isActive ? `Reading ${domain}` : `Read ${domain}`}</span>
+                    <span className="font-medium text-foreground/70 truncate">{isActive ? t("tool.reading", { domain }) : t("tool.read", { domain })}</span>
                   </div>
                 </div>
               );
             })}
-            {toolInvocations && toolInvocations.some(t => SANDBOX_TOOL_NAMES.has(t.toolName)) && (
+            {toolInvocations && toolInvocations.some(ti => SANDBOX_TOOL_NAMES.has(ti.toolName)) && (
               <SandboxStatus invocations={toolInvocations} onLightbox={setLightboxSrc} />
             )}
             {artifacts.length > 0 && onOpenArtifact && (
@@ -584,7 +589,7 @@ function MessageBubble({
                 ))}
               </div>
             )}
-            {toolInvocations && toolInvocations.some(t => ARTIFACT_TOOL_NAMES.has(t.toolName)) && onOpenArtifactById && (
+            {toolInvocations && toolInvocations.some(ti => ARTIFACT_TOOL_NAMES.has(ti.toolName)) && onOpenArtifactById && (
               <ArtifactToolCards invocations={toolInvocations} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
             )}
           </>
@@ -594,14 +599,14 @@ function MessageBubble({
         {!isStreaming && interrupted && (
           <div className="mt-2">
             <span className="inline-flex items-center gap-1 rounded-md bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground/50">
-              Stopped generating
+              {t("tool.stoppedGenerating")}
             </span>
           </div>
         )}
 
         {/* Sources inline after content */}
         {toolInvocations && !isStreaming && (() => {
-          const searches = toolInvocations.filter(t => t.toolName === "web_search" && t.state === "output-available" && t.result);
+          const searches = toolInvocations.filter(ti => ti.toolName === "web_search" && ti.state === "output-available" && ti.result);
           if (searches.length === 0 || content.length === 0) return null;
           const sources: SearchResult[] = [];
           for (const s of searches) {
@@ -630,11 +635,11 @@ function MessageBubble({
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
             <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
-              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Copy">
+              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
                 {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               </button>
               {isLast && onRegenerate && (
-                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title="Regenerate">
+                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}>
                   <RotateCcw className="h-3 w-3" />
                 </button>
               )}

@@ -3,18 +3,18 @@
 import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { PanelLeft, Plus, AlertCircle, RotateCcw, Eye } from "lucide-react";
+import { PanelLeft, Plus, AlertCircle, RotateCcw } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
 import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from "./artifact-preview";
 import type { MessageSegment } from "./chat-messages";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -29,15 +29,16 @@ interface MessageAttachments {
 }
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
+  const { t } = useI18n();
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
-  const [greeting, setGreeting] = useState("What's on your mind?");
+  const [greeting, setGreeting] = useState("");
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 17) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
-  }, []);
+    if (hour < 12) setGreeting(t("chat.goodMorning"));
+    else if (hour < 17) setGreeting(t("chat.goodAfternoon"));
+    else setGreeting(t("chat.goodEvening"));
+  }, [t]);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -109,7 +110,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   } = useChat({
     transport,
     onError: (error) => {
-      const raw = error.message || "Something went wrong";
+      const raw = error.message || t("chat.error.generic");
       let msg = raw;
       try {
         const parsed = JSON.parse(raw);
@@ -118,17 +119,17 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         // Not JSON, use as-is
       }
       if (msg.includes("No endpoints found that support image input") || msg.includes("does not represent a valid image")) {
-        msg = "This model doesn't support images. Try a model with the Vision badge.";
+        msg = t("chat.error.noVision");
       } else if (msg.includes("context length") || msg.includes("too long") || msg.includes("maximum")) {
-        msg = "This message is too long for the current model. Try a shorter message or switch to a model with more context.";
+        msg = t("chat.error.tooLong");
       } else if (msg.includes("rate") && (msg.includes("limit") || msg.includes("increased"))) {
-        msg = "This model is currently rate-limited. Try a different model or wait a moment.";
+        msg = t("chat.error.rateLimit");
       } else if (msg.includes("temporarily") && msg.includes("unavailable")) {
-        msg = "This model is temporarily unavailable. Try a different model.";
+        msg = t("chat.error.unavailable");
       } else if (msg.includes("credits") || msg.includes("balance")) {
-        msg = "You've run out of credits. Contact an admin to add more.";
+        msg = t("chat.error.noCredits");
       } else if (msg.length > 200) {
-        msg = "Something went wrong. Please try again.";
+        msg = t("chat.error.generic");
       }
       console.error("[chat] Error:", raw);
       setChatError(msg);
@@ -595,12 +596,12 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     const toolInvs = getToolInvocations(lastMsg);
     if (!toolInvs) return;
 
-    for (const t of toolInvs) {
-      if (t.state !== "output-available" || !t.result || handledToolCallsRef.current.has(t.toolCallId)) continue;
-      const result = t.result as { id?: string; error?: string };
+    for (const ti of toolInvs) {
+      if (ti.state !== "output-available" || !ti.result || handledToolCallsRef.current.has(ti.toolCallId)) continue;
+      const result = ti.result as { id?: string; error?: string };
       if (result.error || !result.id) continue;
 
-      handledToolCallsRef.current.add(t.toolCallId);
+      handledToolCallsRef.current.add(ti.toolCallId);
 
       fetch(`/api/artifacts/${result.id}`)
         .then((res) => (res.ok ? res.json() : null))
@@ -649,20 +650,20 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       }
 
       if (toolInvs && toolInvs.length > 0) {
-        for (const t of toolInvs) {
-          const isCreate = t.toolName === "create_artifact";
-          const isUpdate = t.toolName === "update_artifact";
+        for (const ti of toolInvs) {
+          const isCreate = ti.toolName === "create_artifact";
+          const isUpdate = ti.toolName === "update_artifact";
           if (!isCreate && !isUpdate) continue;
-          if (t.state !== "input-streaming" && t.state !== "input-available") continue;
+          if (ti.state !== "input-streaming" && ti.state !== "input-available") continue;
 
-          const args = t.args as { title?: string; type?: string; content?: string };
+          const args = ti.args as { title?: string; type?: string; content?: string };
           const rawContent = args.content || "";
           // Strip code fences the model may wrap around content
           const newContent = rawContent.replace(/^```\w*\n/, "").replace(/\n```$/, "").trim() || rawContent;
-          const prevLen = streamedArtifactContent.current[t.toolCallId]?.length || 0;
+          const prevLen = streamedArtifactContent.current[ti.toolCallId]?.length || 0;
 
           if (newContent.length <= prevLen) continue;
-          streamedArtifactContent.current[t.toolCallId] = newContent;
+          streamedArtifactContent.current[ti.toolCallId] = newContent;
 
           if (!artifactOpenedRef.current) {
             artifactOpenedRef.current = true;
@@ -672,7 +673,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
           setArtifactPanel({
             type: args.type || "document",
-            title: args.title || "Creating...",
+            title: args.title || t("chat.creating"),
             content: newContent,
           });
           setArtifactStreaming(true);
@@ -716,7 +717,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               sidebarWasOpen.current = true;
               onCollapseSidebar();
             }
-            setArtifactPanel({ type: "html", title: "Website", content: code });
+            setArtifactPanel({ type: "html", title: t("chat.website"), content: code });
             setArtifactStreaming(true);
           }
         }
@@ -878,7 +879,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const handleOpenArtifact = useCallback((code: string, language: string) => {
     sidebarWasOpen.current = sidebarOpen;
-    setArtifactPanel({ type: language === "svg" ? "svg" : "html", title: "Preview", content: code });
+    setArtifactPanel({ type: language === "svg" ? "svg" : "html", title: t("chat.preview"), content: code });
     setArtifactStreaming(false);
     onCollapseSidebar();
   }, [onCollapseSidebar, sidebarOpen]);
@@ -1085,8 +1086,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         onDrop={handleDrop}
       >
         <div className="rounded-xl border-2 border-dashed border-border px-10 py-6 text-center pointer-events-none">
-          <p className="text-sm font-medium text-muted-foreground">Drop files to attach</p>
-          <p className="mt-0.5 text-xs text-muted-foreground/50">Images, documents, code, spreadsheets, and more</p>
+          <p className="text-sm font-medium text-muted-foreground">{t("chat.dropFiles")}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/50">{t("chat.dropFilesDesc")}</p>
         </div>
       </div>
 
@@ -1102,7 +1103,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 >
                   <PanelLeft className="h-4 w-4" />
                 </TooltipTrigger>
-                <TooltipContent side="bottom">Open sidebar</TooltipContent>
+                <TooltipContent side="bottom">{t("chat.openSidebar")}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger
@@ -1111,7 +1112,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
                 >
                   <Plus className="h-4 w-4" />
                 </TooltipTrigger>
-                <TooltipContent side="bottom">New chat</TooltipContent>
+                <TooltipContent side="bottom">{t("sidebar.newChat")}</TooltipContent>
               </Tooltip>
             </>
           )}
@@ -1127,7 +1128,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               {greeting}
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground/50">
-              Ask anything, create artifacts, run code, or search the web.
+              {t("chat.whatsOnYourMindDesc")}
             </p>
           </div>
         </div>
@@ -1188,7 +1189,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               className="flex items-center gap-1 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
-              Retry
+              {t("chat.retry")}
             </button>
             <button
               onClick={() => setChatError(null)}
@@ -1207,12 +1208,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
             <p className="flex-1 text-sm text-amber-700 dark:text-amber-400">
-              {currentModel.name || selectedModel.split("/").pop()} doesn&apos;t support images. Switch to a model with the{" "}
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-blue-500/10 text-blue-500 border-0 inline-flex align-text-bottom">
-                <Eye className="h-2.5 w-2.5" />
-                Vision
-              </Badge>
-              {" "}badge, or remove the image.
+              {currentModel.name || selectedModel.split("/").pop()} {t("chat.visionWarning")}
             </p>
           </div>
         </div>
@@ -1226,7 +1222,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         onStop={handleStop}
         isLoading={isLoading}
         disabled={viewingOldBranch}
-        placeholder={viewingOldBranch ? "Switch to the latest version to continue chatting" : undefined}
+        placeholder={viewingOldBranch ? t("chat.switchToLatest") : undefined}
         files={files}
         onFilesChange={setFiles}
         onEditLastMessage={() => {}}

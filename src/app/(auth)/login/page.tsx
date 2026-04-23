@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/hooks/use-i18n";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,12 +25,12 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sign in failed");
+      if (!res.ok) throw new Error(data.error || t("auth.signIn"));
 
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in failed");
+      setError(err instanceof Error ? err.message : t("auth.signIn"));
     } finally {
       setLoading(false);
     }
@@ -37,9 +39,9 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("auth.welcomeBack")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sign in to your account
+          {t("auth.signInToAccount")}
         </p>
       </div>
 
@@ -52,7 +54,7 @@ export default function LoginPage() {
 
         <div className="space-y-1.5">
           <label htmlFor="email" className="text-sm font-medium">
-            Email
+            {t("auth.email")}
           </label>
           <input
             id="email"
@@ -67,7 +69,7 @@ export default function LoginPage() {
 
         <div className="space-y-1.5">
           <label htmlFor="password" className="text-sm font-medium">
-            Password
+            {t("auth.password")}
           </label>
           <input
             id="password"
@@ -85,13 +87,13 @@ export default function LoginPage() {
           disabled={loading}
           className="flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {loading ? "Signing in..." : "Sign in"}
+          {loading ? t("auth.signingIn") : t("auth.signIn")}
         </button>
       </form>
 
       <div className="text-center text-sm">
         <p className="text-muted-foreground">
-          Need an account? Contact an admin for an invite link.
+          {t("auth.needAccount")}
         </p>
       </div>
     </div>

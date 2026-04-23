@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/command";
 import { useModels } from "@/hooks/use-models";
 import { USD_TO_CNY } from "@/lib/currency";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface ModelSelectorProps {
   value: string;
@@ -46,6 +47,7 @@ function saveRecentModel(modelId: string) {
 export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const { providers, allModels, isLoading } = useModels();
+  const { t } = useI18n();
   const [recentIds, setRecentIds] = useState<string[]>([]);
 
   // Load recent models on mount
@@ -58,7 +60,7 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
     [allModels, value]
   );
 
-  const displayName = selectedModel?.name || value.split("/").pop() || "Select model";
+  const displayName = selectedModel?.name || value.split("/").pop() || t("model.selectModel");
 
   // Recent models section
   const recentModels = useMemo(() => {
@@ -90,7 +92,7 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
   );
 
   const formatPrice = (price: number) => {
-    if (price === 0) return "Free";
+    if (price === 0) return t("model.free");
     const cny = price * 1_000_000 * USD_TO_CNY;
     return `\u00A5${cny.toFixed(2)}/M`;
   };
@@ -112,7 +114,7 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
           className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
         >
           <Zap className="h-2.5 w-2.5" />
-          Free
+          {t("model.free")}
         </Badge>
       )}
     </>
@@ -131,20 +133,20 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
-        title="Select Model"
-        description="Search and select an AI model"
+        title={t("model.selectModelTitle")}
+        description={t("model.selectModelDesc")}
         className="sm:max-w-[480px]"
       >
         <Command>
-          <CommandInput placeholder="Search models..." />
+          <CommandInput placeholder={t("model.searchModels")} />
           <CommandList className="max-h-[400px]">
             <CommandEmpty>
-              {isLoading ? "Loading models..." : "No models found."}
+              {isLoading ? t("model.loadingModels") : t("model.noModels")}
             </CommandEmpty>
 
             {/* Recent models */}
             {recentModels.length > 0 && (
-              <CommandGroup heading="Recent">
+              <CommandGroup heading={t("model.recent")}>
                 {recentModels.map((model) => (
                   <CommandItem
                     key={`recent-${model.id}`}

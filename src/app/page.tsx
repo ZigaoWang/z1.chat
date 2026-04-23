@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import ChatView from "@/components/chat/chat-view";
 import { useConversations } from "@/hooks/use-conversations";
+import { useI18n } from "@/hooks/use-i18n";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { createConversation } = useConversations();
+  const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Keyboard shortcuts
@@ -90,15 +92,15 @@ export default function Home() {
             className="w-full max-w-sm rounded-xl border border-border/50 bg-card p-6 shadow-lg animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-semibold mb-4">Keyboard Shortcuts</h2>
+            <h2 className="text-base font-semibold mb-4">{t("shortcuts.title")}</h2>
             <div className="space-y-2">
               {[
-                ["New chat", "\u2318 N"],
-                ["Toggle sidebar", "\u2318 B"],
-                ["Model selector", "\u2318 K"],
-                ["Focus chat input", "/"],
-                ["This help", "\u2318 /"],
-                ["Close modal", "Esc"],
+                [t("shortcuts.newChat"), "\u2318 N"],
+                [t("shortcuts.toggleSidebar"), "\u2318 B"],
+                [t("shortcuts.modelSelector"), "\u2318 K"],
+                [t("shortcuts.focusInput"), "/"],
+                [t("shortcuts.help"), "\u2318 /"],
+                [t("shortcuts.close"), "Esc"],
               ].map(([label, shortcut]) => (
                 <div key={label} className="flex items-center justify-between py-1">
                   <span className="text-xs text-muted-foreground">{label}</span>
