@@ -168,10 +168,23 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const messageModelMap = useRef<Map<string, string>>(new Map());
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
-  const [messageAttachments, setMessageAttachments] = useState<Record<string, MessageAttachments>>({});
+  const [messageAttachments, setMessageAttachmentsState] = useState<Record<string, MessageAttachments>>({});
+  const messageAttachmentsRef = useRef<Record<string, MessageAttachments>>({});
+  const setMessageAttachments = useCallback((v: Record<string, MessageAttachments> | ((prev: Record<string, MessageAttachments>) => Record<string, MessageAttachments>)) => {
+    setMessageAttachmentsState((prev) => {
+      const next = typeof v === "function" ? v(prev) : v;
+      messageAttachmentsRef.current = next;
+      return next;
+    });
+  }, []);
   const [regenerationHistory, setRegenerationHistory] = useState<Record<string, VersionEntry[]>>({});
   const [editBranches, setEditBranches] = useState<Record<string, EditBranch[]>>({});
-  const [restoredToolInvocations, setRestoredToolInvocations] = useState<Record<string, ToolInvocation[]>>({});
+  const [restoredToolInvocations, setRestoredToolInvocationsState] = useState<Record<string, ToolInvocation[]>>({});
+  const restoredToolInvocationsRef = useRef<Record<string, ToolInvocation[]>>({});
+  const setRestoredToolInvocations = useCallback((v: Record<string, ToolInvocation[]>) => {
+    restoredToolInvocationsRef.current = v;
+    setRestoredToolInvocationsState(v);
+  }, []);
 
   useEffect(() => {
     if (activeId && !initialLoadDone.current) {
@@ -575,7 +588,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           }));
         if (invocations.length > 0) return invocations;
       }
-      return restoredToolInvocations[msg.id] || undefined;
+      return restoredToolInvocationsRef.current[msg.id] || undefined;
     },
     [restoredToolInvocations]
   );
@@ -1141,8 +1154,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             model:
               messageModelMap.current.get(m.id) ||
               (m.role === "assistant" ? selectedModelRef.current : null),
-            images: messageAttachments[m.id]?.images,
-            files: messageAttachments[m.id]?.files,
+            images: messageAttachmentsRef.current[m.id]?.images,
+            files: messageAttachmentsRef.current[m.id]?.files,
             toolInvocations: getToolInvocations(m),
             segments: getMessageSegments(m),
           }))}

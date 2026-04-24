@@ -524,6 +524,32 @@ function MessageBubble({
         {/* Ordered segments — renders text and tools in chronological order */}
         {hasSegments ? (
           <>
+            {/* Restored tool invocations (not in segments) — render before text to preserve chronological order */}
+            {!segments!.some(s => s.type === "tool") && toolInvocations && toolInvocations.length > 0 && (
+              <>
+                {toolInvocations.filter(ti => ti.toolName === "web_search").length > 0 && (
+                  <SearchStatus invocations={toolInvocations} />
+                )}
+                {toolInvocations.filter(ti => ti.toolName === "fetch_page").map(f => {
+                  const isActive = f.state !== "output-available" && f.state !== "output-error";
+                  const domain = (f.args?.url as string) ? getDomain(f.args.url as string) : "page";
+                  return (
+                    <div key={f.toolCallId} className="mt-3 rounded-lg border border-border/40 overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+                        {isActive ? <span className="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /> : <Check className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
+                        <span className="font-medium text-foreground/70 truncate">{isActive ? t("tool.reading", { domain }) : t("tool.read", { domain })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {toolInvocations.some(ti => SANDBOX_TOOL_NAMES.has(ti.toolName)) && (
+                  <SandboxStatus invocations={toolInvocations} onLightbox={setLightboxSrc} />
+                )}
+                {toolInvocations.some(ti => ARTIFACT_TOOL_NAMES.has(ti.toolName)) && onOpenArtifactById && (
+                  <ArtifactToolCards invocations={toolInvocations} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
+                )}
+              </>
+            )}
             {segments!.map((seg, i) => {
               if (seg.type === "text") {
                 const { cleanContent: segClean, artifacts: segArtifacts } = extractArtifacts(seg.content);
