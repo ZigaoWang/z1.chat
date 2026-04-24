@@ -141,8 +141,129 @@ function getComponents(onOpenArtifact?: (code: string, language: string) => void
   return cached;
 }
 
+// Fullwidth dollar sign — visually identical to $ but won't trigger remark-math delimiters.
+// KaTeX renders it as a regular character inside math blocks.
+const DOLLAR_PLACEHOLDER = "＄";
+
+function preprocessMath(text: string): string {
+  // Convert LaTeX-style delimiters to $/$$ that remark-math understands
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, m) => `$$${m}$$`);
+  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_, m) => `$${m}$`);
+
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    // Skip code spans and fenced code blocks — never process $ inside code
+    if (text[i] === "`") {
+      if (text[i + 1] === "`" && text[i + 2] === "`") {
+        const end = text.indexOf("```", i + 3);
+        const stop = end !== -1 ? end + 3 : text.length;
+        result += text.slice(i, stop);
+        i = stop;
+        continue;
+      }
+      const end = text.indexOf("`", i + 1);
+      const stop = end !== -1 ? end + 1 : text.length;
+      result += text.slice(i, stop);
+      i = stop;
+      continue;
+    }
+
+    // Display math $$...$$ — pass through, replacing \$ with placeholder inside
+    if (text[i] === "$" && text[i + 1] === "$") {
+      const start = i + 2;
+      let j = start;
+      while (j < text.length - 1) {
+        if (text[j] === "$" && text[j + 1] === "$") break;
+        j++;
+      }
+      const inner = text.slice(start, j).replace(/\\\$/g, DOLLAR_PLACEHOLDER);
+      result += "$$" + inner + "$$";
+      i = j + 2;
+      continue;
+    }
+
+    // Potential inline math or money $
+    if (text[i] === "$") {
+      const next = text[i + 1];
+
+      // Lone $, $ at end, or $ followed by whitespace — not math
+      if (!next || next === " " || next === "\n") {
+        result += text[i];
+        i++;
+        continue;
+      }
+
+      // Scan for a matching closing $
+      let j = i + 1;
+      let content = "";
+      let closed = false;
+      while (j < text.length) {
+        // \$ inside potential math — use placeholder
+        if (text[j] === "\\" && text[j + 1] === "$") {
+          content += DOLLAR_PLACEHOLDER;
+          j += 2;
+          continue;
+        }
+        // Found closing $ (not preceded by space)
+        if (text[j] === "$" && text[j - 1] !== " ") {
+          closed = true;
+          break;
+        }
+        // Double newline — not inline math
+        if (text[j] === "\n" && text[j + 1] === "\n") break;
+        content += text[j];
+        j++;
+      }
+
+      if (closed) {
+        const stripped = content.replace(new RegExp(DOLLAR_PLACEHOLDER, "g"), "");
+        const hasLatex = /[\\^_{}]/.test(stripped);
+        const isSingleVar = /^[a-zA-Z]$/.test(stripped.trim());
+
+        if (hasLatex || isSingleVar) {
+          result += "$" + content + "$";
+          i = j + 1;
+          continue;
+        }
+
+        // Purely numeric content like $298$ or $0.85$ — treat as math (model intended it)
+        if (/^[\d.,\s]+$/.test(stripped.trim())) {
+          result += "$" + content + "$";
+          i = j + 1;
+          continue;
+        }
+
+        // Other closed pair — treat as math
+        result += "$" + content + "$";
+        i = j + 1;
+        continue;
+      }
+
+      // No closing $ found — standalone dollar sign
+      // If followed by digit, it's money ($100, $5.00) — escape for markdown
+      if (/\d/.test(next)) {
+        result += "\\$";
+        i++;
+        continue;
+      }
+
+      // Other standalone $ — pass through
+      result += text[i];
+      i++;
+      continue;
+    }
+
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
 function MarkdownRenderer({ content, onOpenArtifact }: { content: string; onOpenArtifact?: (code: string, language: string) => void }) {
   if (!content) return null;
+
+  const processed = preprocessMath(content);
 
   return (
     <div className="prose prose-neutral dark:prose-invert prose-sm max-w-none prose-p:text-[14.5px] prose-p:leading-relaxed prose-p:my-1.5 prose-li:text-[14.5px] prose-headings:font-semibold prose-headings:tracking-tight prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-code:before:content-none prose-code:after:content-none prose-li:my-1 prose-table:my-0 prose-thead:border-0 prose-tr:border-0">
@@ -151,7 +272,7 @@ function MarkdownRenderer({ content, onOpenArtifact }: { content: string; onOpen
         rehypePlugins={rehypePlugins}
         components={getComponents(onOpenArtifact)}
       >
-        {content}
+        {processed}
       </ReactMarkdown>
     </div>
   );
