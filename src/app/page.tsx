@@ -43,10 +43,6 @@ export default function Home() {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  if (authLoading || !user) {
-    return <AppSkeleton />;
-  }
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -105,6 +101,10 @@ export default function Home() {
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => !prev);
   }, []);
+
+  if (authLoading || !user) {
+    return <AppSkeleton />;
+  }
 
   return (
     <div className="flex h-full overflow-hidden">
