@@ -4,13 +4,48 @@ import { useState, useEffect, useCallback } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import ChatView from "@/components/chat/chat-view";
 import { useConversations } from "@/hooks/use-conversations";
+import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function AppSkeleton() {
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* Sidebar skeleton */}
+      <div className="hidden lg:flex w-[250px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+        <div className="flex h-11 items-center px-3 border-b border-sidebar-border/50">
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <div className="px-2 py-1.5">
+          <Skeleton className="h-8 w-full rounded-lg" />
+        </div>
+        <div className="flex-1 space-y-1.5 px-3 pt-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full rounded-lg" style={{ opacity: 1 - i * 0.12 }} />
+          ))}
+        </div>
+      </div>
+      {/* Chat area skeleton */}
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="space-y-3 w-full max-w-md px-6">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-4 w-64 mx-auto" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { createConversation } = useConversations();
+  const { user, isLoading: authLoading } = useAuth();
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  if (authLoading || !user) {
+    return <AppSkeleton />;
+  }
 
   // Keyboard shortcuts
   useEffect(() => {

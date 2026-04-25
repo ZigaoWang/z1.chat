@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { useAuth } from "./use-auth";
 
 export interface Conversation {
   id: string;
@@ -28,6 +29,7 @@ interface ConversationContextType {
 const ConversationContext = createContext<ConversationContextType | null>(null);
 
 export function ConversationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,8 +53,13 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   }, [searchQuery]);
 
   useEffect(() => {
-    refreshConversations();
-  }, [refreshConversations]);
+    if (user) {
+      refreshConversations();
+    } else {
+      setConversations([]);
+      setIsLoading(false);
+    }
+  }, [user, refreshConversations]);
 
   const createConversation = useCallback(() => {
     // Simply clear the active ID to start a new chat

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 
 export default function LoginPage() {
@@ -93,7 +94,7 @@ export default function LoginPage() {
           disabled={loading}
           className="flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {loading ? t("auth.signingIn") : t("auth.signIn")}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.signIn")}
         </button>
       </form>
 

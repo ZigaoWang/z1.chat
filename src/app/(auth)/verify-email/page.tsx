@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 
 function VerifyEmailForm() {
@@ -16,6 +17,7 @@ function VerifyEmailForm() {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!userId) {
@@ -45,11 +47,17 @@ function VerifyEmailForm() {
       setCode(newCode);
       const nextIndex = Math.min(index + digits.length, 5);
       inputRefs.current[nextIndex]?.focus();
+      if (newCode.every((d) => d !== "")) {
+        setTimeout(() => formRef.current?.requestSubmit(), 0);
+      }
     } else {
       newCode[index] = value;
       setCode(newCode);
       if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
+      }
+      if (newCode.every((d) => d !== "")) {
+        setTimeout(() => formRef.current?.requestSubmit(), 0);
       }
     }
   };
@@ -121,7 +129,7 @@ function VerifyEmailForm() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
@@ -149,7 +157,7 @@ function VerifyEmailForm() {
           disabled={loading || code.join("").length !== 6}
           className="flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {loading ? t("auth.verifying") : t("auth.verify")}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.verify")}
         </button>
       </form>
 
