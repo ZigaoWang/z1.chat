@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   name: text("name"),
   avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash"),
+  emailVerified: boolean("email_verified").notNull().default(false),
   role: text("role").notNull().default("user"), // "user" | "admin"
   creditBalance: numeric("credit_balance", { precision: 20, scale: 10 }).notNull().default("0"),
   preferences: jsonb("preferences").$type<UserPreferences>().default({
@@ -194,6 +195,25 @@ export const passwordResetTokens = pgTable(
       .defaultNow(),
   },
   (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)]
+);
+
+// Email Verification Codes
+export const emailVerificationCodes = pgTable(
+  "email_verification_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    used: boolean("used").notNull().default(false),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("email_verification_codes_user_id_idx").on(table.userId)]
 );
 
 // Usage Logs
@@ -475,6 +495,7 @@ export type InviteToken = typeof inviteTokens.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
 export type ArtifactVersion = typeof artifactVersions.$inferSelect;
 export type PaymentOrder = typeof paymentOrders.$inferSelect;
+export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";

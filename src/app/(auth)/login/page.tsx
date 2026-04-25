@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useI18n } from "@/hooks/use-i18n";
 
 export default function LoginPage() {
@@ -26,6 +27,11 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("auth.signIn"));
+
+      if (data.needsVerification) {
+        router.push(`/verify-email?userId=${data.userId}&email=${encodeURIComponent(email)}`);
+        return;
+      }
 
       router.push("/");
       router.refresh();
@@ -91,11 +97,15 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="text-center text-sm">
-        <p className="text-muted-foreground">
-          {t("auth.needAccount")}
-        </p>
-      </div>
+      <p className="text-center text-sm text-muted-foreground">
+        {t("auth.needAccount")}{" "}
+        <Link
+          href="/signup"
+          className="font-medium text-foreground hover:underline"
+        >
+          {t("auth.signUp")}
+        </Link>
+      </p>
     </div>
   );
 }

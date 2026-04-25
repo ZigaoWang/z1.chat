@@ -3,6 +3,8 @@ import { decrypt } from "./lib/session-crypto";
 
 const PUBLIC_PATHS = new Set([
   "/login",
+  "/signup",
+  "/verify-email",
   "/invite",
 ]);
 

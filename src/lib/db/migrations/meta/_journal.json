@@ -71,6 +71,13 @@
       "when": 1776434076005,
       "tag": "0009_tired_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777084649215,
+      "tag": "0010_smooth_tusk",
+      "breakpoints": true
     }
   ]
 }
