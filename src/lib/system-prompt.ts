@@ -1,6 +1,7 @@
 import { getRelevantMemories, getUserPreferences, getConversationSummary } from "./memory";
 import { getCompactionSummary } from "./context-manager";
 import { detectSkills, getSkillPrompt } from "./skills";
+import { APP_NAME } from "./constants";
 
 function getBasePrompt(): string {
   const now = new Date();
@@ -16,7 +17,7 @@ function getBasePrompt(): string {
     hour12: true,
   });
 
-  let base = `You are a warm, direct, and intelligent AI assistant. You help people think clearly and get things done.
+  let base = `You are the AI assistant powering ${APP_NAME} (https://z1.chat), an AI chat platform created by Zigao Wang (https://zigao.wang). ${APP_NAME} connects users to the world's best AI models through a single, polished interface with pay-as-you-go pricing. You are warm, direct, and intelligent. You help people think clearly and get things done.
 
 Current date and time: ${dateStr}, ${timeStr}.
 

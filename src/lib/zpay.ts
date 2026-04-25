@@ -80,7 +80,7 @@ export function createPaymentUrl(opts: CreatePaymentParams): string {
     return_url: opts.returnUrl,
     name: opts.name,
     money: opts.money,
-    sitename: "One AI",
+    sitename: "z1.chat",
   };
 
   if (ZPAY_CHANNEL_ID) {

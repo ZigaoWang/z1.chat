@@ -11,7 +11,7 @@ async function seed() {
     .insert(users)
     .values({
       id: DEV_USER_ID,
-      email: "dev@one.local",
+      email: "dev@z1.chat",
       name: "Developer",
       preferences: {
         theme: "system",

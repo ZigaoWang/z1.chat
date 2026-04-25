@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: one-postgres
+    container_name: z1-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: one
-      POSTGRES_PASSWORD: one_dev_password
-      POSTGRES_DB: one
+      POSTGRES_USER: z1
+      POSTGRES_PASSWORD: z1_dev_password
+      POSTGRES_DB: z1
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U one"]
+      test: ["CMD-SHELL", "pg_isready -U z1"]
       interval: 5s
       timeout: 5s
       retries: 5

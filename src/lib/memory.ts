@@ -154,7 +154,7 @@ GOOD examples:
 - "Interested in film photography"
 - "Uses a Leica M6 camera"
 - "Name is John, lives in Berlin"
-- "Building a Next.js chat app called One"
+- "Building a Next.js chat app called z1.chat"
 
 BAD examples — DO NOT SAVE these:
 - "Prefers short explanations" (vague style observation)

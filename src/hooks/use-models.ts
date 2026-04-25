@@ -23,7 +23,7 @@ interface ModelsData {
   total: number;
 }
 
-const STORAGE_KEY = "one:last-model";
+const STORAGE_KEY = "z1:last-model";
 
 export function useModels() {
   const [data, setData] = useState<ModelsData | null>(null);

@@ -92,7 +92,7 @@ function TypewriterTitle({ text, isActive }: { text: string; isActive: boolean }
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 250;
-const STORAGE_KEY = "one:sidebar-width";
+const STORAGE_KEY = "z1:sidebar-width";
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const {

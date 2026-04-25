@@ -1,5 +1,5 @@
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "One";
-export const APP_TAGLINE = "The last AI app you'll ever download.";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "z1.chat";
+export const APP_TAGLINE = "The last AI app you'll ever need.";
 
 export const DEFAULT_MODEL = process.env.NEXT_PUBLIC_DEFAULT_MODEL || "anthropic/claude-opus-4.6";
 

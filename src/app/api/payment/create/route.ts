@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
         creditAmount,
         status: "pending",
         type: "alipay",
-        name: `One AI Credits`,
+        name: `z1 Credits`,
       })
       .returning();
 
     const paymentUrl = createPaymentUrl({
       outTradeNo,
       money: amountStr,
-      name: `One AI Credits`,
+      name: `z1 Credits`,
       notifyUrl: `${appUrl}/api/payment/notify`,
       returnUrl: `${appUrl}/api/payment/return`,
       type: "alipay",

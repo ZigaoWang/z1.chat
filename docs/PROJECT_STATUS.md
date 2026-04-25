@@ -1,4 +1,4 @@
-# PROJECT STATUS — One
+# PROJECT STATUS — z1.chat
 
 > Last updated: 2026-04-17
 
@@ -111,8 +111,8 @@ npm run build && npm start         # Production on port 4567
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string (e.g. `postgres://user@localhost:5432/one`) |
 | `OPENROUTER_API_KEY` | Yes | — | OpenRouter API key for all AI calls |
 | `AUTH_SECRET` | Yes | — | 32+ char secret for JWE session encryption |
-| `NEXT_PUBLIC_APP_NAME` | No | `"One"` | App name shown in UI |
-| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | App URL for OpenRouter referer |
+| `NEXT_PUBLIC_APP_NAME` | No | `"z1.chat"` | App name shown in UI |
+| `NEXT_PUBLIC_APP_URL` | No | `https://z1.chat` | App URL for OpenRouter referer |
 | `NEXT_PUBLIC_DEFAULT_MODEL` | No | `anthropic/claude-opus-4.6` | Default model for new chats |
 | `TAVILY_API_KEY` | No | — | Enables web search tool |
 | `E2B_API_KEY` | No | — | Enables code execution sandbox |

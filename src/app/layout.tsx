@@ -22,7 +22,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "One — The last AI app you'll ever download",
+  title: "z1.chat — The last AI app you'll ever need",
   description: "A polished, pay-as-you-go AI chat app that connects to all models.",
 };
 
