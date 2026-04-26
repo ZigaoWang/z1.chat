@@ -2,12 +2,15 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, User, Shield } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, User, Shield, CreditCard } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredits } from "@/hooks/use-credits";
 import { useI18n } from "@/hooks/use-i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "./theme-toggle";
+import { formatCNY } from "@/lib/currency";
+import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -100,6 +103,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery, isLoading,
   } = useConversations();
   const { user, signOut } = useAuth();
+  const { creditBalance, isZero, isLow, isCritical } = useCredits();
   const { t } = useI18n();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -381,6 +385,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </Tooltip>
             </div>
           )}
+          <Link href="/settings#credits"
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+            <CreditCard className="h-3.5 w-3.5" />
+            <span className="flex-1">{t("sidebar.balance")}</span>
+            <span className={cn(
+              "tabular-nums",
+              isCritical && "text-amber-500",
+              isZero && "text-red-500/70"
+            )}>
+              {formatCNY(creditBalance)}
+            </span>
+            {isLow && !isZero && (
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            )}
+          </Link>
           <ThemeToggle />
           <Link href="/settings"
             className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">

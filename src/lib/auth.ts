@@ -3,13 +3,15 @@ import "server-only";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, emailVerificationCodes } from "./db/schema";
+import { users, emailVerificationCodes, creditTransactions } from "./db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createSession, deleteSession } from "./session";
 import { verifySession } from "./dal";
 import { sendVerificationEmail } from "./email";
 
 export const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+const FREE_CREDITS_CNY = process.env.FREE_CREDITS_CNY || "7";
 
 const signUpSchema = z.object({
   name: z.string().min(1).max(100),
@@ -38,7 +40,7 @@ export async function signUp(name: string, email: string, password: string) {
   if (existing && !existing.emailVerified) {
     [user] = await db
       .update(users)
-      .set({ name: validated.name, passwordHash, updatedAt: new Date() })
+      .set({ name: validated.name, passwordHash, creditBalance: FREE_CREDITS_CNY, updatedAt: new Date() })
       .where(eq(users.id, existing.id))
       .returning();
   } else {
@@ -48,8 +50,19 @@ export async function signUp(name: string, email: string, password: string) {
         name: validated.name,
         email: validated.email.toLowerCase(),
         passwordHash,
+        creditBalance: FREE_CREDITS_CNY,
       })
       .returning();
+  }
+
+  if (parseFloat(FREE_CREDITS_CNY) > 0) {
+    await db.insert(creditTransactions).values({
+      userId: user.id,
+      amount: FREE_CREDITS_CNY,
+      balance: FREE_CREDITS_CNY,
+      type: "signup_bonus",
+      description: `Welcome credits: ¥${FREE_CREDITS_CNY}`,
+    });
   }
 
   await sendEmailVerificationCode(user.id, user.email!);

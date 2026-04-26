@@ -7,8 +7,10 @@ import { PanelLeft, Plus, AlertCircle, RotateCcw } from "lucide-react";
 import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/chat/chat-messages";
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
+import FreeModeBanner from "@/components/chat/free-mode-banner";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
+import { useCredits } from "@/hooks/use-credits";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type UploadedFile, uploadFiles } from "./file-upload";
 import { type ToolInvocation } from "./message-bubble";
@@ -32,6 +34,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const { t } = useI18n();
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
+  const { isZero, refresh: refreshCredits } = useCredits();
   const [greeting, setGreeting] = useState("");
   useEffect(() => {
     const hour = new Date().getHours();
@@ -137,6 +140,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     onFinish: () => {
       setChatError(null);
       refreshConversations();
+      refreshCredits();
       setTimeout(() => refreshConversations(), 3000);
     },
   });
@@ -1132,6 +1136,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           <ModelSelector value={selectedModel} onChange={selectModel} />
         </div>
       </header>
+
+      {/* Free mode banner */}
+      {isZero && <FreeModeBanner />}
 
       {/* Messages or Empty State */}
       {messages.length === 0 ? (

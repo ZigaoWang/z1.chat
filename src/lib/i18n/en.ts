@@ -255,6 +255,57 @@ export const en = {
   "invite.createAccount": "Create account",
   "invite.passwordsDontMatch": "Passwords don't match",
   "invite.failedToRedeem": "Failed to redeem invite",
+
+  // Credits
+  "credit.freeMode": "Free Mode",
+  "credit.upgradeUnlock": "Upgrade to unlock all models, code execution & more",
+  "credit.viewPlans": "Top up",
+  "credit.topUp": "Top up",
+  "credit.freeModelsOnly": "Free models only",
+  "credit.showAll": "Show all models",
+  "credit.toolLocked": "Code execution requires credits",
+  "credit.toolLockedDesc": "Top up to run code, generate charts, and process data.",
+  "credit.balanceZero": "Out of credits",
+  "credit.switchedFree": "Switched to free model. Your conversations and memories are preserved.",
+  "credit.paidModelLocked": "This model requires credits",
+  "credit.estimatedCost": "~{cost}/message",
+
+  // Sidebar
+  "sidebar.balance": "Balance",
+
+  // Onboarding
+  "onboarding.welcome": "Welcome to z1.chat",
+  "onboarding.subtitle": "Access the world's best AI models in one place",
+  "onboarding.card1Title": "All Models",
+  "onboarding.card1Desc": "Claude, GPT, Gemini, Llama & hundreds more",
+  "onboarding.card2Title": "Smart Tools",
+  "onboarding.card2Desc": "Web search, file reading, code execution",
+  "onboarding.card3Title": "Pay as You Go",
+  "onboarding.card3Desc": "No subscriptions. Pay only for what you use.",
+  "onboarding.startingBalance": "Your starting balance",
+  "onboarding.getStarted": "Get Started",
+  "onboarding.personalize": "Quick Setup",
+  "onboarding.personalizeDesc": "Help the AI understand you better",
+  "onboarding.chooseLanguage": "Preferred language",
+  "onboarding.chooseStyle": "Response style",
+  "onboarding.skip": "Skip",
+  "onboarding.save": "Save & Start",
+  "onboarding.concise": "Concise",
+  "onboarding.balanced": "Balanced",
+  "onboarding.detailed": "Detailed",
+  "onboarding.auto": "Auto-detect",
+  "onboarding.tooltipModel": "Switch models here (⌘K)",
+  "onboarding.tooltipSidebar": "Your chat history lives here",
+
+  // Suggestions
+  "suggestion.poem": "Write a poem about spring",
+  "suggestion.poemTitle": "Write a poem",
+  "suggestion.news": "What's in the news today?",
+  "suggestion.newsTitle": "Today's news",
+  "suggestion.code": "Explain this code to me",
+  "suggestion.codeTitle": "Explain code",
+  "suggestion.website": "Build me a personal homepage",
+  "suggestion.websiteTitle": "Create a website",
 } as const;
 
 export type TranslationKey = keyof typeof en;

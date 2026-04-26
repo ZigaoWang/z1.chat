@@ -10,6 +10,7 @@ import { extractMemories, updateConversationSummary, extractImmediateMemory } fr
 import { checkAndCompactConversation } from "@/lib/context-manager";
 import { getTools, SANDBOX_TOOL_NAMES, IMAGE_TOOL_NAMES, SandboxManager, ArtifactContext } from "@/lib/tools";
 import { trackedStreamText, logSearchUsage, logSandboxUsage } from "@/lib/usage-logger";
+import { getCachedModels } from "@/lib/models-cache";
 import { Sandbox } from "@e2b/code-interpreter";
 import { readFile } from "fs/promises";
 import { join, basename } from "path";
@@ -59,17 +60,32 @@ export async function POST(req: Request) {
 
     const userId = await getCurrentUserId();
 
-    // Credit check: block non-admin users with no credits
+    // Credit check: block non-admin users with no credits from using paid models
     const [currentUser] = await db
       .select({ role: users.role, creditBalance: users.creditBalance })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    if (currentUser && currentUser.role !== "admin" && Number(currentUser.creditBalance) <= 0) {
-      return Response.json(
-        { error: "You've run out of credits. Please top up to continue." },
-        { status: 402 }
-      );
+
+    const userBalance = Number(currentUser?.creditBalance || 0);
+    const isAdmin = currentUser?.role === "admin";
+    const hasCredits = userBalance > 0 || isAdmin;
+
+    if (!hasCredits) {
+      // Check if selected model is free
+      const selectedModel = modelId || DEFAULT_MODEL;
+      const allModels = await getCachedModels();
+      const modelInfo = allModels.find((m) => m.id === selectedModel);
+      const promptPrice = parseFloat(modelInfo?.pricing?.prompt || "0");
+      const completionPrice = parseFloat(modelInfo?.pricing?.completion || "0");
+      const isFreeModel = promptPrice === 0 && completionPrice === 0;
+
+      if (!isFreeModel) {
+        return Response.json(
+          { error: "insufficient_credits", model: selectedModel },
+          { status: 402 }
+        );
+      }
     }
 
     const selectedModel = modelId || DEFAULT_MODEL;
@@ -220,9 +236,13 @@ export async function POST(req: Request) {
 
     // Build dynamic system prompt with conversation context
     // For edits, skip conversation summary/compaction — the edited branch has its own context
-    const systemPrompt = isEdit
+    let systemPrompt = isEdit
       ? await buildSystemPrompt(userId, undefined, userContent)
       : await buildSystemPrompt(userId, convId!, userContent);
+
+    if (!hasCredits) {
+      systemPrompt += "\n\nNote: The user has no credits. Code execution tools are unavailable. If the user asks to run code, explain the code but mention they need to top up credits to execute it.";
+    }
 
     // Check if conversation needs compaction (summarize old messages)
     // Skip compaction for edits — it would mix branches
@@ -303,6 +323,14 @@ export async function POST(req: Request) {
 
     const artifactCtx: ArtifactContext = { conversationId: convId!, userId };
     const tools = getTools(sandboxManager, artifactCtx);
+
+    // At zero credits, remove sandbox tools (code execution costs money)
+    if (!hasCredits) {
+      for (const name of SANDBOX_TOOL_NAMES) {
+        delete tools[name];
+      }
+    }
+
     const hasToolsDefined = Object.keys(tools).length > 0;
 
     // Convert UI messages to model messages.

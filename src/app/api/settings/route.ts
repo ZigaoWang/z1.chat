@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { users, type UserPreferences } from "@/lib/db/schema";
+import { users, type UserPreferences, type OnboardingState } from "@/lib/db/schema";
 import { getCurrentUserId } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 
@@ -38,10 +38,23 @@ export async function PATCH(req: Request) {
     const updates: Partial<{
       name: string;
       preferences: UserPreferences;
+      onboardingCompleted: boolean;
+      onboardingState: OnboardingState;
     }> = {};
 
     if (body.name !== undefined) {
       updates.name = body.name;
+    }
+
+    if (body.onboardingCompleted !== undefined) {
+      updates.onboardingCompleted = body.onboardingCompleted;
+    }
+
+    if (body.onboardingState !== undefined) {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+      updates.onboardingState = { ...(user?.onboardingState || {}), ...body.onboardingState };
     }
 
     if (body.preferences !== undefined) {

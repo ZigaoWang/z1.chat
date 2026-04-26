@@ -22,5 +22,8 @@ export async function GET() {
     email: user.email,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    creditBalance: Number(user.creditBalance),
+    onboardingCompleted: user.onboardingCompleted,
+    onboardingState: user.onboardingState,
   });
 }

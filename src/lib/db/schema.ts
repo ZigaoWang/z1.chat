@@ -39,6 +39,8 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   role: text("role").notNull().default("user"), // "user" | "admin"
   creditBalance: numeric("credit_balance", { precision: 20, scale: 10 }).notNull().default("0"),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  onboardingState: jsonb("onboarding_state").$type<OnboardingState>().default({}),
   preferences: jsonb("preferences").$type<UserPreferences>().default({
     theme: "system",
     defaultModel: null,
@@ -503,4 +505,10 @@ export interface UserPreferences {
   responseStyle: "concise" | "balanced" | "detailed";
   language: string | null;
   customInstructions: string | null;
+}
+
+export interface OnboardingState {
+  modelSelectorTooltipSeen?: boolean;
+  sidebarTooltipSeen?: boolean;
+  firstMessageSent?: boolean;
 }

@@ -16,6 +16,9 @@ interface AuthUser {
   email: string | null;
   avatarUrl?: string | null;
   role: string;
+  creditBalance: number;
+  onboardingCompleted: boolean;
+  onboardingState?: Record<string, boolean>;
 }
 
 interface AuthContextValue {
