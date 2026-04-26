@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -40,10 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   const fetchUser = useCallback(async () => {
     try {
-      setIsLoading(true);
+      if (!hasLoadedRef.current) {
+        setIsLoading(true);
+      }
       const res = await fetch("/api/auth/me");
       if (res.ok) {
         const data = await res.json();
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     } finally {
       setIsLoading(false);
+      hasLoadedRef.current = true;
     }
   }, []);
 

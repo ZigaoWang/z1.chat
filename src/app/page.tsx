@@ -112,9 +112,11 @@ export default function Home() {
     setSidebarOpen((prev) => !prev);
   }, []);
 
-  if (authLoading || !user) {
+  if (!user && authLoading) {
     return <AppSkeleton />;
   }
+
+  if (!user) return null;
 
   if (showOnboarding) {
     return (
