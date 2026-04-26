@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import ChatView from "@/components/chat/chat-view";
+import OnboardingFlow from "@/components/onboarding/onboarding-flow";
 import { useConversations } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredits } from "@/hooks/use-credits";
 import { useI18n } from "@/hooks/use-i18n";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -39,9 +41,17 @@ function AppSkeleton() {
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { createConversation } = useConversations();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, refresh: refreshAuth } = useAuth();
+  const { creditBalance } = useCredits();
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (user && !user.onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -104,6 +114,18 @@ export default function Home() {
 
   if (authLoading || !user) {
     return <AppSkeleton />;
+  }
+
+  if (showOnboarding) {
+    return (
+      <OnboardingFlow
+        creditBalance={creditBalance}
+        onComplete={() => {
+          setShowOnboarding(false);
+          refreshAuth();
+        }}
+      />
+    );
   }
 
   return (

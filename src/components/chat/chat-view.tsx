@@ -8,6 +8,7 @@ import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/c
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
 import FreeModeBanner from "@/components/chat/free-mode-banner";
+import ContextualTooltip from "@/components/onboarding/contextual-tooltip";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
 import { useCredits } from "@/hooks/use-credits";
@@ -35,6 +36,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
   const { isZero, refresh: refreshCredits } = useCredits();
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const [showModelTooltip, setShowModelTooltip] = useState(false);
+  const tooltipShownRef = useRef(false);
   const [greeting, setGreeting] = useState("");
   useEffect(() => {
     const hour = new Date().getHours();
@@ -142,6 +146,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       refreshConversations();
       refreshCredits();
       setTimeout(() => refreshConversations(), 3000);
+      if (!tooltipShownRef.current) {
+        tooltipShownRef.current = true;
+        setTimeout(() => setShowModelTooltip(true), 1000);
+      }
     },
   });
 
@@ -1133,7 +1141,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               </Tooltip>
             </>
           )}
-          <ModelSelector value={selectedModel} onChange={selectModel} />
+          <div ref={modelSelectorRef}>
+            <ModelSelector value={selectedModel} onChange={selectModel} />
+          </div>
         </div>
       </header>
 
@@ -1150,6 +1160,23 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             <p className="mt-1.5 text-sm text-muted-foreground/50">
               {t("chat.whatsOnYourMindDesc")}
             </p>
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              {[
+                { title: t("suggestion.poemTitle"), text: t("suggestion.poem") },
+                { title: t("suggestion.newsTitle"), text: t("suggestion.news") },
+                { title: t("suggestion.codeTitle"), text: t("suggestion.code") },
+                { title: t("suggestion.websiteTitle"), text: t("suggestion.website") },
+              ].map((s) => (
+                <button
+                  key={s.title}
+                  onClick={() => setInput(s.text)}
+                  className="rounded-xl border border-border/40 bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                >
+                  <span className="block text-xs font-medium text-foreground/80">{s.title}</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground/50 line-clamp-1">{s.text}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
@@ -1291,6 +1318,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         </div>
       </>
     )}
+
+    {/* Contextual tooltip for model selector */}
+    <ContextualTooltip
+      targetRef={modelSelectorRef}
+      content={t("onboarding.tooltipModel")}
+      show={showModelTooltip}
+      onDismiss={() => setShowModelTooltip(false)}
+    />
     </div>
   );
 }
