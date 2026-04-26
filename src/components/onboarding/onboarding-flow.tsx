@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import LanguagePicker from "./language-picker";
 import WelcomeScreen from "./welcome-screen";
 import PersonalizationScreen from "./personalization-screen";
 
@@ -10,7 +11,11 @@ interface OnboardingFlowProps {
 }
 
 export default function OnboardingFlow({ creditBalance, onComplete }: OnboardingFlowProps) {
-  const [step, setStep] = useState<"welcome" | "personalize">("welcome");
+  const [step, setStep] = useState<"language" | "welcome" | "personalize">("language");
+
+  if (step === "language") {
+    return <LanguagePicker onContinue={() => setStep("welcome")} />;
+  }
 
   if (step === "welcome") {
     return (
