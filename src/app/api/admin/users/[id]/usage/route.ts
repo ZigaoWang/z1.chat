@@ -26,7 +26,7 @@ export async function GET(
       .from(usageLogs)
       .where(eq(usageLogs.userId, id))
       .orderBy(desc(usageLogs.createdAt))
-      .limit(25);
+      .limit(50);
 
     return Response.json(
       logs.map((l) => ({
