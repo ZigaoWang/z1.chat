@@ -449,9 +449,11 @@ function MessageBubble({
             </div>
           )}
 
-          <div className="rounded-2xl rounded-br-sm bg-primary/[0.06] dark:bg-primary/[0.10] px-3.5 py-2.5">
-            <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
-          </div>
+          {displayContent && (
+            <div className="rounded-2xl rounded-br-sm bg-primary/[0.06] dark:bg-primary/[0.10] px-3.5 py-2.5">
+              <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+            </div>
+          )}
           {/* Actions */}
           <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
             {hasVersions && onVersionChange && currentVersion !== undefined && (

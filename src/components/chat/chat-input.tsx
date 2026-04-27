@@ -58,6 +58,8 @@ export default function ChatInput({
     }
   }, [editing]);
 
+  const hasContent = value.trim().length > 0 || files.length > 0;
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Don't submit during IME composition (中文、日本語 etc.)
     if (composingRef.current) return;
@@ -68,7 +70,7 @@ export default function ChatInput({
         if (value.trim() && value.trim() !== editing.originalContent && onSubmitEdit) {
           onSubmitEdit();
         }
-      } else if (!isLoading && value.trim()) {
+      } else if (!isLoading && hasContent) {
         onSubmit();
       }
     }
@@ -98,7 +100,7 @@ export default function ChatInput({
     }
   }, [files, onFilesChange]);
 
-  const canSubmit = !disabled && (isLoading || value.trim().length > 0);
+  const canSubmit = !disabled && (isLoading || hasContent);
   const isEditChanged = editing ? value.trim() !== editing.originalContent && value.trim().length > 0 : false;
 
   return (
@@ -173,14 +175,14 @@ export default function ChatInput({
                   if (isEditChanged && onSubmitEdit) onSubmitEdit();
                 } else if (isLoading && onStop) {
                   onStop();
-                } else if (value.trim()) {
+                } else if (hasContent) {
                   onSubmit();
                 }
               }}
               disabled={editing ? !isEditChanged : !canSubmit}
               className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                 isLoading && !editing ? "bg-foreground text-background hover:bg-foreground/80" :
-                (editing ? isEditChanged : value.trim()) ? "bg-foreground text-background hover:bg-foreground/80" :
+                (editing ? isEditChanged : hasContent) ? "bg-foreground text-background hover:bg-foreground/80" :
                 "bg-muted text-muted-foreground/25"
               } disabled:opacity-10`}
             >

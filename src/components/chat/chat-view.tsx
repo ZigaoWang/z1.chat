@@ -437,7 +437,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const handleSendMessage = useCallback(
     (overrideText?: string) => {
       const text = (overrideText ?? input).trim();
-      if (!text || isLoading || viewingOldBranch) return;
+      const hasFiles = files.length > 0;
+      if ((!text && !hasFiles) || isLoading || viewingOldBranch) return;
       setChatError(null);
       setWasInterrupted(false);
 
@@ -460,7 +461,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               mediaType: dataUrlMediaType,
               url: f.dataUrl,
             });
-            displayImages.push(f.url);
+            displayImages.push(f.dataUrl);
           } else {
             displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
             if (f.textContent) {
