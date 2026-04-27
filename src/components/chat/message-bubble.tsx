@@ -588,9 +588,7 @@ function MessageBubble({
           </>
         ) : displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) ? (
           <>
-            {/* Fallback: old layout for restored messages */}
-            {displayContent.length > 0 && <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />}
-
+            {/* Fallback: old layout for restored messages — tools first (chronological) */}
             {toolInvocations && toolInvocations.filter(ti => ti.toolName === "web_search").length > 0 && (
               <SearchStatus invocations={toolInvocations} />
             )}
@@ -609,6 +607,12 @@ function MessageBubble({
             {toolInvocations && toolInvocations.some(ti => SANDBOX_TOOL_NAMES.has(ti.toolName)) && (
               <SandboxStatus invocations={toolInvocations} onLightbox={setLightboxSrc} />
             )}
+            {toolInvocations && toolInvocations.some(ti => ARTIFACT_TOOL_NAMES.has(ti.toolName)) && onOpenArtifactById && (
+              <ArtifactToolCards invocations={toolInvocations} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
+            )}
+
+            {displayContent.length > 0 && <MarkdownRenderer content={displayContent} onOpenArtifact={onOpenArtifact} />}
+
             {artifacts.length > 0 && onOpenArtifact && (
               <div className="flex flex-col gap-1.5 mt-3">
                 {artifacts.map((art) => (
@@ -619,9 +623,6 @@ function MessageBubble({
                   </button>
                 ))}
               </div>
-            )}
-            {toolInvocations && toolInvocations.some(ti => ARTIFACT_TOOL_NAMES.has(ti.toolName)) && onOpenArtifactById && (
-              <ArtifactToolCards invocations={toolInvocations} onOpenArtifactById={onOpenArtifactById} parentStreaming={isStreaming} />
             )}
           </>
         ) : null}
