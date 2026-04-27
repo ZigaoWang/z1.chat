@@ -170,6 +170,10 @@ function ChatMessages({
   for (let i = slots.length - 1; i >= 0; i--) {
     if (slots[i].messages[0].role === "assistant") { lastAssistantSlotIdx = i; break; }
   }
+  let lastUserSlotIdx = -1;
+  for (let i = lastAssistantSlotIdx - 1; i >= 0; i--) {
+    if (slots[i].messages[0].role === "user") { lastUserSlotIdx = i; break; }
+  }
 
   // Show typing indicator when streaming but last message is user (no assistant response yet)
   const lastMsg = messages[messages.length - 1];
@@ -221,6 +225,7 @@ function ChatMessages({
                 <div key={`edit-${msg.id}`}>
                   <MessageBubble role={msg.role} content={msg.content} images={msg.images} files={msg.files}
                     onEdit={onEditMessage && slot.originalIndex !== undefined ? (c) => onEditMessage(slot.originalIndex!, c) : undefined}
+                    onRegenerate={slotIdx === lastUserSlotIdx && !isStreaming ? onRegenerate : undefined}
                     versionCount={totalVersions} currentVersion={selectedIdx}
                     onVersionChange={(idx) => setSelectedBranches((p) => ({ ...p, [msg.id]: idx }))} />
                 </div>
@@ -262,12 +267,13 @@ function ChatMessages({
 
           const msg = slot.messages[0];
           const isLA = slotIdx === lastAssistantSlotIdx && msg.role === "assistant";
+          const isLastUser = slotIdx === lastUserSlotIdx && msg.role === "user";
           return (
             <MessageBubble key={msg.id} role={msg.role} content={msg.content} model={msg.model}
               images={msg.images} files={msg.files} toolInvocations={msg.toolInvocations}
               segments={msg.segments}
               isStreaming={isStreaming && slotIdx === slots.length - 1 && msg.role === "assistant"}
-              isLast={isLA} onRegenerate={isLA ? onRegenerate : undefined}
+              isLast={isLA} onRegenerate={isLA ? onRegenerate : (isLastUser && !isStreaming ? onRegenerate : undefined)}
               interrupted={isLA && !isStreaming && !!wasInterrupted}
               onOpenArtifact={onOpenArtifact}
               onOpenArtifactById={onOpenArtifactById}

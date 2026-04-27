@@ -460,6 +460,9 @@ function MessageBubble({
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
             <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+              {onRegenerate && !isStreaming && (
+                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}><RotateCcw className="h-3 w-3" /></button>
+              )}
               {onEdit && !isStreaming && (
                 <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.edit")}><Pencil className="h-3 w-3" /></button>
               )}
