@@ -266,7 +266,7 @@ function MarkdownRenderer({ content, onOpenArtifact }: { content: string; onOpen
   const processed = preprocessMath(content);
 
   return (
-    <div className="prose prose-neutral dark:prose-invert prose-sm max-w-none prose-p:text-[14.5px] prose-p:leading-relaxed prose-p:my-1.5 prose-li:text-[14.5px] prose-headings:font-semibold prose-headings:tracking-tight prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-code:before:content-none prose-code:after:content-none prose-li:my-1 prose-table:my-0 prose-thead:border-0 prose-tr:border-0">
+    <div className="prose prose-neutral dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:font-semibold prose-headings:tracking-tight prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-code:before:content-none prose-code:after:content-none prose-li:my-1 prose-table:my-0 prose-thead:border-0 prose-tr:border-0">
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}

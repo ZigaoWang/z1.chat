@@ -236,10 +236,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     return (
       <div key={conv.id} className="relative group">
-        <button
+          <button
           onClick={() => {
             setActiveId(conv.id);
-            // Close sidebar on mobile after selecting a conversation
             if (window.innerWidth < 1024) onClose();
           }}
           className={`w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
@@ -250,7 +249,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
           </div>
           <span
-            className="shrink-0 flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === conv.id ? null : conv.id); }}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
@@ -258,24 +257,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </button>
 
         {menuOpenId === conv.id && (
-          <div ref={menuRef} className="absolute right-1 top-full z-20 mt-0.5 w-36 rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <div ref={menuRef} className="absolute right-1 top-full z-20 mt-0.5 w-38 rounded-lg border border-border bg-popover py-1 shadow-lg">
             <button
               onClick={() => { setMenuOpenId(null); regenerateTitle(conv.id); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-foreground/80 hover:bg-muted transition-colors"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
             >
-              <Sparkles className="h-3 w-3" /> {t("sidebar.generateTitle")}
+              <Sparkles className="h-3.5 w-3.5" /> {t("sidebar.generateTitle")}
             </button>
             <button
               onClick={() => { setMenuOpenId(null); setEditingId(conv.id); setEditTitle(conv.title || ""); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-foreground/80 hover:bg-muted transition-colors"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
             >
-              <Pencil className="h-3 w-3" /> {t("sidebar.rename")}
+              <Pencil className="h-3.5 w-3.5" /> {t("sidebar.rename")}
             </button>
             <button
               onClick={() => { setMenuOpenId(null); setDeletingId(conv.id); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/5 transition-colors"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
             >
-              <Trash2 className="h-3 w-3" /> {t("sidebar.delete")}
+              <Trash2 className="h-3.5 w-3.5" /> {t("sidebar.delete")}
             </button>
           </div>
         )}
@@ -309,20 +308,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="flex h-11 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
           <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <Tooltip>
               <TooltipTrigger onClick={() => {
                 createConversation();
                 if (window.innerWidth < 1024) onClose();
               }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
                 <Plus className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">{t("sidebar.newChat")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger onClick={onClose}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
                 <PanelLeftClose className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">{t("sidebar.closeSidebar")}</TooltipContent>
@@ -332,10 +331,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="px-2 py-1.5">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/30" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("sidebar.search")}
-              className="h-8 w-full rounded-lg border-0 bg-muted/50 pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground/30 focus:bg-muted/70 focus:ring-1 focus:ring-ring/20 transition-all" />
+              className="h-9 w-full rounded-lg border-0 bg-muted/50 pl-8 pr-3 text-[13px] outline-none placeholder:text-muted-foreground/40 focus:bg-muted/70 focus:ring-1 focus:ring-ring/20 transition-all" />
           </div>
         </div>
 
@@ -348,15 +347,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-3">
-              <MessageSquare className="h-5 w-5 text-muted-foreground/15" />
-              <p className="mt-1.5 text-xs text-muted-foreground/25">{searchQuery ? t("sidebar.noResults") : t("sidebar.noConversations")}</p>
+              <MessageSquare className="h-5 w-5 text-muted-foreground/25" />
+              <p className="mt-1.5 text-xs text-muted-foreground/40">{searchQuery ? t("sidebar.noResults") : t("sidebar.noConversations")}</p>
             </div>
           ) : (
             <div className="space-y-4">
               {grouped.map((group) => (
                 <div key={group.label}>
                   <div className="px-2 pb-1">
-                    <span className="text-[10px] font-medium text-muted-foreground/35 uppercase tracking-wider">{group.label}</span>
+                    <span className="text-[10.5px] font-medium text-muted-foreground/50 uppercase tracking-wider">{group.label}</span>
                   </div>
                   <div className="space-y-px">
                     {group.conversations.map(renderConversation)}
@@ -369,15 +368,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2 space-y-0.5">
           {user && (
-            <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground/70">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/70">
+              <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <User className="h-3 w-3" />
               </div>
               <span className="flex-1 truncate">{user.name || user.email}</span>
               <Tooltip>
                 <TooltipTrigger
                   onClick={signOut}
-                  className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <LogOut className="h-3 w-3" />
                 </TooltipTrigger>
@@ -386,7 +385,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           )}
           <Link href="/settings#credits"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
             <CreditCard className="h-3.5 w-3.5" />
             <span className="flex-1">{t("sidebar.balance")}</span>
             <span className={cn(
@@ -402,12 +401,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </Link>
           <ThemeToggle />
           <Link href="/settings"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
             <Settings className="h-3.5 w-3.5" /> {t("sidebar.settings")}
           </Link>
           {user?.role === "admin" && (
             <Link href="/admin"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
               <Shield className="h-3.5 w-3.5" /> {t("sidebar.admin")}
             </Link>
           )}

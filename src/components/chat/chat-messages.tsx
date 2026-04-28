@@ -105,9 +105,9 @@ function ThinkingIndicator() {
   return (
     <div className="px-4 py-1">
       <div className="mx-auto max-w-3xl flex items-center gap-0.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
       </div>
     </div>
   );

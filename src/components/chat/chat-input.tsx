@@ -104,7 +104,7 @@ export default function ChatInput({
   const isEditChanged = editing ? value.trim() !== editing.originalContent && value.trim().length > 0 : false;
 
   return (
-    <div className="shrink-0 bg-background px-4 pb-4 pt-2">
+    <div className="shrink-0 bg-background px-3 md:px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
       <div className="mx-auto w-full max-w-3xl">
         {/* Editing banner */}
         {editing && (
@@ -117,7 +117,7 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className={`border border-border/60 bg-background transition-all focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
+        <div className={`border border-border/60 bg-background transition-all duration-200 focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 focus-within:shadow-sm ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
           {/* File previews */}
           {(files.length > 0 || pasteUploading) && !editing && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
@@ -149,12 +149,12 @@ export default function ChatInput({
             placeholder={editing ? t("chat.editMessage") : placeholder}
             disabled={disabled}
             rows={1}
-            className="block w-full resize-none bg-transparent px-3.5 py-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/30 disabled:opacity-50"
+            className="block w-full resize-none bg-transparent px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 disabled:opacity-50"
             style={{ maxHeight: "240px" }}
           />
 
           {/* Action bar below textarea */}
-          <div className="flex items-center justify-between px-2 pb-2">
+          <div className="flex items-center justify-between px-2.5 pb-2.5">
             {editing ? (
               <button
                 type="button"
@@ -180,13 +180,13 @@ export default function ChatInput({
                 }
               }}
               disabled={editing ? !isEditChanged : !canSubmit}
-              className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 active:scale-95 ${
                 isLoading && !editing ? "bg-foreground text-background hover:bg-foreground/80" :
                 (editing ? isEditChanged : hasContent) ? "bg-foreground text-background hover:bg-foreground/80" :
-                "bg-muted text-muted-foreground/25"
+                "bg-muted text-muted-foreground/30"
               } disabled:opacity-10`}
             >
-              {isLoading && !editing ? <Square className="h-3.5 w-3.5 fill-current" /> : <ArrowUp className="h-4 w-4 stroke-[2.5]" />}
+              {isLoading && !editing ? <Square className="h-3.5 w-3.5 fill-current" /> : <ArrowUp className="h-4.5 w-4.5 stroke-[2.5]" />}
             </button>
           </div>
         </div>

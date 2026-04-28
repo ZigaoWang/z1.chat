@@ -383,7 +383,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
       <button
         onClick={() => onChange(current - 1)}
         disabled={current === 0}
-        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -393,7 +393,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
       <button
         onClick={() => onChange(current + 1)}
         disabled={current === total - 1}
-        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
@@ -421,18 +421,18 @@ function MessageBubble({
     const displayContent = content.replace(/<attached_file\s[^>]*>[\s\S]*?<\/attached_file>\s*/g, "").replace(/<attached_file\s[^>]*\/>\s*/g, "").trim();
 
     return (
-      <div className="group flex justify-end px-4 py-1.5">
-        <div className="max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
+      <div className="group flex justify-end px-4 py-2 animate-bubble-in">
+        <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
               {files.map((file, i) => {
                 const FIcon = getFileIcon(file.type, file.name);
                 return (
                   <a key={i} href={file.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 rounded-lg border border-border/30 bg-muted/20 px-2 py-1 text-xs hover:bg-muted/40 transition-colors">
-                    <FIcon className="h-3 w-3 text-muted-foreground/40" />
+                    className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/20 px-2.5 py-1.5 text-xs hover:bg-muted/40 transition-colors">
+                    <FIcon className="h-3.5 w-3.5 text-muted-foreground/50" />
                     <span className="truncate max-w-[120px]">{file.name}</span>
-                    {file.size && <span className="text-muted-foreground/30 text-[11px]">{formatFileSize(file.size)}</span>}
+                    {file.size && <span className="text-muted-foreground/50 text-xs">{formatFileSize(file.size)}</span>}
                   </a>
                 );
               })}
@@ -450,24 +450,24 @@ function MessageBubble({
           )}
 
           {displayContent && (
-            <div className="rounded-2xl rounded-br-sm bg-primary/[0.06] dark:bg-primary/[0.10] px-3.5 py-2.5">
-              <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+            <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5">
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
             </div>
           )}
           {/* Actions */}
-          <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
+          <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.75rem]" : "h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150"}`}>
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
-            <div className={`flex items-center gap-1 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+            <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
               {onRegenerate && !isStreaming && (
-                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}><RotateCcw className="h-3 w-3" /></button>
+                <button onClick={onRegenerate} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}><RotateCcw className="h-3.5 w-3.5" /></button>
               )}
               {onEdit && !isStreaming && (
-                <button onClick={() => onEdit(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.edit")}><Pencil className="h-3 w-3" /></button>
+                <button onClick={() => onEdit(displayContent)} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.edit")}><Pencil className="h-3.5 w-3.5" /></button>
               )}
-              <button onClick={() => copy(displayContent)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
-                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              <button onClick={() => copy(displayContent)} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
@@ -513,15 +513,15 @@ function MessageBubble({
   const hasAnyContent = displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) || (segments && segments.length > 0);
 
   return (
-    <div className="group px-4 py-1.5">
+    <div className="group px-4 py-2 animate-message-in">
       <div className="mx-auto max-w-3xl">
         {/* Streaming placeholder — only when nothing to show yet */}
         {isStreaming && !hasAnyContent && (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
             </div>
           </div>
         )}
@@ -580,9 +580,9 @@ function MessageBubble({
             {/* Trailing dots — shows the AI is still working after tools/text */}
             {isStreaming && (
               <div className="flex items-center gap-1 mt-4 py-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_infinite]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/10 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
               </div>
             )}
           </>
@@ -662,21 +662,21 @@ function MessageBubble({
 
         {/* Actions */}
         {!isStreaming && content.length > 0 && (
-          <div className={`flex items-center gap-1 mt-1 ${hasVersions ? "min-h-[1.625rem]" : "h-5 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
+          <div className={`flex items-center gap-1 mt-1 ${hasVersions ? "min-h-[1.75rem]" : "h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150"}`}>
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
             <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
-              <button onClick={() => copy(content)} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
-                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              <button onClick={() => copy(content)} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               {isLast && onRegenerate && (
-                <button onClick={onRegenerate} className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}>
-                  <RotateCcw className="h-3 w-3" />
+                <button onClick={onRegenerate} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}>
+                  <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
-            {modelLabel && <span className="text-[10px] text-muted-foreground/30 ml-auto">{modelLabel}</span>}
+            {modelLabel && <span className="text-[11px] text-muted-foreground/50 ml-auto">{modelLabel}</span>}
           </div>
         )}
       </div>
