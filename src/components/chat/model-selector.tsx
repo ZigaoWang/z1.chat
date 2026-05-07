@@ -71,16 +71,6 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
       .filter(Boolean) as typeof allModels;
   }, [recentIds, allModels]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   // Auto-select free model when balance hits zero
   useEffect(() => {
