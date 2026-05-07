@@ -31,13 +31,7 @@ export async function POST(req: Request) {
   try {
     await getCurrentUserId();
 
-    let formData: FormData;
-    try {
-      formData = await req.formData();
-    } catch {
-      return Response.json({ error: "Invalid form data" }, { status: 400 });
-    }
-
+    const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
