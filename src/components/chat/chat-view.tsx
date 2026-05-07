@@ -8,7 +8,6 @@ import ChatMessages, { type VersionEntry, type EditBranch } from "@/components/c
 import ChatInput, { type EditingState } from "@/components/chat/chat-input";
 import ModelSelector from "@/components/chat/model-selector";
 import FreeModeBanner from "@/components/chat/free-mode-banner";
-import ContextualTooltip from "@/components/onboarding/contextual-tooltip";
 import { useConversations } from "@/hooks/use-conversations";
 import { useModels } from "@/hooks/use-models";
 import { useCredits } from "@/hooks/use-credits";
@@ -36,9 +35,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
   const { isZero, refresh: refreshCredits } = useCredits();
-  const modelSelectorRef = useRef<HTMLDivElement>(null);
-  const [showModelTooltip, setShowModelTooltip] = useState(false);
-  const tooltipShownRef = useRef(false);
   const [greeting, setGreeting] = useState("");
   useEffect(() => {
     const hour = new Date().getHours();
@@ -146,10 +142,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       refreshConversations();
       refreshCredits();
       setTimeout(() => refreshConversations(), 3000);
-      if (!tooltipShownRef.current) {
-        tooltipShownRef.current = true;
-        setTimeout(() => setShowModelTooltip(true), 1000);
-      }
     },
   });
 
@@ -1142,9 +1134,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               </Tooltip>
             </>
           )}
-          <div ref={modelSelectorRef}>
-            <ModelSelector value={selectedModel} onChange={selectModel} />
-          </div>
+          <ModelSelector value={selectedModel} onChange={selectModel} />
         </div>
       </header>
 
@@ -1320,13 +1310,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       </>
     )}
 
-    {/* Contextual tooltip for model selector */}
-    <ContextualTooltip
-      targetRef={modelSelectorRef}
-      content={t("onboarding.tooltipModel")}
-      show={showModelTooltip}
-      onDismiss={() => setShowModelTooltip(false)}
-    />
     </div>
   );
 }

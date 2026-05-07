@@ -58,6 +58,17 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
     setRecentIds(getRecentModels());
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const selectedModel = useMemo(
     () => allModels.find((m) => m.id === value),
     [allModels, value]
