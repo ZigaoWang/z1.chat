@@ -7,6 +7,9 @@ import { processFile } from "@/lib/file-processor";
 import { getCurrentUserId } from "@/lib/auth";
 import { MAX_UPLOAD_SIZE } from "@/lib/constants";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const TEMP_DIR = join(tmpdir(), "one-uploads");
 const CLEANUP_DELAY = 60 * 60 * 1000; // 1 hour
 
