@@ -86,37 +86,36 @@ export async function processFile(
 
   const fileType = getFileType(filename);
 
-  switch (fileType) {
-    case "image":
-      return processImage(buffer, filename, mimeType);
-    case "pdf":
-      return processPdf(buffer, filename, mimeType);
-    case "document":
-    case "text":
-      return processDocument(buffer, filename, mimeType);
-    case "presentation":
-      return processPresentation(buffer, filename, mimeType);
-    case "spreadsheet":
-      return processSpreadsheet(buffer, filename, mimeType);
-    case "data":
-      return processDataFile(buffer, filename, mimeType);
-    case "code":
-      return processCode(buffer, filename, mimeType);
-    case "archive":
-      return {
-        fileType: "archive",
-        originalName: filename,
-        mimeType,
-        size: buffer.length,
-        textContent: "[Archives cannot be read directly. Please extract the files and upload them individually.]",
-        display: { icon: "archive", label: filename.split(".").pop()?.toUpperCase() || "Archive" },
-      };
-    case "unknown":
-    default: {
-      // Try UTF-8 read, fall back to binary note
-      try {
+  try {
+    switch (fileType) {
+      case "image":
+        return await processImage(buffer, filename, mimeType);
+      case "pdf":
+        return await processPdf(buffer, filename, mimeType);
+      case "document":
+      case "text":
+        return await processDocument(buffer, filename, mimeType);
+      case "presentation":
+        return await processPresentation(buffer, filename, mimeType);
+      case "spreadsheet":
+        return await processSpreadsheet(buffer, filename, mimeType);
+      case "data":
+        return await processDataFile(buffer, filename, mimeType);
+      case "code":
+        return await processCode(buffer, filename, mimeType);
+      case "archive":
+        return {
+          fileType: "archive" as const,
+          originalName: filename,
+          mimeType,
+          size: buffer.length,
+          textContent: "[Archives cannot be read directly. Please extract the files and upload them individually.]",
+          display: { icon: "archive" as const, label: filename.split(".").pop()?.toUpperCase() || "Archive" },
+        };
+      case "unknown":
+      default: {
+        // Try UTF-8 read, fall back to binary note
         const text = buffer.toString("utf-8");
-        // Check if it looks like valid text (no excessive null bytes)
         const nullCount = (text.match(/\0/g) || []).length;
         if (nullCount > text.length * 0.01) {
           return {
@@ -143,17 +142,20 @@ export async function processFile(
           truncated,
           display: { icon: "unknown", label: "File" },
         };
-      } catch {
-        return {
-          fileType: "unknown",
-          originalName: filename,
-          mimeType,
-          size: buffer.length,
-          textContent: "[Binary file — content cannot be displayed as text.]",
-          display: { icon: "unknown", label: "File" },
-        };
       }
     }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const ext = filename.split(".").pop()?.toUpperCase() || "File";
+    return {
+      fileType: fileType === "unknown" ? "unknown" : fileType,
+      originalName: filename,
+      mimeType,
+      size: buffer.length,
+      textContent: `[Failed to process file: ${filename}]`,
+      note: `Processing error: ${msg}`,
+      display: { icon: fileType === "unknown" ? "unknown" : fileType, label: ext },
+    };
   }
 }
 

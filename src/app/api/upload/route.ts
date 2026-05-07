@@ -31,11 +31,25 @@ export async function POST(req: Request) {
   try {
     await getCurrentUserId();
 
-    const formData = await req.formData();
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return Response.json({ error: "Invalid form data" }, { status: 400 });
+    }
+
     const file = formData.get("file") as File | null;
 
     if (!file) {
       return Response.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    if (!file.name || file.name.trim() === "") {
+      return Response.json({ error: "File has no name" }, { status: 400 });
+    }
+
+    if (file.size === 0) {
+      return Response.json({ error: "File is empty" }, { status: 400 });
     }
 
     if (file.size > MAX_UPLOAD_SIZE) {
@@ -45,7 +59,13 @@ export async function POST(req: Request) {
       );
     }
 
-    let buffer: Buffer = Buffer.from(await file.arrayBuffer());
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(await file.arrayBuffer());
+    } catch {
+      return Response.json({ error: "Failed to read file data" }, { status: 400 });
+    }
+
     let fileName = file.name;
     let fileType = file.type;
 
