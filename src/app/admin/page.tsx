@@ -52,10 +52,14 @@ interface AdminStats {
   totalConversations: number;
   activeUsers: number;
   bannedUsers: number;
-  totalCostUsd: number;
-  totalCostCny: number;
-  totalRevenueCny: number;
-  marginCny: number;
+  totalApiCostUsd: number;
+  totalApiCostCny: number;
+  adminApiCostUsd: number;
+  adminApiCostCny: number;
+  userApiCostUsd: number;
+  userApiCostCny: number;
+  userRevenueCny: number;
+  profitCny: number;
   totalPaidCny: number;
   totalPaidOrders: number;
 }
@@ -534,64 +538,95 @@ export default function AdminPage() {
 
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
-            <StatCard
-              icon={Users}
-              label="Users"
-              value={stats.totalUsers.toString()}
-              subtitle={
-                stats.bannedUsers > 0 ? (
-                  <span className="text-destructive">
-                    {stats.bannedUsers} banned
+          <div className="mb-8 space-y-3">
+            {/* Row 1: Users */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard
+                icon={Users}
+                label="Users"
+                value={stats.totalUsers.toString()}
+                subtitle={
+                  stats.bannedUsers > 0 ? (
+                    <span className="text-destructive">
+                      {stats.bannedUsers} banned
+                    </span>
+                  ) : undefined
+                }
+              />
+              <StatCard
+                icon={Activity}
+                label="Active (30d)"
+                value={stats.activeUsers.toString()}
+                subtitle={
+                  <span className="text-muted-foreground/50">
+                    {stats.totalConversations} chats
                   </span>
-                ) : undefined
-              }
-            />
-            <StatCard
-              icon={Activity}
-              label="Active (30d)"
-              value={stats.activeUsers.toString()}
-              subtitle={
-                <span className="text-muted-foreground/50">
-                  {stats.totalConversations} chats
-                </span>
-              }
-            />
-            <StatCard
-              icon={TrendingUp}
-              label="API Cost"
-              value={`¥${stats.totalCostCny.toFixed(2)}`}
-              subtitle={
-                <span className="text-muted-foreground/50">
-                  ${stats.totalCostUsd.toFixed(4)}
-                </span>
-              }
-            />
-            <StatCard
-              icon={CreditCard}
-              label="Charged"
-              value={`¥${stats.totalRevenueCny.toFixed(2)}`}
-              subtitle={
-                <span
-                  className={
-                    stats.marginCny >= 0 ? "text-green-500" : "text-red-500"
-                  }
-                >
-                  {stats.marginCny >= 0 ? "+" : ""}¥
-                  {stats.marginCny.toFixed(2)}
-                </span>
-              }
-            />
-            <StatCard
-              icon={Wallet}
-              label="Payments"
-              value={`¥${stats.totalPaidCny.toFixed(2)}`}
-              subtitle={
-                <span className="text-muted-foreground/50">
-                  {stats.totalPaidOrders} orders
-                </span>
-              }
-            />
+                }
+              />
+              <StatCard
+                icon={Wallet}
+                label="Received"
+                value={`¥${stats.totalPaidCny.toFixed(2)}`}
+                subtitle={
+                  <span className="text-muted-foreground/50">
+                    {stats.totalPaidOrders} orders
+                  </span>
+                }
+              />
+              <StatCard
+                icon={Receipt}
+                label="Profit"
+                value={`¥${stats.profitCny.toFixed(2)}`}
+                subtitle={
+                  <span className={stats.profitCny >= 0 ? "text-green-500" : "text-red-500"}>
+                    from paying users
+                  </span>
+                }
+              />
+            </div>
+            {/* Row 2: Cost breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard
+                icon={TrendingUp}
+                label="Total API Cost"
+                value={`¥${stats.totalApiCostCny.toFixed(2)}`}
+                subtitle={
+                  <span className="text-muted-foreground/50">
+                    ${stats.totalApiCostUsd.toFixed(4)}
+                  </span>
+                }
+              />
+              <StatCard
+                icon={Shield}
+                label="Admin Cost"
+                value={`¥${stats.adminApiCostCny.toFixed(2)}`}
+                subtitle={
+                  <span className="text-muted-foreground/50">
+                    ${stats.adminApiCostUsd.toFixed(4)} (free)
+                  </span>
+                }
+              />
+              <StatCard
+                icon={CreditCard}
+                label="User API Cost"
+                value={`¥${stats.userApiCostCny.toFixed(2)}`}
+                subtitle={
+                  <span className="text-muted-foreground/50">
+                    ${stats.userApiCostUsd.toFixed(4)}
+                  </span>
+                }
+              />
+              <StatCard
+                icon={CreditCard}
+                label="User Charged"
+                value={`¥${stats.userRevenueCny.toFixed(2)}`}
+                subtitle={
+                  <span className={stats.userRevenueCny - stats.userApiCostCny >= 0 ? "text-green-500" : "text-red-500"}>
+                    margin ¥{(stats.userRevenueCny - stats.userApiCostCny).toFixed(2)}
+                  </span>
+                }
+              />
+            </div>
           </div>
         )}
 
