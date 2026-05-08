@@ -62,6 +62,7 @@ export const en = {
   "model.loadingModels": "Loading models...",
   "model.noModels": "No models found.",
   "model.recent": "Recent",
+  "model.recommended": "Recommended",
   "model.free": "Free",
   "model.selectModelTitle": "Select Model",
   "model.selectModelDesc": "Search and select an AI model",

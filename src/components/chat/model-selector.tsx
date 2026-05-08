@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronsUpDown, Zap, Eye, Lock } from "lucide-react";
+import { ChevronsUpDown, Zap, Eye, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   CommandDialog,
@@ -12,7 +12,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import { useModels } from "@/hooks/use-models";
+import { useModels, type CuratedModel, type Model } from "@/hooks/use-models";
 import { useCredits } from "@/hooks/use-credits";
 import { USD_TO_CNY, formatCNY } from "@/lib/currency";
 import { useI18n } from "@/hooks/use-i18n";
@@ -46,10 +46,39 @@ function saveRecentModel(modelId: string) {
   }
 }
 
+function IntelligenceDots({ level }: { level: number }) {
+  return (
+    <span className="text-[10px] tracking-tight text-muted-foreground/50" title={`Intelligence: ${level}/5`}>
+      {"●".repeat(level)}
+      {"○".repeat(5 - level)}
+    </span>
+  );
+}
+
+function CostIndicator({ level }: { level: number }) {
+  const colors = ["text-green-500/70", "text-amber-500/70", "text-orange-500/70"];
+  const labels = ["Budget", "Moderate", "Premium"];
+  return (
+    <span className={`text-[10px] font-medium ${colors[level - 1]}`} title={labels[level - 1]}>
+      {"$".repeat(level)}
+    </span>
+  );
+}
+
 export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [lockedModelId, setLockedModelId] = useState<string | null>(null);
-  const { providers, allModels, isLoading } = useModels();
+  const {
+    curatedModels,
+    hasCurated,
+    providers,
+    allModels,
+    showAll,
+    expandAll,
+    collapseAll,
+    isLoading,
+    total,
+  } = useModels();
   const { creditBalance, isZero } = useCredits();
   const { t } = useI18n();
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -70,36 +99,40 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
   }, []);
 
   const selectedModel = useMemo(
-    () => allModels.find((m) => m.id === value),
-    [allModels, value]
+    () =>
+      curatedModels.find((m) => m.id === value) ||
+      allModels.find((m) => m.id === value),
+    [curatedModels, allModels, value]
   );
 
   const displayName = selectedModel?.name || value.split("/").pop() || t("model.selectModel");
 
   const recentModels = useMemo(() => {
+    const all = [...curatedModels, ...allModels];
     return recentIds
-      .map((id) => allModels.find((m) => m.id === id))
-      .filter(Boolean) as typeof allModels;
-  }, [recentIds, allModels]);
+      .map((id) => all.find((m) => m.id === id))
+      .filter(Boolean) as Model[];
+  }, [recentIds, curatedModels, allModels]);
 
-
-  // Auto-select free model when balance hits zero
   useEffect(() => {
-    if (!isZero || !allModels.length) return;
-    const currentModel = allModels.find((m) => m.id === value);
+    if (!isZero) return;
+    const all = hasCurated ? curatedModels : allModels;
+    if (!all.length) return;
+    const currentModel = all.find((m) => m.id === value);
     if (currentModel && !currentModel.isFree) {
-      const bestFree = allModels.find((m) => m.isFree);
+      const bestFree = all.find((m) => m.isFree);
       if (bestFree) {
         onChange(bestFree.id);
         saveRecentModel(bestFree.id);
         setRecentIds(getRecentModels());
       }
     }
-  }, [isZero, allModels, value, onChange]);
+  }, [isZero, curatedModels, allModels, hasCurated, value, onChange]);
 
   const handleSelect = useCallback(
     (modelId: string) => {
-      const model = allModels.find((m) => m.id === modelId);
+      const all = [...curatedModels, ...allModels];
+      const model = all.find((m) => m.id === modelId);
       if (isZero && model && !model.isFree) {
         setLockedModelId(lockedModelId === modelId ? null : modelId);
         return;
@@ -110,44 +143,72 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
       setLockedModelId(null);
       setOpen(false);
     },
-    [onChange, allModels, isZero, lockedModelId]
+    [onChange, curatedModels, allModels, isZero, lockedModelId]
   );
-
-  const formatPrice = (price: number) => {
-    if (price === 0) return t("model.free");
-    const cny = price * 1_000_000 * USD_TO_CNY;
-    return `¥${cny.toFixed(2)}/M`;
-  };
 
   const estimatePerMessage = (promptPrice: number, completionPrice: number) => {
     const cost = (1000 * promptPrice + 500 * completionPrice) * USD_TO_CNY;
     return formatCNY(cost);
   };
 
-  const ModelBadges = ({ model }: { model: { isFree: boolean; supportsVision?: boolean } }) => (
-    <>
-      {model.supportsVision && (
-        <Badge
-          variant="secondary"
-          className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-blue-500/10 text-blue-500 border-0"
-        >
-          <Eye className="h-2.5 w-2.5" />
-          Vision
-        </Badge>
-      )}
-      {model.isFree && (
-        <Badge
-          variant="secondary"
-          className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
-        >
-          <Zap className="h-2.5 w-2.5" />
-          {t("model.free")}
-        </Badge>
-      )}
-    </>
-  );
+  const renderCuratedItem = (model: CuratedModel) => {
+    const isPaid = !model.isFree;
+    const isLocked = isZero && isPaid;
+    const isShowingLockMsg = lockedModelId === model.id;
 
-  const renderModelItem = (model: typeof allModels[0], keyPrefix: string) => {
+    return (
+      <div key={`curated-${model.id}`}>
+        <CommandItem
+          value={model.id}
+          onSelect={() => handleSelect(model.id)}
+          data-checked={value === model.id ? "true" : undefined}
+          className={isLocked ? "opacity-50" : ""}
+        >
+          <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {isLocked && <Lock className="h-2.5 w-2.5 shrink-0 text-muted-foreground/40" />}
+              <span className="truncate text-xs">{model.name}</span>
+              {model.category && (
+                <Badge
+                  variant="secondary"
+                  className="text-[9px] px-1 py-0 h-4 font-normal bg-muted text-muted-foreground border-0"
+                >
+                  {model.category}
+                </Badge>
+              )}
+              {model.supportsVision && (
+                <Eye className="h-2.5 w-2.5 text-blue-500/60 shrink-0" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <IntelligenceDots level={model.intelligenceLevel} />
+              {model.isFree ? (
+                <span className="text-[10px] font-medium text-green-500/70">Free</span>
+              ) : (
+                <CostIndicator level={model.costLevel} />
+              )}
+            </div>
+          </div>
+        </CommandItem>
+        {isShowingLockMsg && (
+          <div className="mx-2 mb-1 rounded-md bg-muted/50 px-3 py-2 text-[11px] text-muted-foreground">
+            <span>{t("credit.paidModelLocked")}</span>
+            <span className="mx-1 text-muted-foreground/40">·</span>
+            <span>{t("credit.estimatedCost").replace("{cost}", estimatePerMessage(model.pricing.prompt, model.pricing.completion))}</span>
+            <Link
+              href="/settings#credits"
+              onClick={() => setOpen(false)}
+              className="ml-1.5 text-primary font-medium hover:underline"
+            >
+              {t("credit.topUp")}
+            </Link>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderModelItem = (model: Model, keyPrefix: string) => {
     const isPaid = !model.isFree;
     const isLocked = isZero && isPaid;
     const isShowingLockMsg = lockedModelId === model.id;
@@ -162,15 +223,21 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
         >
           <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-1.5 min-w-0">
+              {isLocked && <Lock className="h-2.5 w-2.5 shrink-0 text-muted-foreground/40" />}
               <span className="truncate text-xs">{model.name}</span>
-              <ModelBadges model={model} />
+              {model.supportsVision && (
+                <Eye className="h-2.5 w-2.5 text-blue-500/60 shrink-0" />
+              )}
+              {model.isFree && (
+                <Badge
+                  variant="secondary"
+                  className="text-[9px] px-1 py-0 h-4 gap-0.5 font-medium bg-primary/10 text-primary border-0"
+                >
+                  <Zap className="h-2.5 w-2.5" />
+                  Free
+                </Badge>
+              )}
             </div>
-            {isPaid && (
-              <span className="shrink-0 text-[11px] text-muted-foreground/40 tabular-nums flex items-center gap-1">
-                {isLocked && <Lock className="h-2.5 w-2.5" />}
-                {formatPrice(model.pricing.prompt)}
-              </span>
-            )}
           </div>
         </CommandItem>
         {isShowingLockMsg && (
@@ -203,7 +270,7 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
 
       <CommandDialog
         open={open}
-        onOpenChange={(v) => { setOpen(v); if (!v) setLockedModelId(null); }}
+        onOpenChange={(v) => { setOpen(v); if (!v) { setLockedModelId(null); collapseAll(); } }}
         title={t("model.selectModelTitle")}
         description={t("model.selectModelDesc")}
         className="sm:max-w-[480px]"
@@ -233,18 +300,51 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
               {isLoading ? t("model.loadingModels") : t("model.noModels")}
             </CommandEmpty>
 
-            {recentModels.length > 0 && (
+            {recentModels.length > 0 && !showAll && (
               <CommandGroup heading={t("model.recent")}>
                 {recentModels.map((model) => renderModelItem(model, "recent"))}
               </CommandGroup>
             )}
 
-            {providers.map((provider) => (
+            {hasCurated && !showAll && (
+              <CommandGroup heading={t("model.recommended") || "Recommended"}>
+                {curatedModels.map((model) => renderCuratedItem(model))}
+              </CommandGroup>
+            )}
+
+            {!hasCurated && !showAll && providers.map((provider) => (
+              <CommandGroup key={provider.name} heading={provider.name}>
+                {provider.models.map((model) => renderModelItem(model, provider.name))}
+              </CommandGroup>
+            ))}
+
+            {showAll && providers.map((provider) => (
               <CommandGroup key={provider.name} heading={provider.name}>
                 {provider.models.map((model) => renderModelItem(model, provider.name))}
               </CommandGroup>
             ))}
           </CommandList>
+
+          {hasCurated && (
+            <div className="border-t border-border/40">
+              <button
+                onClick={() => showAll ? collapseAll() : expandAll()}
+                className="flex w-full items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              >
+                {showAll ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" />
+                    Show recommended only
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    View all {total}+ models
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </Command>
       </CommandDialog>
     </>

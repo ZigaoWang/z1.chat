@@ -64,6 +64,7 @@ export const zh: Record<TranslationKey, string> = {
   "model.loadingModels": "加载模型中...",
   "model.noModels": "未找到模型。",
   "model.recent": "最近使用",
+  "model.recommended": "推荐",
   "model.free": "免费",
   "model.selectModelTitle": "选择模型",
   "model.selectModelDesc": "搜索并选择一个 AI 模型",

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import ModelCuration from "./model-curation";
 
 interface AdminUser {
   id: string;
@@ -725,6 +726,9 @@ export default function AdminPage() {
             )}
           </div>
         </section>
+
+        {/* Model Curation */}
+        <ModelCuration />
 
         {/* Users */}
         <section>

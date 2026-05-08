@@ -364,6 +364,31 @@ export const artifactVersions = pgTable(
   ]
 );
 
+// Curated Models
+export const curatedModels = pgTable(
+  "curated_models",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    modelId: text("model_id").notNull().unique(),
+    displayName: text("display_name"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    intelligenceLevel: integer("intelligence_level").notNull().default(3),
+    costLevel: integer("cost_level").notNull().default(2),
+    category: text("category"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("curated_models_sort_order_idx").on(table.sortOrder),
+    index("curated_models_enabled_idx").on(table.enabled),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),

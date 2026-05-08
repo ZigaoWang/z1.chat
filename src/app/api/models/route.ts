@@ -1,9 +1,53 @@
 import { getCachedModels, type OpenRouterModel } from "@/lib/models-cache";
+import { db } from "@/lib/db";
+import { curatedModels } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const showAll = url.searchParams.get("all") === "true";
     const chatModels = await getCachedModels();
-    return Response.json(formatModels(chatModels));
+
+    if (showAll) {
+      return Response.json(formatModels(chatModels));
+    }
+
+    const curated = await db
+      .select()
+      .from(curatedModels)
+      .where(eq(curatedModels.enabled, true))
+      .orderBy(asc(curatedModels.sortOrder));
+
+    if (curated.length === 0) {
+      return Response.json({ ...formatModels(chatModels), hasCurated: false });
+    }
+
+    const curatedResult = curated
+      .map((cm) => {
+        const live = chatModels.find((m) => m.id === cm.modelId);
+        if (!live) return null;
+        const promptPrice = parseFloat(live.pricing.prompt) || 0;
+        const completionPrice = parseFloat(live.pricing.completion) || 0;
+        return {
+          id: live.id,
+          name: cm.displayName || live.name,
+          contextLength: live.context_length,
+          pricing: { prompt: promptPrice, completion: completionPrice },
+          isFree: promptPrice === 0 && completionPrice === 0,
+          supportsVision: (live.architecture?.input_modalities || []).includes("image"),
+          intelligenceLevel: cm.intelligenceLevel,
+          costLevel: cm.costLevel,
+          category: cm.category,
+        };
+      })
+      .filter(Boolean);
+
+    return Response.json({
+      curated: curatedResult,
+      total: chatModels.length,
+      hasCurated: true,
+    });
   } catch (error) {
     console.error("Fetch models error:", error);
     return Response.json({ error: "Failed to fetch models" }, { status: 500 });
@@ -38,10 +82,7 @@ function formatModels(models: OpenRouterModel[]) {
       name: model.name,
       description: model.description,
       contextLength: model.context_length,
-      pricing: {
-        prompt: promptPrice,
-        completion: completionPrice,
-      },
+      pricing: { prompt: promptPrice, completion: completionPrice },
       isFree: promptPrice === 0 && completionPrice === 0,
       supportsVision: inputModalities.includes("image"),
     });

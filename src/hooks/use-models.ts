@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { DEFAULT_MODEL } from "@/lib/constants";
 
-interface Model {
+export interface Model {
   id: string;
   name: string;
   description?: string;
@@ -13,12 +13,18 @@ interface Model {
   supportsVision: boolean;
 }
 
+export interface CuratedModel extends Model {
+  intelligenceLevel: number;
+  costLevel: number;
+  category: string | null;
+}
+
 interface Provider {
   name: string;
   models: Model[];
 }
 
-interface ModelsData {
+interface AllModelsData {
   providers: Provider[];
   total: number;
 }
@@ -26,22 +32,33 @@ interface ModelsData {
 const STORAGE_KEY = "z1:last-model";
 
 export function useModels() {
-  const [data, setData] = useState<ModelsData | null>(null);
+  const [curatedModels, setCuratedModels] = useState<CuratedModel[]>([]);
+  const [allData, setAllData] = useState<AllModelsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+  const [hasCurated, setHasCurated] = useState(false);
+  const [total, setTotal] = useState(0);
 
-  // Sync from localStorage after mount (avoids hydration mismatch)
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) setSelectedModel(stored);
   }, []);
 
-  const fetchModels = useCallback(async () => {
+  const fetchCurated = useCallback(async () => {
     try {
       const res = await fetch("/api/models");
       if (res.ok) {
         const json = await res.json();
-        setData(json);
+        if (json.hasCurated) {
+          setCuratedModels(json.curated);
+          setHasCurated(true);
+          setTotal(json.total);
+        } else {
+          setAllData(json);
+          setHasCurated(false);
+          setTotal(json.total);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch models:", error);
@@ -51,27 +68,48 @@ export function useModels() {
   }, []);
 
   useEffect(() => {
-    fetchModels();
-  }, [fetchModels]);
+    fetchCurated();
+  }, [fetchCurated]);
+
+  const expandAll = useCallback(async () => {
+    setShowAll(true);
+    if (!allData) {
+      try {
+        const res = await fetch("/api/models?all=true");
+        if (res.ok) {
+          const json = await res.json();
+          setAllData(json);
+        }
+      } catch (error) {
+        console.error("Failed to fetch all models:", error);
+      }
+    }
+  }, [allData]);
+
+  const collapseAll = useCallback(() => setShowAll(false), []);
 
   const selectModel = useCallback((modelId: string) => {
     setSelectedModel(modelId);
     localStorage.setItem(STORAGE_KEY, modelId);
   }, []);
 
-  // Flatten all models for search
-  const allModels = data?.providers.flatMap((p) => p.models) || [];
-
-  // Find current model info
-  const currentModel = allModels.find((m) => m.id === selectedModel);
+  const allModels = allData?.providers.flatMap((p) => p.models) || [];
+  const currentModel =
+    curatedModels.find((m) => m.id === selectedModel) ||
+    allModels.find((m) => m.id === selectedModel);
 
   return {
-    providers: data?.providers || [],
+    curatedModels,
+    hasCurated,
+    providers: allData?.providers || [],
     allModels,
+    showAll,
+    expandAll,
+    collapseAll,
     selectedModel,
     selectModel,
     currentModel,
     isLoading,
-    total: data?.total || 0,
+    total,
   };
 }
