@@ -208,7 +208,8 @@ function ChatMessages({
   }, [isViewingOldBranch, onViewingOldBranch]);
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto">
+    <div className="relative flex-1 overflow-hidden">
+      <div ref={containerRef} onScroll={handleScroll} className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl pt-6 pb-4">
         {visibleSlots.map((slot, slotIdx) => {
           if (slot.type === "user-edit-group") {
@@ -285,10 +286,11 @@ function ChatMessages({
         {/* Typing indicator — visible when waiting for first token */}
         {showTypingIndicator && <ThinkingIndicator />}
       </div>
+      </div>
 
       {showScrollBtn && (
         <button onClick={scrollToBottom}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <ArrowDown className="h-3.5 w-3.5" />
         </button>
       )}
