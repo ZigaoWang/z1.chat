@@ -126,6 +126,7 @@ export const zh: Record<TranslationKey, string> = {
   "memory.delete": "删除",
   "memory.noMemories": "还没有记忆。开始聊天后，我会记住关于你的重要信息。",
   "memory.deleted": "记忆已删除",
+  "memory.updated": "记忆已更新",
   "memory.failedToDelete": "删除记忆失败",
   "memory.allCleared": "已清除全部记忆",
   "memory.failedToClear": "清除记忆失败",
@@ -137,6 +138,8 @@ export const zh: Record<TranslationKey, string> = {
   "memory.projects": "项目",
   "memory.style": "沟通风格",
   "memory.facts": "事实",
+  "memory.chatPlaceholder": "更新或删除记忆...",
+  "memory.chatError": "处理请求失败",
 
   // Usage
   "usage.title": "用量",
@@ -159,6 +162,7 @@ export const zh: Record<TranslationKey, string> = {
   "usage.type.search": "搜索",
   "usage.type.sandbox": "沙盒",
   "usage.type.code_execute": "代码执行",
+  "usage.type.memory_chat": "记忆管理",
 
   // Credits
   "credits.title": "余额",

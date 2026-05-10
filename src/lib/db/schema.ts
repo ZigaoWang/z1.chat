@@ -48,6 +48,7 @@ export const users = pgTable("users", {
     language: null,
     customInstructions: null,
   }),
+  memoryDocument: text("memory_document"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -363,6 +364,15 @@ export const artifactVersions = pgTable(
     index("artifact_versions_artifact_id_idx").on(table.artifactId),
   ]
 );
+
+// System Settings (key-value store for admin-configurable settings)
+export const systemSettings = pgTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // Curated Models
 export const curatedModels = pgTable(

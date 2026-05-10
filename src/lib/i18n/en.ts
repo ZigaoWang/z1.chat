@@ -124,6 +124,7 @@ export const en = {
   "memory.delete": "Delete",
   "memory.noMemories": "No memories yet. Start chatting and I'll remember important details about you.",
   "memory.deleted": "Memory deleted",
+  "memory.updated": "Memory updated",
   "memory.failedToDelete": "Failed to delete memory",
   "memory.allCleared": "All memories cleared",
   "memory.failedToClear": "Failed to clear memories",
@@ -135,6 +136,8 @@ export const en = {
   "memory.projects": "Projects",
   "memory.style": "Communication Style",
   "memory.facts": "Facts",
+  "memory.chatPlaceholder": "Update or remove memories...",
+  "memory.chatError": "Failed to process request",
 
   // Usage
   "usage.title": "Usage",
@@ -157,6 +160,7 @@ export const en = {
   "usage.type.search": "Search",
   "usage.type.sandbox": "Sandbox",
   "usage.type.code_execute": "Code Execute",
+  "usage.type.memory_chat": "Memory Management",
 
   // Credits
   "credits.title": "Credits",

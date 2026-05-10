@@ -1,17 +1,12 @@
 import { getOpenRouter, MEMORY_MODEL } from "./openrouter";
 import { db } from "./db";
-import { memories, conversations, messages, users } from "./db/schema";
-import { eq, desc, and, count, lt, sql } from "drizzle-orm";
-import { MAX_CONTEXT_MEMORIES, SUMMARY_UPDATE_INTERVAL } from "./constants";
+import { conversations, messages, users } from "./db/schema";
+import { eq, desc, and, count } from "drizzle-orm";
+import { SUMMARY_UPDATE_INTERVAL } from "./constants";
 import { trackedGenerateText } from "./usage-logger";
 
-// How many conversations between automatic memory consolidation runs
-const CONSOLIDATION_INTERVAL = 10;
-const MAX_RETRIES = 1;
-
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const ORGANIZE_INTERVAL = 10;
+const organizeCounters = new Map<string, number>();
 
 // ─── Layer 1: Conversation Summary ──────────────────────────────────
 
@@ -98,23 +93,33 @@ Keep it under 300 words. Be specific and info-dense. No filler. Update the exist
   }
 }
 
-// ─── Layer 2: User Memory ───────────────────────────────────────────
+// ─── Layer 2: User Memory Document ─────────────────────────────────
 
-interface ExtractedMemory {
-  category: "personal" | "preferences" | "projects" | "style" | "facts";
-  content: string;
-}
-
-interface DeduplicationAction {
-  action: "insert" | "update" | "merge" | "skip";
-  newContent: string;
-  existingId?: string;
-  category: string;
+/**
+ * Get the user's memory document.
+ */
+export async function getMemoryDocument(userId: string): Promise<string> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { memoryDocument: true },
+  });
+  return user?.memoryDocument || "";
 }
 
 /**
- * Extract durable user memories from a conversation exchange.
- * Runs async in the background, never blocks chat.
+ * Save the user's memory document.
+ */
+export async function setMemoryDocument(userId: string, content: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ memoryDocument: content, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+/**
+ * Extract memories from a conversation and append to the memory document.
+ * Runs async in the background after each assistant response.
+ * Only appends new facts — never rewrites or removes existing content.
  */
 export async function extractMemories(
   userId: string,
@@ -122,62 +127,35 @@ export async function extractMemories(
   userMessage: string,
   assistantMessage: string
 ): Promise<void> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const openrouter = getOpenRouter();
-      if (attempt === 0) {
-        console.log(`[memory] Extracting memories using model: ${MEMORY_MODEL}`);
-      } else {
-        console.log(`[memory] Retry attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
-      }
+  try {
+    const currentDoc = await getMemoryDocument(userId);
+    const openrouter = getOpenRouter();
 
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `You are a memory extraction system. Analyze this conversation and extract specific, concrete, durable facts that would be useful in FUTURE conversations.
+      system: `You extract durable facts about a user from conversations. Your job is to identify NEW information worth remembering that is NOT already in their memory document.
 
-Save things like:
-- User's name, age, location, school, job, company
-- Specific projects (name, tech stack, goals, URLs)
-- Tools, languages, and technologies they use
-- People they mention by name and relationship
-- Strong opinions or preferences they've explicitly stated
-- Hobbies, interests, side projects, creative pursuits
-- Equipment, gear, or tools they own or use (cameras, lenses, instruments, etc.)
-- Websites, blogs, social media they own or maintain
-- Knowledge topics they're actively learning or passionate about
-- Specific factual knowledge they demonstrated or discussed in depth
+Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
-IMPORTANT: Focus on CONCRETE facts, not vague style observations.
+Their current memory document:
+${currentDoc || "(empty)"}
 
-GOOD examples:
-- "Shoots Ferrania P30 black-and-white film"
-- "Interested in film photography"
-- "Uses a Leica M6 camera"
-- "Name is John, lives in Berlin"
-- "Building a Next.js chat app called z1.chat"
+Rules:
+- Only output NEW facts not already captured in the document above
+- Each fact is one short sentence, third person ("Uses React", "Lives in Berlin")
+- Only save durable facts: name, job, projects, tools, preferences, people, interests, plans with dates
+- Convert relative dates to absolute ("next week" → the actual date)
+- Do NOT save: conversation-specific context, vague style observations, things the user merely asked about, transient tasks
+- If nothing new is worth remembering, return exactly: NONE
 
-BAD examples — DO NOT SAVE these:
-- "Prefers short explanations" (vague style observation)
-- "Likes Wikipedia-style answers" (inferred communication style)
-- "Asked about film photography" (temporary context)
-- "Prefers concise responses" (vague)
-
-The "style" category should ONLY be used for EXPLICIT requests like "always respond in bullet points" or "use formal language with me". NEVER infer style from how the user phrases one question.
-
-Each memory must have:
-- category: "personal" | "preferences" | "projects" | "style" | "facts"
-- content: A concise, specific statement
-
-If nothing is worth saving long-term, return an empty array. Be very selective.
-
-Return valid JSON array only. No markdown, no explanation, no thinking.`,
+Return one fact per line. No bullets, no numbering, no explanation. Just the new facts or NONE.`,
       messages: [
         {
           role: "user",
-          content: `User: ${userMessage}\n\nAssistant: ${assistantMessage.slice(0, 3000)}`,
+          content: `User: ${userMessage}\nAssistant: ${assistantMessage.slice(0, 2000)}`,
         },
       ],
-      maxOutputTokens: 500,
+      maxOutputTokens: 300,
       temperature: 0.1,
     }, {
       userId,
@@ -188,456 +166,146 @@ Return valid JSON array only. No markdown, no explanation, no thinking.`,
 
     const cleaned = text
       .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .trim()
-      .replace(/^```json\n?|```$/g, "");
-    let extracted: ExtractedMemory[];
-    try {
-      extracted = JSON.parse(cleaned);
-    } catch {
+      .replace(/^```\w*\n?|```$/g, "")
+      .trim();
+
+    if (!cleaned || cleaned === "NONE" || cleaned === "(empty)") {
+      maybeOrganize(userId).catch(console.error);
       return;
     }
 
-    if (!Array.isArray(extracted) || extracted.length === 0) return;
+    const newDoc = currentDoc
+      ? `${currentDoc}\n${cleaned}`
+      : cleaned;
 
-    const existingMemories = await db
-      .select({
-        id: memories.id,
-        category: memories.category,
-        content: memories.content,
-      })
-      .from(memories)
-      .where(eq(memories.userId, userId));
-
-    for (const mem of extracted) {
-      if (!mem.content || !mem.category) continue;
-
-      const action = await deduplicateMemory(
-        mem,
-        existingMemories,
-        openrouter,
-        userId,
-        conversationId
-      );
-
-      switch (action.action) {
-        case "insert":
-          await db.insert(memories).values({
-            userId,
-            category: mem.category,
-            content: action.newContent,
-            sourceConversationId: conversationId,
-            relevanceScore: getCategoryRelevance(mem.category),
-          });
-          break;
-
-        case "update":
-        case "merge":
-          if (action.existingId) {
-            await db
-              .update(memories)
-              .set({
-                content: action.newContent,
-                sourceConversationId: conversationId,
-                updatedAt: new Date(),
-              })
-              .where(eq(memories.id, action.existingId));
-          }
-          break;
-
-        case "skip":
-          break;
-      }
-    }
-
-    // Trigger consolidation periodically
-    maybeConsolidate(userId).catch(console.error);
-    return; // Success — exit retry loop
+    await setMemoryDocument(userId, newDoc);
+    maybeOrganize(userId).catch(console.error);
   } catch (error) {
-    console.error(
-      `[memory] Extraction attempt ${attempt + 1} failed:`,
-      error instanceof Error ? error.message : error
-    );
-    if (attempt < MAX_RETRIES) {
-      await sleep(1500);
-    }
+    console.error("Memory extraction failed:", error);
   }
-  } // end retry loop
 }
 
 /**
- * Determine if a new memory is a duplicate, update, merge, or genuinely new.
+ * Immediately append to memory when user explicitly says "remember this".
  */
-async function deduplicateMemory(
-  newMem: ExtractedMemory,
-  existing: { id: string; category: string; content: string }[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  openrouter: any,
-  userId?: string,
-  conversationId?: string
-): Promise<DeduplicationAction> {
-  if (existing.length === 0) {
-    return { action: "insert", newContent: newMem.content, category: newMem.category };
-  }
-
-  const exactMatch = existing.find(
-    (e) => e.content.toLowerCase() === newMem.content.toLowerCase()
-  );
-  if (exactMatch) {
-    return { action: "skip", newContent: "", category: newMem.category };
-  }
-
-  const sameCategoryMemories = existing.filter(
-    (e) => e.category === newMem.category
-  );
-
-  if (sameCategoryMemories.length === 0) {
-    return { action: "insert", newContent: newMem.content, category: newMem.category };
-  }
-
-  const existingList = sameCategoryMemories
-    .map((e, i) => `[${i}] (id: ${e.id}) ${e.content}`)
-    .join("\n");
-
+export async function extractImmediateMemory(
+  userId: string,
+  conversationId: string,
+  userMessage: string
+): Promise<void> {
   try {
+    const currentDoc = await getMemoryDocument(userId);
+    const openrouter = getOpenRouter();
+
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `You are a memory deduplication system. Compare the new memory against existing memories and decide the action.
+      system: `The user explicitly asked you to remember something. Extract what they want remembered as one or two concise sentences in third person.
 
-Return JSON only:
-- {"action": "skip"} — if the new memory is already captured (same fact, different wording)
-- {"action": "update", "existingIndex": N, "mergedContent": "..."} — if the new memory contradicts or supersedes an existing one (e.g. user changed jobs). Provide the updated content.
-- {"action": "merge", "existingIndex": N, "mergedContent": "..."} — if the new memory adds detail to an existing one about the same topic. Provide the combined content.
-- {"action": "insert"} — if the new memory is genuinely new information
+Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
-Be conservative. When in doubt, insert rather than skip.`,
+Return just the fact(s) to add. No explanation, no markdown.`,
       messages: [
         {
           role: "user",
-          content: `Existing memories:\n${existingList}\n\nNew memory: ${newMem.content}`,
+          content: userMessage,
         },
       ],
       maxOutputTokens: 200,
-      temperature: 0,
-    }, {
-      userId: userId || "system",
-      conversationId,
-      type: "memory_dedup",
-      model: MEMORY_MODEL,
-    });
-
-    const result = JSON.parse(
-      text.replace(/<think>[\s\S]*?<\/think>/g, "").trim().replace(/^```json\n?|```$/g, "")
-    );
-
-    if (result.action === "skip") {
-      return { action: "skip", newContent: "", category: newMem.category };
-    }
-
-    if (
-      (result.action === "update" || result.action === "merge") &&
-      result.existingIndex !== undefined
-    ) {
-      const target = sameCategoryMemories[result.existingIndex];
-      if (target) {
-        return {
-          action: result.action,
-          newContent: result.mergedContent || newMem.content,
-          existingId: target.id,
-          category: newMem.category,
-        };
-      }
-    }
-
-    return { action: "insert", newContent: newMem.content, category: newMem.category };
-  } catch {
-    return { action: "insert", newContent: newMem.content, category: newMem.category };
-  }
-}
-
-function getCategoryRelevance(category: string): number {
-  switch (category) {
-    case "personal": return 1.0;
-    case "projects": return 0.9;
-    case "preferences": return 0.7;
-    case "style": return 0.6;
-    case "facts": return 0.5;
-    default: return 0.5;
-  }
-}
-
-// ─── Layer 3: Memory Consolidation (Human-like) ─────────────────────
-
-// Track conversation count for consolidation trigger (in-memory counter per user)
-const consolidationCounters = new Map<string, number>();
-
-/**
- * Check if it's time to consolidate, and do so if needed.
- * Runs every CONSOLIDATION_INTERVAL conversations per user.
- */
-async function maybeConsolidate(userId: string): Promise<void> {
-  const current = (consolidationCounters.get(userId) || 0) + 1;
-  consolidationCounters.set(userId, current);
-
-  if (current % CONSOLIDATION_INTERVAL !== 0) return;
-
-  await consolidateMemories(userId);
-}
-
-/**
- * Consolidate memories: merge similar ones, decay stale ones, rewrite messy ones,
- * delete trivial ones. Like a human brain during sleep — organize and clean up.
- *
- * This is the "forgetting + strengthening" pass that keeps memory lean and useful.
- */
-export async function consolidateMemories(userId: string): Promise<void> {
-  try {
-    const allMemories = await db
-      .select({
-        id: memories.id,
-        category: memories.category,
-        content: memories.content,
-        relevanceScore: memories.relevanceScore,
-        accessCount: memories.accessCount,
-        lastAccessedAt: memories.lastAccessedAt,
-        createdAt: memories.createdAt,
-        updatedAt: memories.updatedAt,
-      })
-      .from(memories)
-      .where(eq(memories.userId, userId))
-      .orderBy(desc(memories.relevanceScore));
-
-    if (allMemories.length < 5) return; // Not enough to bother
-
-    // Step 1: Decay stale memories (not accessed in 30+ days, low access count)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    for (const mem of allMemories) {
-      const isStale = !mem.lastAccessedAt || mem.lastAccessedAt < thirtyDaysAgo;
-      const isLowUse = (mem.accessCount || 0) < 3;
-      const isNotCritical = mem.category !== "personal";
-
-      if (isStale && isLowUse && isNotCritical) {
-        // Decay: reduce relevance score
-        const newScore = Math.max(0.1, (mem.relevanceScore || 0.5) - 0.15);
-        await db
-          .update(memories)
-          .set({ relevanceScore: newScore })
-          .where(eq(memories.id, mem.id));
-      }
-    }
-
-    // Step 2: Strengthen frequently accessed memories
-    for (const mem of allMemories) {
-      if ((mem.accessCount || 0) >= 5) {
-        const boost = Math.min(1.0, (mem.relevanceScore || 0.5) + 0.1);
-        if (boost > (mem.relevanceScore || 0.5)) {
-          await db
-            .update(memories)
-            .set({ relevanceScore: boost })
-            .where(eq(memories.id, mem.id));
-        }
-      }
-    }
-
-    // Step 3: Delete very low relevance memories (decayed to near-zero)
-    await db
-      .delete(memories)
-      .where(
-        and(
-          eq(memories.userId, userId),
-          lt(memories.relevanceScore, 0.15)
-        )
-      );
-
-    // Step 4: LLM-powered consolidation — merge, rewrite, clean up
-    // Re-fetch after decay/deletion
-    const remaining = await db
-      .select({
-        id: memories.id,
-        category: memories.category,
-        content: memories.content,
-        accessCount: memories.accessCount,
-        relevanceScore: memories.relevanceScore,
-      })
-      .from(memories)
-      .where(eq(memories.userId, userId))
-      .orderBy(desc(memories.relevanceScore));
-
-    if (remaining.length < 3) return;
-
-    const memoryList = remaining
-      .map((m, i) => `[${i}] (id: ${m.id}, category: ${m.category}, uses: ${m.accessCount || 0}, score: ${(m.relevanceScore || 0.5).toFixed(2)}) ${m.content}`)
-      .join("\n");
-
-    const openrouter = getOpenRouter();
-    const { text } = await trackedGenerateText({
-      model: openrouter(MEMORY_MODEL),
-      system: `You are a memory consolidation system, like a human brain organizing memories during sleep. Review all memories and return a list of actions to keep them clean, useful, and well-organized.
-
-Your goals:
-1. **Merge** memories about the same topic into one clear memory (e.g. two memories about the user's job → one comprehensive one)
-2. **Rewrite** awkwardly worded memories to be clearer and more natural
-3. **Delete** memories that are trivial, redundant after merging, or no longer useful
-4. **Keep** important identity, project, and preference memories untouched
-
-Rules:
-- Personal identity memories (name, job, location) are sacred — never delete, only improve wording
-- Frequently used memories (high "uses" count) are important — strengthen, don't delete
-- Merge related memories across categories if they're about the same topic
-- If two memories say basically the same thing, merge into the better one and delete the other
-- Rewrite should make memories sound natural and concise, like how a friend would remember facts about someone
-
-Return a JSON array of actions:
-- {"action": "merge", "keepIndex": N, "deleteIndex": M, "newContent": "merged content"}
-- {"action": "rewrite", "index": N, "newContent": "improved wording"}
-- {"action": "delete", "index": N, "reason": "why"}
-
-If everything looks good, return an empty array. Be judicious — don't change things that are already fine.
-
-Return valid JSON array only. No markdown.`,
-      messages: [
-        {
-          role: "user",
-          content: `All memories:\n${memoryList}`,
-        },
-      ],
-      maxOutputTokens: 800,
       temperature: 0.1,
     }, {
       userId,
-      type: "consolidation",
+      conversationId,
+      type: "immediate_memory",
       model: MEMORY_MODEL,
     });
 
     const cleaned = text
       .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .trim()
-      .replace(/^```json\n?|```$/g, "");
-    let actions: Array<{
-      action: string;
-      keepIndex?: number;
-      deleteIndex?: number;
-      index?: number;
-      newContent?: string;
-      reason?: string;
-    }>;
-    try {
-      actions = JSON.parse(cleaned);
-    } catch {
-      return;
-    }
+      .replace(/^```\w*\n?|```$/g, "")
+      .trim();
 
-    if (!Array.isArray(actions) || actions.length === 0) return;
+    if (!cleaned) return;
 
-    const deletedIds = new Set<string>();
+    const newDoc = currentDoc
+      ? `${currentDoc}\n${cleaned}`
+      : cleaned;
 
-    for (const act of actions) {
-      switch (act.action) {
-        case "merge": {
-          const keep = remaining[act.keepIndex!];
-          const del = remaining[act.deleteIndex!];
-          if (keep && del && !deletedIds.has(keep.id) && !deletedIds.has(del.id)) {
-            await db
-              .update(memories)
-              .set({
-                content: act.newContent || keep.content,
-                accessCount: (keep.accessCount || 0) + (del.accessCount || 0),
-                updatedAt: new Date(),
-              })
-              .where(eq(memories.id, keep.id));
-            await db.delete(memories).where(eq(memories.id, del.id));
-            deletedIds.add(del.id);
-          }
-          break;
-        }
-        case "rewrite": {
-          const mem = remaining[act.index!];
-          if (mem && act.newContent && !deletedIds.has(mem.id)) {
-            await db
-              .update(memories)
-              .set({ content: act.newContent, updatedAt: new Date() })
-              .where(eq(memories.id, mem.id));
-          }
-          break;
-        }
-        case "delete": {
-          const mem = remaining[act.index!];
-          if (mem && !deletedIds.has(mem.id)) {
-            // Don't delete personal memories
-            if (mem.category === "personal") break;
-            await db.delete(memories).where(eq(memories.id, mem.id));
-            deletedIds.add(mem.id);
-          }
-          break;
-        }
-      }
-    }
-
-    console.log(`Memory consolidation for user ${userId}: ${actions.length} actions applied`);
+    await setMemoryDocument(userId, newDoc);
   } catch (error) {
-    console.error("Memory consolidation failed:", error);
+    console.error("Immediate memory extraction failed:", error);
+  }
+}
+
+// ─── Auto-Organization ─────────────────────────────────────────────
+
+/**
+ * Silently reorganize the memory document every ORGANIZE_INTERVAL extractions.
+ * Merges duplicates, removes outdated info, improves wording.
+ */
+async function maybeOrganize(userId: string): Promise<void> {
+  const current = organizeCounters.get(userId) || 0;
+  const next = current + 1;
+  organizeCounters.set(userId, next);
+
+  if (next % ORGANIZE_INTERVAL !== 0) return;
+
+  const doc = await getMemoryDocument(userId);
+  if (!doc || doc.split("\n").filter(Boolean).length < 5) return;
+
+  const openrouter = getOpenRouter();
+  const { text } = await trackedGenerateText({
+    model: openrouter(MEMORY_MODEL),
+    system: `You are reorganizing a user's memory document. Rewrite it to be cleaner and more concise.
+
+Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+
+Rules:
+- Merge duplicate or near-duplicate facts into one
+- Remove facts that are clearly outdated (past events, expired plans)
+- Keep the same style: one fact per line, third person, concise
+- Do NOT add new information — only reorganize what's there
+- Do NOT remove facts that are still relevant (preferences, identity, ongoing projects)
+- Output the cleaned document directly. No explanation, no markdown fences.`,
+    messages: [{ role: "user", content: doc }],
+    maxOutputTokens: 1500,
+    temperature: 0.1,
+  }, {
+    userId,
+    type: "consolidation",
+    model: MEMORY_MODEL,
+  });
+
+  const cleaned = text
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/^```\w*\n?|```$/g, "")
+    .trim();
+
+  if (cleaned && cleaned.length > 10) {
+    await setMemoryDocument(userId, cleaned);
   }
 }
 
 // ─── Memory Injection ───────────────────────────────────────────────
 
 /**
- * Get relevant memories for injection into system prompt.
- * Also tracks access: bumps accessCount and lastAccessedAt for used memories.
+ * Get memory for injection into system prompt.
  */
 export async function getRelevantMemories(userId: string): Promise<string> {
   try {
-    const userMemories = await db
-      .select({
-        id: memories.id,
-        category: memories.category,
-        content: memories.content,
-        relevanceScore: memories.relevanceScore,
-      })
-      .from(memories)
-      .where(eq(memories.userId, userId))
-      .orderBy(desc(memories.relevanceScore), desc(memories.updatedAt))
-      .limit(MAX_CONTEXT_MEMORIES);
+    const doc = await getMemoryDocument(userId);
+    if (!doc) return "";
 
-    if (userMemories.length === 0) return "";
+    // Cap at ~2000 chars to keep prompt reasonable
+    const trimmed = doc.length > 2000 ? doc.slice(0, 2000) + "..." : doc;
 
-    const memoryLines: string[] = [];
-    const usedIds: string[] = [];
-
-    // Cap at ~400 tokens (~1600 chars)
-    let totalLen = 0;
-    for (const m of userMemories) {
-      const line = `- ${m.content}`;
-      if (totalLen + line.length > 1600) break;
-      memoryLines.push(line);
-      usedIds.push(m.id);
-      totalLen += line.length + 1;
-    }
-
-    if (memoryLines.length === 0) return "";
-
-    // Background: bump access count for injected memories
-    if (usedIds.length > 0) {
-      db.update(memories)
-        .set({
-          accessCount: sql`COALESCE(${memories.accessCount}, 0) + 1`,
-          lastAccessedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(memories.userId, userId),
-            sql`${memories.id} = ANY(${usedIds})`
-          )
-        )
-        .execute()
-        .catch(console.error);
-    }
-
-    return `\n\nAbout this user (from previous conversations):\n${memoryLines.join("\n")}\nUse this knowledge naturally. Don't announce that you remember things. Just be contextually aware.`;
+    return `\n\nAbout this user (from previous conversations):\n${trimmed}\nUse this knowledge naturally. Don't announce that you remember things. Just be contextually aware.`;
   } catch (error) {
     console.error("Failed to load memories:", error);
     return "";
   }
 }
+
+// ─── Helpers ────────────────────────────────────────────────────────
 
 /**
  * Get conversation summary for the current conversation.
@@ -698,70 +366,5 @@ export async function getUserPreferences(
   } catch (error) {
     console.error("Failed to load user preferences:", error);
     return "";
-  }
-}
-
-/**
- * Immediately extract a memory when user explicitly says "remember this".
- */
-export async function extractImmediateMemory(
-  userId: string,
-  conversationId: string,
-  userMessage: string
-): Promise<void> {
-  try {
-    const openrouter = getOpenRouter();
-
-    const { text } = await trackedGenerateText({
-      model: openrouter(MEMORY_MODEL),
-      system: `The user has explicitly asked you to remember something. Extract exactly what they want remembered as a memory.
-
-Return a JSON object with:
-- category: "personal", "preferences", "projects", "style", or "facts"
-- content: The specific thing to remember
-
-Return valid JSON only, no markdown.`,
-      messages: [
-        { role: "user", content: userMessage },
-      ],
-      maxOutputTokens: 200,
-      temperature: 0,
-    }, {
-      userId,
-      conversationId,
-      type: "immediate_memory",
-      model: MEMORY_MODEL,
-    });
-
-    const cleaned = text
-      .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .trim()
-      .replace(/^```json\n?|```$/g, "");
-    const mem: ExtractedMemory = JSON.parse(cleaned);
-
-    if (!mem.content || !mem.category) return;
-
-    const existing = await db
-      .select({ id: memories.id, content: memories.content })
-      .from(memories)
-      .where(
-        and(eq(memories.userId, userId), eq(memories.category, mem.category))
-      );
-
-    const isDuplicate = existing.some(
-      (e) => e.content.toLowerCase() === mem.content.toLowerCase()
-    );
-
-    if (!isDuplicate) {
-      await db.insert(memories).values({
-        userId,
-        category: mem.category,
-        content: mem.content,
-        sourceConversationId: conversationId,
-        relevanceScore: getCategoryRelevance(mem.category),
-      });
-    }
-  } catch (error) {
-    console.error("Immediate memory extraction failed:", error);
   }
 }

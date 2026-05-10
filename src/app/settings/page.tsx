@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   ArrowLeft,
-  Trash2,
-  Brain,
   Palette,
   User,
-  Pencil,
-  Check,
-  X,
-  AlertTriangle,
   Sun,
   Moon,
   Monitor,
-  MessageSquare,
   Sparkles,
   CreditCard,
   Activity,
@@ -26,16 +19,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useI18n } from "@/hooks/use-i18n";
-
-interface Memory {
-  id: string;
-  category: string;
-  content: string;
-  sourceConversationId: string | null;
-  sourceTitle: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+import MemorySection from "@/components/settings/memory-section";
 
 interface UserSettings {
   name: string | null;
@@ -73,31 +57,9 @@ interface UsageData {
   }>;
 }
 
-const categoryLabelKey: Record<string, string> = {
-  personal: "memory.personal",
-  preferences: "memory.preferences",
-  projects: "memory.projects",
-  style: "memory.style",
-  facts: "memory.facts",
-};
-
-const categoryIcon: Record<string, React.ElementType> = {
-  personal: User,
-  preferences: Palette,
-  projects: MessageSquare,
-  style: Sparkles,
-  facts: Brain,
-};
-
-const CATEGORY_ORDER = ["personal", "projects", "preferences", "style", "facts"];
-
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [editingMemory, setEditingMemory] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [customInstructions, setCustomInstructions] = useState("");
   const [instructionsSaved, setInstructionsSaved] = useState(true);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -126,13 +88,6 @@ export default function SettingsPage() {
         setCustomInstructions(data?.preferences?.customInstructions || "");
       })
       .catch(() => toast.error(t("settings.failedToLoad")));
-
-    fetch("/api/memories")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setMemories(data);
-      })
-      .catch(() => toast.error(t("memory.failedToLoad")));
 
     fetch("/api/usage")
       .then((r) => r.json())
@@ -201,62 +156,6 @@ export default function SettingsPage() {
     setInstructionsSaved(true);
   }, [customInstructions, updatePreference]);
 
-  const deleteMemory = useCallback(async (id: string) => {
-    try {
-      const res = await fetch("/api/memories", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (res.ok) {
-        setMemories((prev) => prev.filter((m) => m.id !== id));
-        toast.success(t("memory.deleted"));
-      }
-    } catch {
-      toast.error(t("memory.failedToDelete"));
-    }
-  }, [t]);
-
-  const clearAllMemories = useCallback(async () => {
-    try {
-      const res = await fetch("/api/memories", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clearAll: true }),
-      });
-      if (res.ok) {
-        setMemories([]);
-        setShowClearConfirm(false);
-        toast.success(t("memory.allCleared"));
-      }
-    } catch {
-      toast.error(t("memory.failedToClear"));
-    }
-  }, [t]);
-
-  const saveMemoryEdit = useCallback(
-    async (id: string) => {
-      try {
-        const res = await fetch("/api/memories", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, content: editContent }),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          setMemories((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, content: updated.content, updatedAt: updated.updatedAt } : m))
-          );
-          setEditingMemory(null);
-        toast.success(t("sidebar.renamed"));
-        }
-      } catch {
-        toast.error(t("memory.failedToUpdate"));
-      }
-    },
-    [editContent]
-  );
-
   const activeAmount = selectedAmount ?? (customAmount ? parseFloat(customAmount) : null);
 
   const handleTopUp = useCallback(async () => {
@@ -283,38 +182,6 @@ export default function SettingsPage() {
       setTopUpLoading(false);
     }
   }, [activeAmount, t]);
-
-  const groupedMemories = useMemo(() => {
-    const groups: Record<string, Memory[]> = {};
-    for (const cat of CATEGORY_ORDER) {
-      const catMemories = memories.filter((m) => m.category === cat);
-      if (catMemories.length > 0) {
-        groups[cat] = catMemories;
-      }
-    }
-    for (const m of memories) {
-      if (!CATEGORY_ORDER.includes(m.category)) {
-        if (!groups[m.category]) groups[m.category] = [];
-        if (!groups[m.category].some((gm) => gm.id === m.id)) {
-          groups[m.category].push(m);
-        }
-      }
-    }
-    return groups;
-  }, [memories]);
-
-  function formatDate(dateStr: string): string {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const isZh = locale === "zh";
-
-    if (diffDays === 0) return isZh ? "今天" : "Today";
-    if (diffDays === 1) return isZh ? "昨天" : "Yesterday";
-    if (diffDays < 7) return isZh ? `${diffDays} 天前` : `${diffDays} days ago`;
-    return d.toLocaleDateString(isZh ? "zh-CN" : "en-US", { month: "short", day: "numeric", year: "numeric" });
-  }
 
   return (
     <div className="min-h-full bg-background">
@@ -500,149 +367,7 @@ export default function SettingsPage() {
         </section>
 
         {/* Memory */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <SectionHeader icon={Brain} title={t("memory.title")} count={memories.length} />
-            {memories.length > 0 && !showClearConfirm && (
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted-foreground/50 transition-colors hover:text-destructive hover:bg-destructive/8"
-              >
-                <Trash2 className="h-3 w-3" />
-                {t("memory.clearAll")}
-              </button>
-            )}
-          </div>
-
-          {showClearConfirm && (
-            <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <span className="text-xs text-destructive">
-                  {t("memory.deleteAll").replace("{count}", String(memories.length))}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={clearAllMemories}
-                  className="rounded-lg bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
-                >
-                  {t("memory.delete")}
-                </button>
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="rounded-lg px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
-                >
-                  {t("memory.cancel")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {memories.length === 0 ? (
-            <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
-              <Brain className="mx-auto h-8 w-8 text-muted-foreground/15" />
-              <p className="mt-2 text-xs text-muted-foreground/40">
-                {t("memory.noMemories")}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {Object.entries(groupedMemories).map(([category, catMemories]) => {
-                const Icon = categoryIcon[category] || Brain;
-                return (
-                  <div key={category}>
-                    <div className="flex items-center gap-1.5 mb-2 px-1">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground/40" />
-                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                        {categoryLabelKey[category] ? t(categoryLabelKey[category] as "memory.personal") : category}
-                      </h3>
-                      <span className="text-[11px] text-muted-foreground/30">
-                        ({catMemories.length})
-                      </span>
-                    </div>
-                    <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
-                      {catMemories.map((memory) => (
-                        <div
-                          key={memory.id}
-                          className="group px-4 py-3"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 min-w-0">
-                              {editingMemory === memory.id ? (
-                                <div className="flex items-center gap-1.5">
-                                  <input
-                                    value={editContent}
-                                    onChange={(e) => setEditContent(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") saveMemoryEdit(memory.id);
-                                      if (e.key === "Escape") setEditingMemory(null);
-                                    }}
-                                    className="flex-1 rounded-md bg-muted/30 px-2 py-1 text-xs outline-none ring-1 ring-primary/30 focus:ring-primary/50"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => saveMemoryEdit(memory.id)}
-                                    className="text-muted-foreground hover:text-foreground"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingMemory(null)}
-                                    className="text-muted-foreground hover:text-foreground"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <p className="text-xs leading-relaxed">
-                                  {memory.content}
-                                </p>
-                              )}
-                              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/35">
-                                <span>{formatDate(memory.updatedAt || memory.createdAt)}</span>
-                                {memory.sourceTitle && memory.sourceConversationId && (
-                                  <>
-                                    <span>{"\u00B7"}</span>
-                                    <Link
-                                      href={`/?c=${memory.sourceConversationId}`}
-                                      className="hover:text-muted-foreground/60 transition-colors truncate max-w-[200px]"
-                                    >
-                                      {memory.sourceTitle}
-                                    </Link>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            {editingMemory !== memory.id && (
-                              <div className="hidden items-center gap-1 group-hover:flex shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setEditingMemory(memory.id);
-                                    setEditContent(memory.content);
-                                  }}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={() => deleteMemory(memory.id)}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-muted transition-colors"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        <MemorySection />
 
         {/* Usage */}
         <section className="mb-8">

@@ -13,6 +13,7 @@ type UsageType =
   | "memory_dedup"
   | "consolidation"
   | "immediate_memory"
+  | "memory_chat"
   | "compaction"
   | "search"
   | "code_execute"
