@@ -390,6 +390,7 @@ export async function POST(req: Request) {
     const allToolInvocations: Array<Record<string, any>> = [];
     let searchCallCount = 0;
     let sandboxCallCount = 0;
+    let accumulatedReasoning = "";
 
     // Periodically flush accumulated text to DB so stop/refresh preserves content
     let accumulatedText = "";
@@ -400,11 +401,11 @@ export async function POST(req: Request) {
       if (!assistantMessageId || accumulatedText.length <= lastSavedLen) return;
       lastSavedLen = accumulatedText.length;
       try {
-        const metadata = allToolInvocations.length > 0
-          ? { toolInvocations: allToolInvocations }
-          : undefined;
+        const metadata: Record<string, unknown> = {};
+        if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
+        if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
         await db.update(messages)
-          .set({ content: accumulatedText, metadata })
+          .set({ content: accumulatedText, metadata: Object.keys(metadata).length > 0 ? metadata : undefined })
           .where(eq(messages.id, assistantMessageId));
       } catch {
         // Non-fatal — onFinish will do final save
@@ -435,6 +436,10 @@ export async function POST(req: Request) {
         if (chunk.type === "text-delta" && chunk.text) {
           accumulatedText += chunk.text;
           scheduleFlush();
+        } else if (chunk.type === "reasoning-delta") {
+          const c = chunk as any;
+          const delta = c.text || c.delta || "";
+          if (delta) accumulatedReasoning += delta;
         }
       },
       onStepFinish: async ({ text, toolCalls, toolResults }) => {
@@ -460,11 +465,11 @@ export async function POST(req: Request) {
         try {
           if (assistantMessageId) {
             const content = stepText;
-            const metadata = allToolInvocations.length > 0
-              ? { toolInvocations: allToolInvocations }
-              : undefined;
+            const metadata: Record<string, unknown> = {};
+            if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
+            if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
             await db.update(messages)
-              .set({ content, metadata })
+              .set({ content, metadata: Object.keys(metadata).length > 0 ? metadata : undefined })
               .where(eq(messages.id, assistantMessageId));
           }
         } catch (err) {
@@ -473,10 +478,12 @@ export async function POST(req: Request) {
       },
       onAbort: async () => {
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-        if (assistantMessageId && accumulatedText.length > 0) {
+        if (assistantMessageId && (accumulatedText.length > 0 || accumulatedReasoning)) {
           try {
-            const metadata = allToolInvocations.length > 0 ? { toolInvocations: allToolInvocations } : undefined;
-            await db.update(messages).set({ content: accumulatedText, metadata }).where(eq(messages.id, assistantMessageId));
+            const metadata: Record<string, unknown> = {};
+            if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
+            if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
+            await db.update(messages).set({ content: accumulatedText, metadata: Object.keys(metadata).length > 0 ? metadata : undefined }).where(eq(messages.id, assistantMessageId));
           } catch (err) { console.error("[chat] Failed to save on abort:", err); }
         }
         if (sandboxManager) sandboxManager.kill().catch(console.error);
@@ -489,15 +496,15 @@ export async function POST(req: Request) {
 
         // Final update with complete text and token counts
         try {
-          const metadata = allToolInvocations.length > 0
-            ? { toolInvocations: allToolInvocations }
-            : undefined;
+          const metadata: Record<string, unknown> = {};
+          if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
+          if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
 
           if (assistantMessageId) {
             await db.update(messages)
               .set({
                 content: finalText,
-                metadata,
+                metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
               })

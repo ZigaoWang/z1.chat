@@ -13,6 +13,8 @@ interface Message {
   files?: { name: string; type: string; url: string; size?: number }[];
   toolInvocations?: ToolInvocation[];
   segments?: MessageSegment[];
+  thinking?: string;
+  isThinking?: boolean;
 }
 
 export type MessageSegment =
@@ -274,6 +276,8 @@ function ChatMessages({
               images={msg.images} files={msg.files} toolInvocations={msg.toolInvocations}
               segments={msg.segments}
               isStreaming={isStreaming && slotIdx === slots.length - 1 && msg.role === "assistant"}
+              isThinking={msg.isThinking}
+              thinking={msg.thinking}
               isLast={isLA} onRegenerate={isLA ? onRegenerate : (isLastUser && !isStreaming ? onRegenerate : undefined)}
               interrupted={isLA && !isStreaming && !!wasInterrupted}
               onOpenArtifact={onOpenArtifact}

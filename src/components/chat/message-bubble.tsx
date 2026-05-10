@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useEffect, useRef } from "react";
 import {
   RotateCcw,
   ChevronDown,
@@ -16,6 +16,7 @@ import {
   FileCode,
   FileSpreadsheet,
   File,
+  Sparkles,
 } from "lucide-react";
 import MarkdownRenderer from "./markdown-renderer";
 import { extractArtifacts } from "./artifact-preview";
@@ -46,6 +47,8 @@ interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
   content: string;
   isStreaming?: boolean;
+  isThinking?: boolean;
+  thinking?: string;
   model?: string | null;
   images?: string[];
   files?: { name: string; type: string; url: string; size?: number }[];
@@ -98,6 +101,53 @@ function useCopy() {
     setTimeout(() => setCopied(false), 2000);
   }, []);
   return { copied, copy };
+}
+
+// --- Thinking/Reasoning block (collapsible, like DeepSeek/Claude) ---
+function ThinkingBlock({ content, isActive }: { content: string; isActive?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isActive) {
+      if (!startRef.current) startRef.current = Date.now();
+      const timer = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startRef.current!) / 1000));
+      }, 1000);
+      return () => clearInterval(timer);
+    } else if (startRef.current) {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }
+  }, [isActive]);
+
+  const label = isActive
+    ? `Thinking${elapsed > 0 ? ` (${elapsed}s)` : "..."}`
+    : elapsed > 0
+      ? `Thought for ${elapsed}s`
+      : "Thought";
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors py-1"
+      >
+        {isActive ? (
+          <span className="h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" />
+        ) : (
+          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+        )}
+        <span className="font-medium">{label}</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${expanded || isActive ? "rotate-180" : ""}`} />
+      </button>
+      {(expanded || isActive) && content && (
+        <div className="mt-1 ml-5 border-l-2 border-border/40 pl-3 text-xs text-muted-foreground/50 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+          {content}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // --- Search status (clean, no spinning globe) ---
@@ -402,7 +452,7 @@ function VersionNav({ current, total, onChange }: { current: number; total: numb
 }
 
 function MessageBubble({
-  role, content, isStreaming, model, images, files, toolInvocations,
+  role, content, isStreaming, isThinking, thinking, model, images, files, toolInvocations,
   isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, interrupted, segments, versionCount, currentVersion, onVersionChange,
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -515,8 +565,13 @@ function MessageBubble({
   return (
     <div className="group px-4 py-2 animate-message-in">
       <div className="mx-auto max-w-3xl">
-        {/* Streaming placeholder — only when nothing to show yet */}
-        {isStreaming && !hasAnyContent && (
+        {/* Thinking/reasoning block */}
+        {thinking && (
+          <ThinkingBlock content={thinking} isActive={isThinking} />
+        )}
+
+        {/* Streaming placeholder — only when nothing to show yet and not thinking */}
+        {isStreaming && !hasAnyContent && !thinking && (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
@@ -578,7 +633,7 @@ function MessageBubble({
               return renderToolInline(seg.invocation);
             })}
             {/* Trailing dots — shows the AI is still working after tools/text */}
-            {isStreaming && (
+            {isStreaming && !isThinking && (
               <div className="flex items-center gap-1 mt-4 py-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
                 <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
