@@ -56,6 +56,7 @@ export const zh: Record<TranslationKey, string> = {
   "chat.error.rateLimit": "当前模型请求频率受限，请换一个模型或稍后再试。",
   "chat.error.unavailable": "该模型暂时不可用，请选择其他模型。",
   "chat.error.noCredits": "余额不足，请充值后继续使用。",
+  "chat.error.noResponse": "未收到回复，模型可能过载，请重试或切换模型。",
   "chat.error.generic": "出了点问题，请重试。",
 
   // Model selector

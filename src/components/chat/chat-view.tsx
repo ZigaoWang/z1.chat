@@ -147,6 +147,38 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
   const isLoading = status === "streaming" || status === "submitted";
 
+  // Timeout: if status stays "submitted" (no tokens arrive) for 30s, show error
+  const submittedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (submittedTimerRef.current) {
+      clearTimeout(submittedTimerRef.current);
+      submittedTimerRef.current = null;
+    }
+    if (status === "submitted") {
+      submittedTimerRef.current = setTimeout(() => {
+        stop();
+        const msgs = messagesRef.current;
+        const last = msgs[msgs.length - 1];
+        if (last?.role === "assistant") {
+          const content = last.parts
+            ?.filter((p: { type: string }) => p.type === "text")
+            .map((p: { type: string; text?: string }) => p.text || "")
+            .join("") || "";
+          if (!content.trim()) {
+            setMessages(msgs.slice(0, -1));
+          }
+        }
+        setChatError(t("chat.error.noResponse"));
+      }, 30000);
+    }
+    return () => {
+      if (submittedTimerRef.current) {
+        clearTimeout(submittedTimerRef.current);
+        submittedTimerRef.current = null;
+      }
+    };
+  }, [status, stop, t]);
+
   // Reset state when switching conversations
   const stopRef = useRef(stop);
   useEffect(() => { stopRef.current = stop; }, [stop]);

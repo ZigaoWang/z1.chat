@@ -54,6 +54,7 @@ export const en = {
   "chat.error.rateLimit": "This model is currently rate-limited. Try a different model or wait a moment.",
   "chat.error.unavailable": "This model is temporarily unavailable. Try a different model.",
   "chat.error.noCredits": "You've run out of credits. Please top up to continue.",
+  "chat.error.noResponse": "No response received. The model may be overloaded — try again or switch models.",
   "chat.error.generic": "Something went wrong. Please try again.",
 
   // Model selector
