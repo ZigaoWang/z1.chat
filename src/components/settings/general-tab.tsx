@@ -108,20 +108,23 @@ export default function GeneralTab({ settings, setSettings }: {
         </div>
       </div>
 
-      {/* Language */}
+      {/* UI Language */}
       <div>
-        <h3 className="text-sm font-medium mb-1">{t("settings.language")}</h3>
-        <p className="text-xs text-muted-foreground mb-3">{t("settings.languageDesc")}</p>
+        <h3 className="text-sm font-medium mb-1">
+          {locale === "zh" ? "界面语言" : "Interface language"}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          {locale === "zh" ? "设置界面显示语言" : "Language for buttons, labels, and menus"}
+        </p>
         <div className="flex gap-2">
           {([
-            { value: "en" as const, lang: "English", label: "English" },
-            { value: "zh" as const, lang: "Chinese", label: "中文" },
+            { value: "en" as const, label: "English" },
+            { value: "zh" as const, label: "中文" },
           ]).map((opt) => (
             <button
               key={opt.value}
               onClick={() => {
                 setLocale(opt.value);
-                updatePreference("language", opt.lang);
               }}
               className={`rounded-lg border px-4 py-2 text-sm transition-all ${
                 locale === opt.value
@@ -133,6 +136,40 @@ export default function GeneralTab({ settings, setSettings }: {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* AI Response Language */}
+      <div>
+        <h3 className="text-sm font-medium mb-1">
+          {locale === "zh" ? "AI 回复语言" : "AI response language"}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          {locale === "zh" ? "AI 默认使用的回复语言。设为「自动」时，AI 会使用你发送消息的语言回复。" : "Default language for AI responses. Set to \"Auto\" to match the language you write in."}
+        </p>
+        <select
+          value={settings?.preferences?.language || ""}
+          onChange={(e) => updatePreference("language", e.target.value || null)}
+          className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-primary/30 focus:ring-1 focus:ring-primary/10 transition-all"
+        >
+          <option value="">{locale === "zh" ? "自动（跟随输入语言）" : "Auto (match input language)"}</option>
+          <option value="English">English</option>
+          <option value="Chinese">中文</option>
+          <option value="Japanese">日本語</option>
+          <option value="Korean">한국어</option>
+          <option value="Spanish">Español</option>
+          <option value="French">Français</option>
+          <option value="German">Deutsch</option>
+          <option value="Portuguese">Português</option>
+          <option value="Russian">Русский</option>
+          <option value="Arabic">العربية</option>
+          <option value="Hindi">हिन्दी</option>
+          <option value="Italian">Italiano</option>
+          <option value="Dutch">Nederlands</option>
+          <option value="Turkish">Türkçe</option>
+          <option value="Vietnamese">Tiếng Việt</option>
+          <option value="Thai">ไทย</option>
+          <option value="Indonesian">Bahasa Indonesia</option>
+        </select>
       </div>
 
       {/* Response Style */}
