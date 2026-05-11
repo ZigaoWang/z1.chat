@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, User, Shield, CreditCard } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, Shield, CreditCard } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -368,11 +368,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2 space-y-0.5">
           {user && (
-            <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/70">
-              <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <User className="h-3 w-3" />
-              </div>
-              <span className="flex-1 truncate">{user.name || user.email}</span>
+            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs">
+              <span className="flex-1 truncate text-sm font-medium text-foreground/80">{user.name || user.email}</span>
               <Tooltip>
                 <TooltipTrigger
                   onClick={signOut}
@@ -399,17 +396,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
             )}
           </Link>
-          <ThemeToggle />
-          <Link href="/settings"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
-            <Settings className="h-3.5 w-3.5" /> {t("sidebar.settings")}
-          </Link>
-          {user?.role === "admin" && (
-            <Link href="/admin"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
-              <Shield className="h-3.5 w-3.5" /> {t("sidebar.admin")}
+          <div className="flex items-center gap-0.5 px-1">
+            <ThemeToggle />
+            <Link href="/settings"
+              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+              <Settings className="h-3.5 w-3.5" /> {t("sidebar.settings")}
             </Link>
-          )}
+            {user?.role === "admin" && (
+              <Link href="/admin"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
+                <Shield className="h-3.5 w-3.5" /> {t("sidebar.admin")}
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Resize handle — hidden on mobile where sidebar is an overlay */}
