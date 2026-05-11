@@ -1,6 +1,6 @@
 import { getCurrentUserId } from "@/lib/auth";
-import { getOpenRouter, MEMORY_MODEL } from "@/lib/openrouter";
-import { trackedGenerateText } from "@/lib/usage-logger";
+import { getOpenRouter, ORGANIZE_MODEL } from "@/lib/openrouter";
+import { trackedStreamText } from "@/lib/usage-logger";
 import { getMemoryDocument, setMemoryDocument } from "@/lib/memory";
 
 export const maxDuration = 60;
@@ -17,12 +17,13 @@ export async function POST(req: Request) {
     const currentDoc = await getMemoryDocument(userId);
 
     if (!currentDoc && !message.toLowerCase().includes("add")) {
-      return Response.json({ summary: "No memories to manage.", document: "" });
+      return Response.json({ error: "No memories to manage." }, { status: 400 });
     }
 
     const openrouter = getOpenRouter();
-    const { text } = await trackedGenerateText({
-      model: openrouter(MEMORY_MODEL),
+
+    const result = trackedStreamText({
+      model: openrouter(ORGANIZE_MODEL),
       system: `You manage a user's memory document. The user will give you an instruction about their memories.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -30,11 +31,7 @@ Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: 
 Current memory document:
 ${currentDoc || "(empty)"}
 
-Based on the user's instruction, return a JSON object:
-{
-  "document": "the updated memory document text",
-  "summary": "Brief description of what you changed (1 sentence, same language as user)"
-}
+Based on the user's instruction, output the UPDATED memory document.
 
 Rules:
 - If the user asks to delete something, remove it from the document
@@ -42,45 +39,28 @@ Rules:
 - If the user asks to add something, append it naturally
 - If the user asks to organize/clean up, rewrite the document to be cleaner and remove outdated info
 - Keep the same concise style: one fact per sentence, third person
-- If no changes needed, return the document unchanged with an explanatory summary
-
-Return valid JSON only. No markdown fences, no explanation outside the JSON.`,
+- Output the updated document directly. No explanation, no markdown fences, no JSON wrapping.
+- If no changes needed, output the document unchanged.`,
       messages: [{ role: "user", content: message }],
       maxOutputTokens: 1500,
       temperature: 0.1,
+      onFinish: async (event) => {
+        const cleaned = event.text
+          .replace(/<think>[\s\S]*?<\/think>/g, "")
+          .replace(/^```\w*\n?|```$/g, "")
+          .trim();
+
+        if (cleaned) {
+          await setMemoryDocument(userId, cleaned);
+        }
+      },
     }, {
       userId,
       type: "memory_chat",
-      model: MEMORY_MODEL,
+      model: ORGANIZE_MODEL,
     });
 
-    let cleaned = text
-      .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .trim()
-      .replace(/^```(?:json)?\s*\n?/gm, "")
-      .replace(/\n?```\s*$/gm, "")
-      .trim();
-
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) cleaned = jsonMatch[0];
-
-    let result: { document: string; summary: string };
-
-    try {
-      result = JSON.parse(cleaned);
-    } catch {
-      console.error("[memory-chat] Failed to parse:", cleaned.slice(0, 500));
-      return Response.json({ summary: "Could not process the request. Try again.", document: currentDoc });
-    }
-
-    if (result.document !== undefined) {
-      await setMemoryDocument(userId, result.document);
-    }
-
-    return Response.json({
-      summary: result.summary || "Done",
-      document: result.document ?? currentDoc,
-    });
+    return result.toTextStreamResponse();
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Memory chat error:", errMsg);

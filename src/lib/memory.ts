@@ -1,4 +1,4 @@
-import { getOpenRouter, MEMORY_MODEL } from "./openrouter";
+import { getOpenRouter, MEMORY_MODEL, ORGANIZE_MODEL } from "./openrouter";
 import { db } from "./db";
 import { conversations, messages, users } from "./db/schema";
 import { eq, desc, and, count } from "drizzle-orm";
@@ -254,7 +254,7 @@ async function maybeOrganize(userId: string): Promise<void> {
 
   const openrouter = getOpenRouter();
   const { text } = await trackedGenerateText({
-    model: openrouter(MEMORY_MODEL),
+    model: openrouter(ORGANIZE_MODEL),
     system: `You are reorganizing a user's memory document. Rewrite it to be cleaner and more concise.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -272,7 +272,7 @@ Rules:
   }, {
     userId,
     type: "consolidation",
-    model: MEMORY_MODEL,
+    model: ORGANIZE_MODEL,
   });
 
   const cleaned = text

@@ -94,49 +94,89 @@ export default function MemorySection() {
         toast.error(err?.error || t("memory.chatError"));
         return;
       }
-      const data = await res.json();
-      if (data.document !== undefined) {
-        setDocument(data.document);
-        docRef.current = data.document;
-        setDirty(false);
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        toast.error(t("memory.chatError"));
+        return;
       }
-      setChatResult(data.summary);
+
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        const cleaned = accumulated
+          .replace(/<think>[\s\S]*?<\/think>/g, "")
+          .replace(/^```\w*\n?|```$/g, "")
+          .trim();
+        setDocument(cleaned);
+      }
+
+      const final = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/^```\w*\n?|```$/g, "")
+        .trim();
+      setDocument(final);
+      docRef.current = final;
+      setDirty(false);
+      setChatResult(locale === "zh" ? "已更新" : "Updated");
       setChatInput("");
     } catch {
       toast.error(t("memory.chatError"));
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, chatLoading, t]);
+  }, [chatInput, chatLoading, t, locale]);
 
   const handleOrganize = useCallback(async () => {
     if (chatLoading || !document.trim()) return;
     setChatLoading(true);
     setChatResult(null);
     try {
-      const res = await fetch("/api/memories/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "Organize and clean up my memories. Remove outdated or redundant info, improve wording, make it concise." }),
-      });
+      const res = await fetch("/api/memories/organize", { method: "POST" });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         toast.error(err?.error || t("memory.chatError"));
         return;
       }
-      const data = await res.json();
-      if (data.document !== undefined) {
-        setDocument(data.document);
-        docRef.current = data.document;
-        setDirty(false);
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        toast.error(t("memory.chatError"));
+        return;
       }
-      setChatResult(data.summary);
+
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        const cleaned = accumulated
+          .replace(/<think>[\s\S]*?<\/think>/g, "")
+          .replace(/^```\w*\n?|```$/g, "")
+          .trim();
+        setDocument(cleaned);
+      }
+
+      const final = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/^```\w*\n?|```$/g, "")
+        .trim();
+      setDocument(final);
+      docRef.current = final;
+      setDirty(false);
+      setChatResult(locale === "zh" ? "记忆已整理完成" : "Memories organized successfully");
     } catch {
       toast.error(t("memory.chatError"));
     } finally {
       setChatLoading(false);
     }
-  }, [chatLoading, document, t]);
+  }, [chatLoading, document, t, locale]);
 
   const wordCount = document.trim() ? document.trim().split(/\s+/).length : 0;
 
