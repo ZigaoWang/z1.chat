@@ -36,13 +36,15 @@ Based on the user's instruction, output the UPDATED memory document.
 Rules:
 - If the user asks to delete something, remove it from the document
 - If the user asks to update something, modify it in place
-- If the user asks to add something, append it naturally
-- If the user asks to organize/clean up, rewrite the document to be cleaner and remove outdated info
-- Keep the same concise style: one fact per sentence, third person
-- Output the updated document directly. No explanation, no markdown fences, no JSON wrapping.
-- If no changes needed, output the document unchanged.`,
+- If the user asks to add something, integrate it naturally into the appropriate section
+- If the user asks to organize/clean up, restructure into clear sections with rich detail
+- Preserve the document's structure (sections, paragraphs, prose style)
+- PRESERVE ALL INFORMATION unless the user explicitly asks to remove something
+- Write in third person, prose style. Keep specific details (names, dates, numbers, links).
+- If no changes needed, output the document unchanged.
+- Output the updated document directly. No explanation, no markdown fences, no preamble.`,
       messages: [{ role: "user", content: message }],
-      maxOutputTokens: 1500,
+      maxOutputTokens: 3000,
       temperature: 0.1,
       onFinish: async (event) => {
         const cleaned = event.text

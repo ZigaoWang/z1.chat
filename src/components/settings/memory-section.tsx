@@ -196,7 +196,7 @@ export default function MemorySection() {
           onChange={(e) => { setDocument(e.target.value); setDirty(e.target.value !== docRef.current); }}
           placeholder={locale === "zh" ? "还没有记忆。开始聊天后会自动记住关于你的信息。" : "No memories yet. Start chatting and I'll remember things about you."}
           rows={Math.max(6, Math.min(16, document.split("\n").length + 1))}
-          className="w-full px-3.5 py-3 text-sm leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/30 font-mono"
+          className="w-full px-3.5 py-3 text-sm leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/30"
         />
         <div className="flex items-center justify-between border-t border-border/30 px-3.5 py-2">
           <span className="text-xs text-muted-foreground/50">

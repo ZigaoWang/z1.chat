@@ -10,11 +10,6 @@ const organizeCounters = new Map<string, number>();
 
 // ─── Layer 1: Conversation Summary ──────────────────────────────────
 
-/**
- * Update the running summary for a conversation.
- * Called after every assistant response. Only actually runs the LLM
- * every SUMMARY_UPDATE_INTERVAL messages to keep costs low.
- */
 export async function updateConversationSummary(
   conversationId: string,
   userId?: string
@@ -95,9 +90,6 @@ Keep it under 300 words. Be specific and info-dense. No filler. Update the exist
 
 // ─── Layer 2: User Memory Document ─────────────────────────────────
 
-/**
- * Get the user's memory document.
- */
 export async function getMemoryDocument(userId: string): Promise<string> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
@@ -106,9 +98,6 @@ export async function getMemoryDocument(userId: string): Promise<string> {
   return user?.memoryDocument || "";
 }
 
-/**
- * Save the user's memory document.
- */
 export async function setMemoryDocument(userId: string, content: string): Promise<void> {
   await db
     .update(users)
@@ -119,7 +108,6 @@ export async function setMemoryDocument(userId: string, content: string): Promis
 /**
  * Extract memories from a conversation and append to the memory document.
  * Runs async in the background after each assistant response.
- * Only appends new facts — never rewrites or removes existing content.
  */
 export async function extractMemories(
   userId: string,
@@ -133,29 +121,43 @@ export async function extractMemories(
 
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `You extract durable facts about a user from conversations. Your job is to identify NEW information worth remembering that is NOT already in their memory document.
+      system: `You extract durable information about a user from conversations. Identify NEW information worth remembering that is NOT already captured in their memory document.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
 Their current memory document:
 ${currentDoc || "(empty)"}
 
-Rules:
-- Only output NEW facts not already captured in the document above
-- Each fact is one short sentence, third person ("Uses React", "Lives in Berlin")
-- Only save durable facts: name, job, projects, tools, preferences, people, interests, plans with dates
-- Convert relative dates to absolute ("next week" → the actual date)
-- Do NOT save: conversation-specific context, vague style observations, things the user merely asked about, transient tasks
+What to extract:
+- Identity: name, age, location, school, job, roles
+- Projects: what they're building, tech stack, status, goals
+- Skills & interests: languages, tools, hobbies, activities
+- People & relationships: collaborators, teachers, teams
+- Preferences: communication style, tools, workflows
+- Plans & timelines: upcoming events, deadlines, applications (convert relative dates to absolute)
+- Achievements: awards, scores, milestones
+- Context that would help future conversations be more relevant
+
+What NOT to extract:
+- Things already in the document (even if phrased differently)
+- Transient conversation context (debugging steps, temporary questions)
+- Things the user merely asked about but don't reflect who they are
+- Vague observations without substance
+
+Output format:
+- Write in third person, concise but complete sentences
+- Include specific details (names, dates, numbers, links) — these matter
+- Group related facts together if multiple are found
 - If nothing new is worth remembering, return exactly: NONE
 
-Return one fact per line. No bullets, no numbering, no explanation. Just the new facts or NONE.`,
+Output only the new information to append. No bullets, no markdown, no explanation.`,
       messages: [
         {
           role: "user",
           content: `User: ${userMessage}\nAssistant: ${assistantMessage.slice(0, 2000)}`,
         },
       ],
-      maxOutputTokens: 300,
+      maxOutputTokens: 400,
       temperature: 0.1,
     }, {
       userId,
@@ -199,18 +201,18 @@ export async function extractImmediateMemory(
 
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `The user explicitly asked you to remember something. Extract what they want remembered as one or two concise sentences in third person.
+      system: `The user explicitly asked you to remember something. Extract what they want remembered in third person. Be specific — include names, dates, details. Write 1-3 concise sentences capturing the information faithfully.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
-Return just the fact(s) to add. No explanation, no markdown.`,
+Output only the fact(s) to add. No explanation, no markdown.`,
       messages: [
         {
           role: "user",
           content: userMessage,
         },
       ],
-      maxOutputTokens: 200,
+      maxOutputTokens: 300,
       temperature: 0.1,
     }, {
       userId,
@@ -238,10 +240,6 @@ Return just the fact(s) to add. No explanation, no markdown.`,
 
 // ─── Auto-Organization ─────────────────────────────────────────────
 
-/**
- * Silently reorganize the memory document every ORGANIZE_INTERVAL extractions.
- * Merges duplicates, removes outdated info, improves wording.
- */
 async function maybeOrganize(userId: string): Promise<void> {
   const current = organizeCounters.get(userId) || 0;
   const next = current + 1;
@@ -255,19 +253,9 @@ async function maybeOrganize(userId: string): Promise<void> {
   const openrouter = getOpenRouter();
   const { text } = await trackedGenerateText({
     model: openrouter(ORGANIZE_MODEL),
-    system: `You are reorganizing a user's memory document. Rewrite it to be cleaner and more concise.
-
-Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-
-Rules:
-- Merge duplicate or near-duplicate facts into one
-- Remove facts that are clearly outdated (past events, expired plans)
-- Keep the same style: one fact per line, third person, concise
-- Do NOT add new information — only reorganize what's there
-- Do NOT remove facts that are still relevant (preferences, identity, ongoing projects)
-- Output the cleaned document directly. No explanation, no markdown fences.`,
+    system: getOrganizeSystemPrompt(),
     messages: [{ role: "user", content: doc }],
-    maxOutputTokens: 1500,
+    maxOutputTokens: 3000,
     temperature: 0.1,
   }, {
     userId,
@@ -280,25 +268,60 @@ Rules:
     .replace(/^```\w*\n?|```$/g, "")
     .trim();
 
-  if (cleaned && cleaned.length > 10) {
+  if (cleaned && cleaned.length > 50) {
     await setMemoryDocument(userId, cleaned);
   }
 }
 
+// ─── Shared Organize Prompt ───────────────────────────────────────
+
+export function getOrganizeSystemPrompt(): string {
+  return `You are reorganizing a user's memory document. This document is the AI's long-term memory of who the user is. It must be comprehensive, structured, and information-dense.
+
+Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+
+OUTPUT FORMAT — follow this exactly:
+
+The document must use SECTIONS with plain-text headers (no markdown, no bold, no #). Each section contains PROSE PARAGRAPHS — full sentences grouped into short paragraphs. NEVER use bullet points, numbered lists, or one-fact-per-line format.
+
+Sections to use (include only those with content):
+
+Work/School context
+[1-2 paragraphs about their school/job, roles, teams, activities]
+
+Personal context
+[1-2 paragraphs about who they are — skills, interests, hobbies, key links, notable highlights]
+
+Top of mind
+[1-2 paragraphs about what they're actively working on, current projects, immediate goals]
+
+Brief history
+[Multiple paragraphs organized chronologically or thematically. Use sub-headers like "Recent months" and "Earlier context" if the history is long. Include specific details: project names, tech stacks, competition results with dates and scores, applications, events.]
+
+Other instructions
+[Any behavioral preferences for the AI — what to do, what to avoid]
+
+CRITICAL RULES:
+1. NEVER DROP INFORMATION. Every name, date, number, URL, score, project name, and specific detail from the input MUST appear in the output. If you're unsure whether something matters, KEEP IT.
+2. Write in third person prose. Combine related facts into flowing sentences and paragraphs. "Zigao built X using Y and Z" not "Built X. Uses Y. Uses Z."
+3. Merge true duplicates only. If two facts add different details about the same topic, combine them into one richer sentence — don't delete either.
+4. Only remove information that is explicitly contradicted by newer information in the same document.
+5. The output should be LONGER and MORE DETAILED than a flat list — paragraphs carry more information than bullet points.
+6. Do NOT add information that isn't in the input.
+7. Do NOT add meta-commentary about the document.
+8. Output the document directly. No markdown fences, no preamble, no "Here's the reorganized document:".`;
+}
+
 // ─── Memory Injection ───────────────────────────────────────────────
 
-/**
- * Get memory for injection into system prompt.
- */
 export async function getRelevantMemories(userId: string): Promise<string> {
   try {
     const doc = await getMemoryDocument(userId);
     if (!doc) return "";
 
-    // Cap at ~2000 chars to keep prompt reasonable
-    const trimmed = doc.length > 2000 ? doc.slice(0, 2000) + "..." : doc;
+    const trimmed = doc.length > 4000 ? doc.slice(0, 4000) + "\n..." : doc;
 
-    return `\n\nAbout this user (from previous conversations):\n${trimmed}\nUse this knowledge naturally. Don't announce that you remember things. Just be contextually aware.`;
+    return `\n\nAbout this user (from previous conversations):\n${trimmed}\n\nUse this knowledge naturally. Don't announce that you remember things. Don't repeatedly reference the same facts. Only mention stored context when directly relevant to what the user is asking about.`;
   } catch (error) {
     console.error("Failed to load memories:", error);
     return "";
@@ -307,9 +330,6 @@ export async function getRelevantMemories(userId: string): Promise<string> {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-/**
- * Get conversation summary for the current conversation.
- */
 export async function getConversationSummary(
   conversationId: string
 ): Promise<string> {
@@ -328,9 +348,6 @@ export async function getConversationSummary(
   }
 }
 
-/**
- * Get user preferences for system prompt injection
- */
 export async function getUserPreferences(
   userId: string
 ): Promise<string> {
