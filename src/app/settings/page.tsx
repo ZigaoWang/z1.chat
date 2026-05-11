@@ -1,24 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import {
-  ArrowLeft,
-  Palette,
-  User,
-  Sun,
-  Moon,
-  Monitor,
-  Sparkles,
-  CreditCard,
-  Activity,
-  Loader2,
-  CheckCircle2,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Settings, Activity, CreditCard, Brain } from "lucide-react";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useI18n } from "@/hooks/use-i18n";
+import GeneralTab from "@/components/settings/general-tab";
+import UsageTab from "@/components/settings/usage-tab";
+import CreditsTab from "@/components/settings/credits-tab";
 import MemorySection from "@/components/settings/memory-section";
 
 interface UserSettings {
@@ -34,18 +24,16 @@ interface UserSettings {
   };
 }
 
-interface UsageBreakdown {
-  type: string;
-  count: number;
-  totalCost: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
-
 interface UsageData {
   totalCost: number;
   monthCost: number;
-  breakdown: UsageBreakdown[];
+  breakdown: Array<{
+    type: string;
+    count: number;
+    totalCost: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+  }>;
   recent: Array<{
     id: string;
     type: string;
@@ -57,15 +45,13 @@ interface UsageData {
   }>;
 }
 
+type Tab = "general" | "memory" | "usage" | "credits";
+
 export default function SettingsPage() {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [instructionsSaved, setInstructionsSaved] = useState(true);
   const [usage, setUsage] = useState<UsageData | null>(null);
-  const [topUpLoading, setTopUpLoading] = useState(false);
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  const [customAmount, setCustomAmount] = useState("");
   const [recentOrders, setRecentOrders] = useState<Array<{
     id: string;
     outTradeNo: string;
@@ -75,18 +61,38 @@ export default function SettingsPage() {
     type: string;
     createdAt: string;
   }>>([]);
-  const searchParams = useSearchParams();
-  const { theme, setTheme } = useTheme();
-  const [themeMounted, setThemeMounted] = useState(false);
-  useEffect(() => setThemeMounted(true), []);
 
+  // Determine initial tab from hash
+  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [hashRead, setHashRead] = useState(false);
+
+  // Read hash on mount and listen for hash changes
+  useEffect(() => {
+    const readHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (["general", "memory", "usage", "credits"].includes(hash)) {
+        setActiveTab(hash as Tab);
+      }
+    };
+    readHash();
+    setHashRead(true);
+    window.addEventListener("hashchange", readHash);
+    return () => window.removeEventListener("hashchange", readHash);
+  }, []);
+
+  // Sync hash on tab change (only after initial hash is read)
+  useEffect(() => {
+    if (!hashRead) return;
+    if (window.location.hash !== `#${activeTab}`) {
+      window.history.replaceState(null, "", `#${activeTab}`);
+    }
+  }, [activeTab, hashRead]);
+
+  // Load data
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => {
-        setSettings(data);
-        setCustomInstructions(data?.preferences?.customInstructions || "");
-      })
+      .then((data) => setSettings(data))
       .catch(() => toast.error(t("settings.failedToLoad")));
 
     fetch("/api/usage")
@@ -102,14 +108,14 @@ export default function SettingsPage() {
         if (Array.isArray(data)) setRecentOrders(data);
       })
       .catch(() => {});
-  }, []);
+  }, [t]);
 
-  // Handle payment return redirect
+  // Handle payment return
   useEffect(() => {
     const payment = searchParams.get("payment");
     if (payment === "success") {
       toast.success(t("credits.creditsAdded"));
-      // Refresh settings to get updated balance
+      setActiveTab("credits");
       fetch("/api/settings")
         .then((r) => r.json())
         .then((data) => setSettings(data))
@@ -122,72 +128,25 @@ export default function SettingsPage() {
         .catch(() => {});
     } else if (payment === "error") {
       toast.error(t("credits.paymentError"));
+      setActiveTab("credits");
     } else if (payment === "pending") {
       toast.info(t("credits.paymentPending"));
+      setActiveTab("credits");
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
-  const updatePreference = useCallback(
-    async (key: string, value: string | null) => {
-      try {
-        const res = await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            preferences: { [key]: value },
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSettings((prev) =>
-            prev ? { ...prev, preferences: data.preferences } : prev
-          );
-          toast.success(t("settings.saved"));
-        }
-      } catch {
-        toast.error(t("settings.failedToSave"));
-      }
-    },
-    [t]
-  );
-
-  const saveCustomInstructions = useCallback(async () => {
-    await updatePreference("customInstructions", customInstructions || null);
-    setInstructionsSaved(true);
-  }, [customInstructions, updatePreference]);
-
-  const activeAmount = selectedAmount ?? (customAmount ? parseFloat(customAmount) : null);
-
-  const handleTopUp = useCallback(async () => {
-    if (!activeAmount || activeAmount < 1) {
-      toast.error(t("credits.selectAnAmount"));
-      return;
-    }
-    setTopUpLoading(true);
-    try {
-      const res = await fetch("/api/payment/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: activeAmount }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || t("credits.paymentError"));
-        return;
-      }
-      window.location.href = data.paymentUrl;
-    } catch {
-      toast.error(t("credits.paymentError"));
-    } finally {
-      setTopUpLoading(false);
-    }
-  }, [activeAmount, t]);
+  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+    { id: "general", label: locale === "zh" ? "通用" : "General", icon: Settings },
+    { id: "memory", label: locale === "zh" ? "记忆" : "Memory", icon: Brain },
+    { id: "usage", label: locale === "zh" ? "用量" : "Usage", icon: Activity },
+    { id: "credits", label: locale === "zh" ? "余额" : "Credits", icon: CreditCard },
+  ];
 
   return (
     <div className="min-h-full bg-background">
       <div className="mx-auto max-w-2xl px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6">
           <Link
             href="/"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -197,414 +156,39 @@ export default function SettingsPage() {
           <h1 className="text-lg font-semibold tracking-tight">{t("settings.title")}</h1>
         </div>
 
-        {/* Profile Section */}
-        <section className="mb-8">
-          <SectionHeader icon={User} title={t("settings.profile")} />
-          <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">{t("settings.name")}</span>
-              <span className="text-xs text-muted-foreground">
-                {settings?.name || "Developer"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">{t("settings.email")}</span>
-              <span className="text-xs text-muted-foreground">
-                {settings?.email || "\u2014"}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Appearance */}
-        <section className="mb-8">
-          <SectionHeader icon={Palette} title={t("settings.appearance")} />
-          <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">{t("settings.theme")}</span>
-              <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
-                {([
-                  { value: "light", icon: Sun, labelKey: "settings.light" as const },
-                  { value: "dark", icon: Moon, labelKey: "settings.dark" as const },
-                  { value: "system", icon: Monitor, labelKey: "settings.system" as const },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      setTheme(opt.value);
-                      updatePreference("theme", opt.value);
-                    }}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      themeMounted && theme === opt.value
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <opt.icon className="h-3 w-3" />
-                    {t(opt.labelKey)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-xs">{t("settings.language")}</span>
-              <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
-                {([
-                  { value: "en" as const, label: "English" },
-                  { value: "zh" as const, label: "中文" },
-                ]).map((lang) => (
-                  <button
-                    key={lang.value}
-                    onClick={() => {
-                      setLocale(lang.value);
-                      updatePreference("language", lang.value === "zh" ? "Chinese" : "English");
-                    }}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      locale === lang.value
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* AI Preferences */}
-        <section className="mb-8">
-          <SectionHeader icon={Sparkles} title={t("settings.aiPreferences")} />
-          <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/30 shadow-sm">
-            {/* Response Style */}
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <div>
-                <span className="text-xs">{t("settings.responseStyle")}</span>
-                <p className="text-[11px] text-muted-foreground/50 mt-0.5">{t("settings.responseStyleDesc")}</p>
-              </div>
-              <div className="flex gap-1 rounded-lg border border-border/30 bg-muted/30 p-0.5">
-                {([
-                  { value: "concise", labelKey: "settings.concise" as const },
-                  { value: "balanced", labelKey: "settings.balanced" as const },
-                  { value: "detailed", labelKey: "settings.detailed" as const },
-                ] as const).map((s) => (
-                  <button
-                    key={s.value}
-                    onClick={() => updatePreference("responseStyle", s.value)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
-                      settings?.preferences?.responseStyle === s.value
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {t(s.labelKey)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Language */}
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <div>
-                <span className="text-xs">{t("settings.language")}</span>
-                <p className="text-[11px] text-muted-foreground/50 mt-0.5">{t("settings.languageDesc")}</p>
-              </div>
-              <select
-                value={settings?.preferences?.language || ""}
-                onChange={(e) => {
-                  const val = e.target.value || null;
-                  updatePreference("language", val);
-                  if (val === "Chinese") setLocale("zh");
-                  else setLocale("en");
-                }}
-                className="rounded-lg border border-border/40 bg-muted/20 px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary/20 transition-all"
-              >
-                <option value="">{t("settings.autoDetect")}</option>
-                <option value="English">English</option>
-                <option value="Chinese">{"\u4E2D\u6587"}</option>
-                <option value="Spanish">{"\u0045\u0073\u0070\u0061\u00F1\u006F\u006C"}</option>
-                <option value="Japanese">{"\u65E5\u672C\u8A9E"}</option>
-                <option value="Korean">{"\uD55C\uAD6D\uC5B4"}</option>
-                <option value="French">{"\u0046\u0072\u0061\u006E\u00E7\u0061\u0069\u0073"}</option>
-                <option value="German">Deutsch</option>
-              </select>
-            </div>
-
-            {/* Custom Instructions */}
-            <div className="px-4 py-3.5">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <span className="text-xs">{t("settings.customInstructions")}</span>
-                  <p className="text-[11px] text-muted-foreground/50 mt-0.5">
-                    {t("settings.customInstructionsDesc")}
-                  </p>
-                </div>
-                {!instructionsSaved && (
-                  <button
-                    onClick={saveCustomInstructions}
-                    className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    {t("settings.save")}
-                  </button>
-                )}
-              </div>
-              <textarea
-                value={customInstructions}
-                onChange={(e) => {
-                  setCustomInstructions(e.target.value);
-                  setInstructionsSaved(false);
-                }}
-                onBlur={() => {
-                  if (!instructionsSaved) saveCustomInstructions();
-                }}
-                placeholder={t("settings.customInstructionsPlaceholder")}
-                rows={4}
-                className="w-full rounded-lg border border-border/40 bg-muted/10 px-3 py-2 text-xs leading-relaxed resize-none outline-none placeholder:text-muted-foreground/30 focus:ring-1 focus:ring-primary/20 focus:border-primary/20 transition-all"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Memory */}
-        <MemorySection />
-
-        {/* Usage */}
-        <section className="mb-8">
-          <SectionHeader icon={Activity} title={t("usage.title")} />
-          {usage ? (
-            <div className="space-y-3">
-              {/* Cost cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
-                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">{t("usage.thisMonth")}</p>
-                  <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.monthCost.toFixed(4)}</p>
-                </div>
-                <div className="rounded-xl border border-border/40 bg-card px-4 py-3 shadow-sm">
-                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">{t("usage.allTime")}</p>
-                  <p className="text-lg font-semibold mt-1">{"\u00A5"}{usage.totalCost.toFixed(4)}</p>
-                </div>
-              </div>
-
-              {/* Breakdown table */}
-              {usage.breakdown.length > 0 && (
-                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-x-auto">
-                  <table className="w-full text-xs min-w-[300px]">
-                    <thead>
-                      <tr className="border-b border-border/30 text-muted-foreground/50">
-                        <th className="text-left px-4 py-2 font-medium">{t("usage.type")}</th>
-                        <th className="text-right px-4 py-2 font-medium">{t("usage.calls")}</th>
-                        <th className="text-right px-4 py-2 font-medium">{t("usage.cost")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {usage.breakdown.map((b) => (
-                        <tr key={b.type}>
-                          <td className="px-4 py-2">{t(`usage.type.${b.type}` as "usage.type.chat") || b.type.replace(/_/g, " ")}</td>
-                          <td className="px-4 py-2 text-right text-muted-foreground">{b.count}</td>
-                          <td className="px-4 py-2 text-right">{"\u00A5"}{b.totalCost.toFixed(4)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        {/* Tab navigation */}
+        <nav className="flex gap-1 mb-8 border-b border-border/40 pb-px">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-t-md transition-colors relative ${
+                activeTab === tab.id
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
               )}
+            </button>
+          ))}
+        </nav>
 
-              {/* Recent usage */}
-              {usage.recent.length > 0 && (
-                <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
-                  <div className="px-4 py-2 border-b border-border/30">
-                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                      {t("usage.recentActivity")}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-border/20 max-h-64 overflow-y-auto">
-                    {usage.recent.slice(0, 20).map((log) => (
-                      <div key={log.id} className="flex items-center justify-between px-4 py-2 text-xs min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-muted-foreground shrink-0">{t(`usage.type.${log.type}` as "usage.type.chat") || log.type.replace(/_/g, " ")}</span>
-                          <span className="text-muted-foreground/30 truncate">{log.model.split("/").pop()}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium">{"\u00A5"}{log.costUsd.toFixed(5)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-border/40 bg-card px-4 py-8 text-center shadow-sm">
-              <Activity className="mx-auto h-8 w-8 text-muted-foreground/15" />
-              <p className="mt-2 text-xs text-muted-foreground/40">
-                {t("usage.noUsage")}
-              </p>
-            </div>
+        {/* Tab content */}
+        <div className="animate-in fade-in duration-150">
+          {activeTab === "general" && (
+            <GeneralTab settings={settings} setSettings={setSettings} />
           )}
-        </section>
-
-        {/* Credits & Top Up */}
-        <section className="mb-8">
-          <SectionHeader icon={CreditCard} title={t("credits.title")} />
-          <div className="space-y-3">
-            {/* Balance card */}
-            <div className="rounded-xl border border-border/40 bg-card shadow-sm">
-              <div className="flex items-center justify-between px-4 py-4">
-                <div>
-                  <p className="text-xs text-muted-foreground/50">{t("credits.currentBalance")}</p>
-                  <p className="text-2xl font-semibold mt-0.5">
-                    {"\u00A5"}{(settings?.creditBalance ?? 0).toFixed(2)}
-                  </p>
-                </div>
-                <CreditCard className="h-8 w-8 text-muted-foreground/15" />
-              </div>
-            </div>
-
-            {/* Top up card */}
-            <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-border/30">
-                <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                  {t("credits.topUp")}
-                </span>
-              </div>
-
-              {/* Amount selection */}
-              <div className="px-4 pt-3 pb-2">
-                <p className="text-[11px] text-muted-foreground/50 mb-2">{t("credits.selectAmount")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {[5, 10, 30, 50, 100].map((amt) => (
-                    <button
-                      key={amt}
-                      onClick={() => {
-                        setSelectedAmount(amt);
-                        setCustomAmount("");
-                      }}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                        selectedAmount === amt && !customAmount
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/40 bg-muted/20 text-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      {"\u00A5"}{amt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom amount input */}
-              <div className="px-4 py-2">
-                <p className="text-[11px] text-muted-foreground/50 mb-1.5">{t("credits.customAmount")}</p>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/50">{"\u00A5"}</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10000"
-                    step="0.01"
-                    placeholder={t("credits.enterAmount")}
-                    value={customAmount}
-                    onChange={(e) => {
-                      setCustomAmount(e.target.value);
-                      if (e.target.value) setSelectedAmount(null);
-                    }}
-                    className="w-full rounded-lg border border-border/40 bg-muted/10 pl-7 pr-3 py-2 text-xs outline-none placeholder:text-muted-foreground/30 focus:ring-1 focus:ring-primary/20 focus:border-primary/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Payment method */}
-              <div className="px-4 py-3 border-t border-border/30">
-                <p className="text-[11px] text-muted-foreground/50 mb-2">{t("credits.paymentMethod")}</p>
-                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 flex items-center gap-3">
-                  {/* Alipay logo */}
-                  <svg viewBox="0 0 1024 1024" className="h-6 w-6 shrink-0" fill="none">
-                    <rect width="1024" height="1024" rx="180" fill="#1677FF" />
-                    <path d="M770.8 620.2c-27.6-11.8-57.4-23.2-88.8-34.2 18.6-46.8 31.2-99.6 35.4-155.2H596.8v-56.4h138V340h-138v-84.8h-69.6c-8 0-14.4 6.4-14.4 14.4V340H376.4v34.4h136.4v56.4H394v34.4h240.8c-4.6 42.4-15.2 82-30.4 117.4-62.4-17.6-129.2-33-196.4-43.6-91.6-14.4-131.6 30-139 76.8-8.6 54.2 27 115.4 143.2 115.4 76.6 0 142.6-32 195.2-84.6 58.2 28.2 107.2 58.2 140.4 82.8l57.8-82.8c-5.6-4.4-17-12.4-34.8-26.4zM439 680.4c-68.2 0-98-28.4-93.4-57.4 3.2-20 24.8-43.6 72.4-43.6 57.4 0 121.6 13.4 184 32.4C558 654 502.2 680.4 439 680.4z" fill="white" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium">Alipay</p>
-                    <p className="text-[10px] text-muted-foreground/50">{"\u652F\u4ED8\u5B9D"}</p>
-                  </div>
-                  <div className="h-4 w-4 rounded-full border-2 border-primary flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit button */}
-              <div className="px-4 pb-4 pt-2">
-                <button
-                  onClick={handleTopUp}
-                  disabled={topUpLoading || !activeAmount || activeAmount < 1}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#1677FF] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#1677FF]/90 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {topUpLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("credits.processing")}
-                    </>
-                  ) : activeAmount && activeAmount >= 1 ? (
-                    <>{t("credits.pay")} {"\u00A5"}{activeAmount.toFixed(2)}</>
-                  ) : (
-                    t("credits.selectAnAmount")
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Payment history */}
-            {recentOrders.length > 0 && (
-              <div className="rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
-                <div className="px-4 py-2 border-b border-border/30">
-                  <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                    {t("credits.paymentHistory")}
-                  </span>
-                </div>
-                <div className="divide-y divide-border/20 max-h-48 overflow-y-auto">
-                  {recentOrders.slice(0, 10).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                        <span>{"\u00A5"}{order.amount}</span>
-                        <span className="text-muted-foreground/40">+{"\u00A5"}{parseFloat(order.creditAmount).toFixed(2)}</span>
-                      </div>
-                      <span className="text-muted-foreground/40">
-                        {new Date(order.createdAt).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+          {activeTab === "memory" && <MemorySection />}
+          {activeTab === "usage" && <UsageTab usage={usage} />}
+          {activeTab === "credits" && (
+            <CreditsTab settings={settings} recentOrders={recentOrders} />
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-// --- Shared section header ---
-function SectionHeader({
-  icon: Icon,
-  title,
-  count,
-}: {
-  icon: React.ElementType;
-  title: string;
-  count?: number;
-}) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <Icon className="h-4 w-4 text-muted-foreground/50" />
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/50">
-        {title}
-      </h2>
-      {count !== undefined && (
-        <span className="text-[11px] text-muted-foreground/35">
-          ({count})
-        </span>
-      )}
     </div>
   );
 }

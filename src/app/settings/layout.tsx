@@ -1,5 +1,3 @@
-import { Providers } from "@/components/providers";
-
 export default function SettingsLayout({
   children,
 }: {
