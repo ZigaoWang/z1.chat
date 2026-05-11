@@ -108,6 +108,7 @@ function ThinkingBlock({ content, isActive }: { content: string; isActive?: bool
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isActive) {
@@ -120,6 +121,13 @@ function ThinkingBlock({ content, isActive }: { content: string; isActive?: bool
       setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     }
   }, [isActive]);
+
+  // Auto-scroll the thinking content to bottom while active
+  useEffect(() => {
+    if (isActive && contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+  }, [isActive, content]);
 
   const label = isActive
     ? `Thinking${elapsed > 0 ? ` (${elapsed}s)` : "..."}`
@@ -142,7 +150,7 @@ function ThinkingBlock({ content, isActive }: { content: string; isActive?: bool
         <ChevronDown className={`h-3 w-3 transition-transform ${expanded || isActive ? "rotate-180" : ""}`} />
       </button>
       {(expanded || isActive) && content && (
-        <div className="mt-1 ml-5 border-l-2 border-border/40 pl-3 text-xs text-muted-foreground/50 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+        <div ref={contentRef} className="mt-1 ml-5 border-l-2 border-border/40 pl-3 text-xs text-muted-foreground/50 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
           {content}
         </div>
       )}

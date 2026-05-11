@@ -155,8 +155,8 @@ function ChatMessages({
     if (!stickToBottom.current) return;
     const el = containerRef.current;
     if (!el) return;
-    // Only scroll if content actually changed
-    if (el.scrollHeight !== lastContentLen.current) {
+    // Scroll if content changed OR if streaming (thinking block grows internally)
+    if (el.scrollHeight !== lastContentLen.current || isStreaming) {
       lastContentLen.current = el.scrollHeight;
       el.scrollTop = el.scrollHeight;
     }
