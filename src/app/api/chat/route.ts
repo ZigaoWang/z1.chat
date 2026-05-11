@@ -390,7 +390,7 @@ export async function POST(req: Request) {
     const allToolInvocations: Array<Record<string, any>> = [];
     let searchCallCount = 0;
     let sandboxCallCount = 0;
-    let accumulatedReasoning = "";
+    let accumulatedReasoning: string[] = [];
 
     // Periodically flush accumulated text to DB so stop/refresh preserves content
     let accumulatedText = "";
@@ -403,7 +403,7 @@ export async function POST(req: Request) {
       try {
         const metadata: Record<string, unknown> = {};
         if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
-        if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
+        const reasoningSegments = accumulatedReasoning.filter(s => s.trim()); if (reasoningSegments.length > 0) metadata.reasoning = reasoningSegments;
         await db.update(messages)
           .set({ content: accumulatedText, metadata: Object.keys(metadata).length > 0 ? metadata : undefined })
           .where(eq(messages.id, assistantMessageId));
@@ -439,10 +439,20 @@ export async function POST(req: Request) {
         } else if (chunk.type === "reasoning-delta") {
           const c = chunk as any;
           const delta = c.text || c.delta || "";
-          if (delta) accumulatedReasoning += delta;
+          if (delta) {
+            if (accumulatedReasoning.length === 0) {
+              accumulatedReasoning.push(delta);
+            } else {
+              accumulatedReasoning[accumulatedReasoning.length - 1] += delta;
+            }
+          }
         }
       },
       onStepFinish: async ({ text, toolCalls, toolResults }) => {
+        // Start a new reasoning segment for the next step
+        if (accumulatedReasoning.length > 0 && accumulatedReasoning[accumulatedReasoning.length - 1].trim()) {
+          accumulatedReasoning.push("");
+        }
         const stepText = text || accumulatedText || "";
         // Collect tool invocations from this step
         if (toolCalls) {
@@ -467,7 +477,7 @@ export async function POST(req: Request) {
             const content = stepText;
             const metadata: Record<string, unknown> = {};
             if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
-            if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
+            const reasoningSegments = accumulatedReasoning.filter(s => s.trim()); if (reasoningSegments.length > 0) metadata.reasoning = reasoningSegments;
             await db.update(messages)
               .set({ content, metadata: Object.keys(metadata).length > 0 ? metadata : undefined })
               .where(eq(messages.id, assistantMessageId));
@@ -478,11 +488,11 @@ export async function POST(req: Request) {
       },
       onAbort: async () => {
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-        if (assistantMessageId && (accumulatedText.length > 0 || accumulatedReasoning)) {
+        if (assistantMessageId && (accumulatedText.length > 0 || accumulatedReasoning.some(s => s.trim()))) {
           try {
             const metadata: Record<string, unknown> = {};
             if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
-            if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
+            const reasoningSegments = accumulatedReasoning.filter(s => s.trim()); if (reasoningSegments.length > 0) metadata.reasoning = reasoningSegments;
             await db.update(messages).set({ content: accumulatedText, metadata: Object.keys(metadata).length > 0 ? metadata : undefined }).where(eq(messages.id, assistantMessageId));
           } catch (err) { console.error("[chat] Failed to save on abort:", err); }
         }
@@ -498,7 +508,7 @@ export async function POST(req: Request) {
         try {
           const metadata: Record<string, unknown> = {};
           if (allToolInvocations.length > 0) metadata.toolInvocations = allToolInvocations;
-          if (accumulatedReasoning) metadata.reasoning = accumulatedReasoning;
+          const reasoningSegments = accumulatedReasoning.filter(s => s.trim()); if (reasoningSegments.length > 0) metadata.reasoning = reasoningSegments;
 
           if (assistantMessageId) {
             await db.update(messages)

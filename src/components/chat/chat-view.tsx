@@ -221,8 +221,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     restoredToolInvocationsRef.current = v;
     setRestoredToolInvocationsState(v);
   }, []);
-  const [restoredReasoning, setRestoredReasoning] = useState<Record<string, string>>({});
-  const restoredReasoningRef = useRef<Record<string, string>>({});
+  const [restoredReasoning, setRestoredReasoning] = useState<Record<string, string | string[]>>({});
+  const restoredReasoningRef = useRef<Record<string, string | string[]>>({});
 
   useEffect(() => {
     if (activeId && !initialLoadDone.current) {
@@ -242,14 +242,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
             const restoredAttachments: Record<string, MessageAttachments> = {};
             const restoredTools: Record<string, ToolInvocation[]> = {};
-            const restoredReasoningMap: Record<string, string> = {};
+            const restoredReasoningMap: Record<string, string | string[]> = {};
             for (const m of filtered) {
               if (m.model) messageModelMap.current.set(m.id, m.model);
               if (m.metadata?.attachments) {
                 restoredAttachments[m.id] = m.metadata.attachments as MessageAttachments;
               }
               if (m.metadata?.reasoning) {
-                restoredReasoningMap[m.id] = m.metadata.reasoning as string;
+                restoredReasoningMap[m.id] = m.metadata.reasoning as string | string[];
               } else if (m.role === "assistant" && m.content) {
                 // Fallback: extract from <think> tags still in content
                 const thinkMatch = m.content.match(/<think>([\s\S]*?)<\/think>/);
@@ -580,10 +580,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       if (!msg.parts || msg.role !== "assistant") return undefined;
       const segments: MessageSegment[] = [];
       let textBuffer = "";
+      let reasoningBuffer = "";
 
       const flushText = () => {
         if (textBuffer.trim()) {
-          // Clean the text the same way getMessageContent does
           const cleaned = textBuffer
             .replace(/<file name="[^"]*">[\s\S]*?<\/file>\s*/g, "")
             .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
@@ -594,11 +594,26 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         textBuffer = "";
       };
 
+      const flushReasoning = () => {
+        if (reasoningBuffer.trim()) {
+          segments.push({ type: "reasoning", content: reasoningBuffer.trim() });
+        }
+        reasoningBuffer = "";
+      };
+
       for (const p of msg.parts) {
         if (p.type === "text") {
+          flushReasoning();
           textBuffer += (p as { text: string }).text;
+        } else if (p.type === "reasoning") {
+          flushText();
+          reasoningBuffer += (p as any).text || (p as any).reasoning || (p as any).delta || "";
+        } else if (p.type === "step-start") {
+          flushText();
+          flushReasoning();
         } else if (p.type.startsWith("tool-") || p.type === "dynamic-tool") {
           flushText();
+          flushReasoning();
           const part = p as any;
           segments.push({
             type: "tool",
@@ -611,9 +626,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             },
           });
         }
-        // Skip other part types (step-start, reasoning, etc.)
       }
       flushText();
+      flushReasoning();
 
       return segments.length > 0 ? segments : undefined;
     },
@@ -1264,9 +1279,48 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               // 3. Fallback: check restored metadata
               if (!thinking) {
                 const restored = restoredReasoningRef.current[m.id];
-                if (restored) thinking = restored;
+                if (restored) {
+                  if (Array.isArray(restored)) {
+                    thinking = restored.join("\n\n");
+                  } else {
+                    thinking = restored;
+                  }
+                }
               }
             }
+
+            // Build segments — inject restored reasoning segments for messages without parts
+            let finalSegments = getMessageSegments(m);
+            if (!finalSegments || !finalSegments.some(s => s.type === "reasoning")) {
+              const restored = restoredReasoningRef.current[m.id];
+              if (restored) {
+                const reasoningArr = Array.isArray(restored) ? restored : [restored];
+                const toolInvs = getToolInvocations(m) || [];
+                const content = getCachedContent(m);
+                const segs: MessageSegment[] = [];
+
+                for (let ri = 0; ri < reasoningArr.length; ri++) {
+                  if (reasoningArr[ri].trim()) {
+                    segs.push({ type: "reasoning", content: reasoningArr[ri].trim() });
+                  }
+                  // Insert tool invocations between reasoning segments
+                  if (ri < reasoningArr.length - 1 && ri < toolInvs.length) {
+                    segs.push({ type: "tool", invocation: toolInvs[ri] });
+                  }
+                }
+                // Add remaining tools after last reasoning
+                const toolsPlaced = Math.max(0, reasoningArr.length - 1);
+                for (let ti = toolsPlaced; ti < toolInvs.length; ti++) {
+                  segs.push({ type: "tool", invocation: toolInvs[ti] });
+                }
+                // Add text content at the end
+                if (content.trim()) {
+                  segs.push({ type: "text", content: content });
+                }
+                if (segs.length > 0) finalSegments = segs;
+              }
+            }
+
             return {
               id: m.id,
               role: m.role as "user" | "assistant" | "system",
@@ -1277,7 +1331,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               images: messageAttachmentsRef.current[m.id]?.images,
               files: messageAttachmentsRef.current[m.id]?.files,
               toolInvocations: getToolInvocations(m),
-              segments: getMessageSegments(m),
+              segments: finalSegments,
               thinking,
               isThinking,
             };

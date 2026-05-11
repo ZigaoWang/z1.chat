@@ -19,7 +19,8 @@ interface Message {
 
 export type MessageSegment =
   | { type: "text"; content: string }
-  | { type: "tool"; invocation: ToolInvocation };
+  | { type: "tool"; invocation: ToolInvocation }
+  | { type: "reasoning"; content: string };
 
 export interface VersionEntry {
   id: string;

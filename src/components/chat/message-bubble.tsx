@@ -568,13 +568,14 @@ function MessageBubble({
 
   // Use ordered segments when available (live streaming), fall back to old layout (restored)
   const hasSegments = segments && segments.length > 0;
+  const hasReasoningSegments = hasSegments && segments!.some(s => s.type === "reasoning");
   const hasAnyContent = displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) || (segments && segments.length > 0);
 
   return (
     <div className="group px-4 py-2 animate-message-in">
       <div className="mx-auto max-w-3xl">
-        {/* Thinking/reasoning block */}
-        {thinking && (
+        {/* Thinking/reasoning block — only show top-level when segments don't include reasoning */}
+        {thinking && !hasReasoningSegments && (
           <ThinkingBlock content={thinking} isActive={isThinking} />
         )}
 
@@ -619,6 +620,11 @@ function MessageBubble({
               </>
             )}
             {segments!.map((seg, i) => {
+              if (seg.type === "reasoning") {
+                const isLastSegment = i === segments!.length - 1;
+                const isActiveReasoning = isLastSegment && isStreaming && isThinking;
+                return <div key={`r-${i}`} className="mt-2 first:mt-0"><ThinkingBlock content={seg.content} isActive={isActiveReasoning} /></div>;
+              }
               if (seg.type === "text") {
                 const { cleanContent: segClean, artifacts: segArtifacts } = extractArtifacts(seg.content);
                 return (
