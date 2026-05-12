@@ -30,7 +30,7 @@ export type { EditingState };
 
 export default function ChatInput({
   value, onChange, onSubmit, onStop, isLoading, disabled,
-  placeholder = "Ask anything...", files, onFilesChange, onEditLastMessage,
+  placeholder = "What's on your mind?", files, onFilesChange, onEditLastMessage,
   editing, onCancelEdit, onSubmitEdit,
 }: ChatInputProps) {
   const { t } = useI18n();
@@ -123,7 +123,7 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className={`border border-border/60 bg-background transition-all duration-200 focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 focus-within:shadow-sm ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
+        <div className={`border border-border/60 bg-background shadow-sm transition-all duration-200 focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 focus-within:shadow-md ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
           {/* File previews */}
           {files.length > 0 && !editing && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">

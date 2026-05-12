@@ -29,10 +29,10 @@ export const en = {
 
   // Chat
   "chat.askAnything": "Ask anything...",
-  "chat.goodMorning": "Good morning",
-  "chat.goodAfternoon": "Good afternoon",
-  "chat.goodEvening": "Good evening",
-  "chat.whatsOnYourMind": "What's on your mind?",
+  "chat.goodMorning": "Good morning, {name}",
+  "chat.goodAfternoon": "Good afternoon, {name}",
+  "chat.goodEvening": "Good evening, {name}",
+  "chat.placeholder": "Ask me anything...",
   "chat.editingMessage": "Editing message",
   "chat.cancel": "Cancel",
   "chat.uploading": "Uploading...",
@@ -45,7 +45,7 @@ export const en = {
   "chat.dropFiles": "Drop files to attach",
   "chat.dropFilesDesc": "Images, documents, code, spreadsheets, and more",
   "chat.openSidebar": "Open sidebar",
-  "chat.whatsOnYourMindDesc": "Ask anything, create artifacts, run code, or search the web.",
+  "chat.whatsOnYourMindDesc": "",
   "chat.visionWarning": "doesn't support images. Switch to a model with the Vision badge, or remove the image.",
   "chat.pdfVisionWarning": "This PDF was rendered as page images, but {model} doesn't support vision. Switch to a vision-capable model for best results.",
 
@@ -305,14 +305,14 @@ export const en = {
   "onboarding.tooltipSidebar": "Your chat history lives here",
 
   // Suggestions
-  "suggestion.poem": "Write a poem about spring",
-  "suggestion.poemTitle": "Write a poem",
-  "suggestion.news": "What's in the news today?",
-  "suggestion.newsTitle": "Today's news",
-  "suggestion.code": "Explain this code to me",
-  "suggestion.codeTitle": "Explain code",
-  "suggestion.website": "Build me a personal homepage",
-  "suggestion.websiteTitle": "Create a website",
+  "suggestion.poem": "Compare the pros and cons of living in 3 cities I'm considering",
+  "suggestion.poemTitle": "Help me decide",
+  "suggestion.news": "Build me a retro pixel-art snake game I can play in the browser",
+  "suggestion.newsTitle": "Make a game",
+  "suggestion.code": "Explain quantum computing like I'm a curious 10-year-old",
+  "suggestion.codeTitle": "Explain simply",
+  "suggestion.website": "Analyze this CSV and find the most interesting patterns",
+  "suggestion.websiteTitle": "Analyze data",
 } as const;
 
 export type TranslationKey = keyof typeof en;

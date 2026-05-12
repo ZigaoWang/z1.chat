@@ -17,6 +17,7 @@ import { type ToolInvocation } from "./message-bubble";
 import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from "./artifact-preview";
 import type { MessageSegment } from "./chat-messages";
 import { useI18n } from "@/hooks/use-i18n";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -32,16 +33,19 @@ interface MessageAttachments {
 
 export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSidebar, onOpenSidebar }: ChatViewProps) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const { activeId, setActiveId, refreshConversations } = useConversations();
   const { selectedModel, selectModel, currentModel } = useModels();
   const { isZero, refresh: refreshCredits } = useCredits();
-  const [greeting, setGreeting] = useState("");
-  useEffect(() => {
+
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting(t("chat.goodMorning"));
-    else if (hour < 17) setGreeting(t("chat.goodAfternoon"));
-    else setGreeting(t("chat.goodEvening"));
-  }, [t]);
+    const name = user?.name?.split(" ")[0] || "";
+    if (hour < 12) return t("chat.goodMorning", { name });
+    if (hour < 17) return t("chat.goodAfternoon", { name });
+    return t("chat.goodEvening", { name });
+  }, [t, user?.name]);
+
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -1233,31 +1237,26 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
       {/* Messages or Empty State */}
       {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-20">
-          <div className="w-full max-w-md text-center animate-fade-in">
-            <p className="text-2xl font-semibold tracking-tight text-foreground">
+        <div className="flex flex-1 flex-col items-center justify-center px-4 -mt-16">
+          <div className="w-full max-w-2xl">
+            <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight text-foreground">
               {greeting}
-            </p>
-            <p className="mt-1.5 text-sm text-muted-foreground/50">
-              {t("chat.whatsOnYourMindDesc")}
-            </p>
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              {[
-                { title: t("suggestion.poemTitle"), text: t("suggestion.poem") },
-                { title: t("suggestion.newsTitle"), text: t("suggestion.news") },
-                { title: t("suggestion.codeTitle"), text: t("suggestion.code") },
-                { title: t("suggestion.websiteTitle"), text: t("suggestion.website") },
-              ].map((s) => (
-                <button
-                  key={s.title}
-                  onClick={() => setInput(s.text)}
-                  className="rounded-xl border border-border/40 bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
-                >
-                  <span className="block text-xs font-medium text-foreground/80">{s.title}</span>
-                  <span className="mt-0.5 block text-[11px] text-muted-foreground/50 line-clamp-1">{s.text}</span>
-                </button>
-              ))}
-            </div>
+            </h1>
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSubmit={() => handleSendMessage()}
+              onStop={handleStop}
+              isLoading={isLoading}
+              disabled={viewingOldBranch}
+              placeholder={t("chat.placeholder")}
+              files={files}
+              onFilesChange={setFiles}
+              onEditLastMessage={() => {}}
+              editing={editingState}
+              onCancelEdit={handleCancelEdit}
+              onSubmitEdit={handleSubmitEdit}
+            />
           </div>
         </div>
       ) : (
@@ -1414,7 +1413,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       )}
 
       {/* Vision warning */}
-      {files.some(f => f.isImage && f.dataUrl) && currentModel && !currentModel.supportsVision && (
+      {messages.length > 0 && files.some(f => f.isImage && f.dataUrl) && currentModel && !currentModel.supportsVision && (
         <div className="shrink-0 px-4">
           <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
@@ -1426,7 +1425,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       )}
 
       {/* PDF vision warning */}
-      {files.some(f => f.isPdfImages && f.dataUrls?.length) && currentModel && !currentModel.supportsVision && (
+      {messages.length > 0 && files.some(f => f.isPdfImages && f.dataUrls?.length) && currentModel && !currentModel.supportsVision && (
         <div className="shrink-0 px-4">
           <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
@@ -1438,21 +1437,23 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       )}
 
       {/* Input */}
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSubmit={() => handleSendMessage()}
-        onStop={handleStop}
-        isLoading={isLoading}
-        disabled={viewingOldBranch}
-        placeholder={viewingOldBranch ? t("chat.switchToLatest") : undefined}
-        files={files}
-        onFilesChange={setFiles}
-        onEditLastMessage={() => {}}
-        editing={editingState}
-        onCancelEdit={handleCancelEdit}
-        onSubmitEdit={handleSubmitEdit}
-      />
+      {messages.length > 0 && (
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSubmit={() => handleSendMessage()}
+          onStop={handleStop}
+          isLoading={isLoading}
+          disabled={viewingOldBranch}
+          placeholder={viewingOldBranch ? t("chat.switchToLatest") : t("chat.placeholder")}
+          files={files}
+          onFilesChange={setFiles}
+          onEditLastMessage={() => {}}
+          editing={editingState}
+          onCancelEdit={handleCancelEdit}
+          onSubmitEdit={handleSubmitEdit}
+        />
+      )}
     </div>
 
     {/* Artifact Preview Panel */}

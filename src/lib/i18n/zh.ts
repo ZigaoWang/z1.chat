@@ -31,10 +31,10 @@ export const zh: Record<TranslationKey, string> = {
 
   // Chat
   "chat.askAnything": "随便问点什么...",
-  "chat.goodMorning": "早上好",
-  "chat.goodAfternoon": "下午好",
-  "chat.goodEvening": "晚上好",
-  "chat.whatsOnYourMind": "想聊点什么？",
+  "chat.goodMorning": "早上好，{name}",
+  "chat.goodAfternoon": "下午好，{name}",
+  "chat.goodEvening": "晚上好，{name}",
+  "chat.placeholder": "随便问点什么...",
   "chat.editingMessage": "编辑消息",
   "chat.cancel": "取消",
   "chat.uploading": "上传中...",
@@ -47,7 +47,7 @@ export const zh: Record<TranslationKey, string> = {
   "chat.dropFiles": "拖放文件到此处",
   "chat.dropFilesDesc": "支持图片、文档、代码、表格等文件",
   "chat.openSidebar": "打开侧栏",
-  "chat.whatsOnYourMindDesc": "随时提问，创建内容，运行代码，或搜索网络。",
+  "chat.whatsOnYourMindDesc": "",
   "chat.visionWarning": "不支持图片。请切换到支持视觉的模型，或移除图片。",
   "chat.pdfVisionWarning": "此 PDF 已渲染为页面图片，但 {model} 不支持视觉。请切换到支持视觉的模型以获得最佳效果。",
 
@@ -307,12 +307,12 @@ export const zh: Record<TranslationKey, string> = {
   "onboarding.tooltipSidebar": "你的对话都保存在这里",
 
   // Suggestions
-  "suggestion.poem": "帮我写一首关于春天的诗",
-  "suggestion.poemTitle": "写一首诗",
-  "suggestion.news": "今天有什么重要新闻？",
-  "suggestion.newsTitle": "今日新闻",
-  "suggestion.code": "帮我解释这段代码",
-  "suggestion.codeTitle": "解释代码",
-  "suggestion.website": "帮我创建一个个人主页",
-  "suggestion.websiteTitle": "创建网页",
+  "suggestion.poem": "帮我对比三个我在考虑的城市的优缺点",
+  "suggestion.poemTitle": "帮我做决定",
+  "suggestion.news": "帮我做一个复古像素风格的贪吃蛇游戏",
+  "suggestion.newsTitle": "做个游戏",
+  "suggestion.code": "用给10岁小孩讲故事的方式解释量子计算",
+  "suggestion.codeTitle": "简单解释",
+  "suggestion.website": "分析这个 CSV 文件，找出最有趣的规律",
+  "suggestion.websiteTitle": "分析数据",
 };
