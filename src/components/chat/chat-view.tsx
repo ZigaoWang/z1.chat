@@ -482,7 +482,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     (overrideText?: string) => {
       const text = (overrideText ?? input).trim();
       const hasFiles = files.length > 0;
-      if ((!text && !hasFiles) || isLoading || viewingOldBranch) return;
+      const stillUploading = files.some(f => f.uploading);
+      if ((!text && !hasFiles) || isLoading || viewingOldBranch || stillUploading) return;
       setChatError(null);
       setWasInterrupted(false);
 
@@ -1118,10 +1119,19 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       setDragOver(false);
       const droppedFiles = Array.from(e.dataTransfer.files);
       if (droppedFiles.length === 0) return;
+
+      const placeholders: UploadedFile[] = droppedFiles.map(f => ({
+        url: "",
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        isImage: f.type.startsWith("image/"),
+        uploading: true,
+      }));
+      setFiles((prev) => [...prev, ...placeholders]);
+
       const uploaded = await uploadFiles(droppedFiles);
-      if (uploaded.length > 0) {
-        setFiles((prev) => [...prev, ...uploaded]);
-      }
+      setFiles((prev) => [...prev.filter(f => !f.uploading), ...uploaded]);
     },
     []
   );

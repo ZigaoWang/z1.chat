@@ -19,10 +19,12 @@ export interface UploadedFile {
   isImage: boolean;
   isPdfImages?: boolean;
   processed?: ProcessedFile;
+  uploading?: boolean;
 }
 
 interface FileUploadProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
+  onUploadStart?: (placeholders: UploadedFile[]) => void;
   disabled?: boolean;
 }
 
@@ -106,11 +108,11 @@ export async function uploadFiles(
   return uploaded;
 }
 
-export default function FileUpload({ onFilesUploaded, disabled }: FileUploadProps) {
+export default function FileUpload({ onFilesUploaded, onUploadStart, disabled }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const { t } = useI18n();
-  const [progress, setProgress] = useState(0); // overall progress 0-100
+  const [progress, setProgress] = useState(0);
 
   const handleFiles = useCallback(
     async (files: File[]) => {
@@ -122,8 +124,17 @@ export default function FileUpload({ onFilesUploaded, disabled }: FileUploadProp
       setUploading(true);
       setProgress(0);
 
+      const placeholders: UploadedFile[] = files.map(f => ({
+        url: "",
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        isImage: f.type.startsWith("image/"),
+        uploading: true,
+      }));
+      onUploadStart?.(placeholders);
+
       const uploaded = await uploadFiles(files, (progressList) => {
-        // Average progress across all files
         const total = progressList.reduce((sum, p) => sum + Math.max(0, p.percent), 0);
         setProgress(Math.round(total / progressList.length));
       });
@@ -132,7 +143,7 @@ export default function FileUpload({ onFilesUploaded, disabled }: FileUploadProp
       setUploading(false);
       setProgress(0);
     },
-    [onFilesUploaded]
+    [onFilesUploaded, onUploadStart]
   );
 
   return (
