@@ -30,6 +30,8 @@ export interface ProcessedFile {
   textContent?: string;
   /** Image data URL (for image files) */
   imageData?: ImageData;
+  /** Page images for short PDFs rendered as images */
+  pageImages?: ImageData[];
   /** Display metadata */
   display: DisplayInfo;
   /** Whether content was truncated */

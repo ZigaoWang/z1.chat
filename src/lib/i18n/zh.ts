@@ -49,6 +49,7 @@ export const zh: Record<TranslationKey, string> = {
   "chat.openSidebar": "打开侧栏",
   "chat.whatsOnYourMindDesc": "随时提问，创建内容，运行代码，或搜索网络。",
   "chat.visionWarning": "不支持图片。请切换到支持视觉的模型，或移除图片。",
+  "chat.pdfVisionWarning": "此 PDF 已渲染为页面图片，但 {model} 不支持视觉。请切换到支持视觉的模型以获得最佳效果。",
 
   // Chat errors
   "chat.error.noVision": "该模型不支持图片，请选择带有 Vision 标识的模型。",

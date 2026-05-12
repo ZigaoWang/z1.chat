@@ -47,6 +47,7 @@ export const en = {
   "chat.openSidebar": "Open sidebar",
   "chat.whatsOnYourMindDesc": "Ask anything, create artifacts, run code, or search the web.",
   "chat.visionWarning": "doesn't support images. Switch to a model with the Vision badge, or remove the image.",
+  "chat.pdfVisionWarning": "This PDF was rendered as page images, but {model} doesn't support vision. Switch to a vision-capable model for best results.",
 
   // Chat errors
   "chat.error.noVision": "This model doesn't support images. Try a model with the Vision badge.",

@@ -44,6 +44,7 @@ export async function POST(req: Request) {
       regenerate,
       parentId,
       editedMessageId,
+      pdfPageImages,
     } = body as {
       messages: UIMessage[];
       conversationId?: string;
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
       regenerate?: boolean;
       parentId?: string | null;
       editedMessageId?: string | null;
+      pdfPageImages?: string[];
     };
 
     if (!chatMessages || !Array.isArray(chatMessages) || chatMessages.length === 0) {
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
     }
 
     const selectedModel = modelId || DEFAULT_MODEL;
-    console.log(`[chat] Request: model=${selectedModel}, messages=${chatMessages.length}, convId=${conversationId || "new"}, regenerate=${!!regenerate}`);
+    console.log(`[chat] Request: model=${selectedModel}, messages=${chatMessages.length}, convId=${conversationId || "new"}, regenerate=${!!regenerate}, pdfPages=${pdfPageImages?.length || 0}`);
 
     const openrouter = getOpenRouter();
 
@@ -369,6 +371,25 @@ export async function POST(req: Request) {
       };
     });
     const modelMessages = await convertToModelMessages(cleanedMessages);
+
+    // Inject PDF page images into the last user message for the model
+    if (pdfPageImages?.length) {
+      for (let i = modelMessages.length - 1; i >= 0; i--) {
+        const msg = modelMessages[i];
+        if (msg.role === "user") {
+          const imageParts = pdfPageImages.map(dataUrl => ({
+            type: "image" as const,
+            image: dataUrl,
+          }));
+          if (Array.isArray(msg.content)) {
+            msg.content = [...imageParts, ...msg.content];
+          } else {
+            msg.content = [...imageParts, { type: "text" as const, text: msg.content }];
+          }
+          break;
+        }
+      }
+    }
 
     // Create assistant message immediately so other tabs can see it
     let assistantMessageId: string | null = null;

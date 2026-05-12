@@ -36,6 +36,11 @@ export const MAX_TEXT_PER_FILE = 100_000; // chars
 export const MAX_TOTAL_ATTACHMENT_TEXT = 200_000; // chars
 export const MAX_FILES_PER_MESSAGE = 10;
 
+// PDF page-as-image rendering
+export const PDF_IMAGE_PAGE_LIMIT = 30;
+export const PDF_PAGE_MAX_DIMENSION = 1568;
+export const PDF_PAGE_JPEG_QUALITY = 80;
+
 // Skills: max number of skill prompts injected per message
 export const MAX_SKILLS_PER_MESSAGE = 3;
 

@@ -11,11 +11,13 @@ import { MAX_FILES_PER_MESSAGE } from "@/lib/constants";
 export interface UploadedFile {
   url: string;
   dataUrl?: string | null;
+  dataUrls?: string[] | null;
   textContent?: string | null;
   name: string;
   type: string;
   size: number;
   isImage: boolean;
+  isPdfImages?: boolean;
   processed?: ProcessedFile;
 }
 

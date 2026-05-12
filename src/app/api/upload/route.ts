@@ -105,8 +105,13 @@ export async function POST(req: Request) {
 
     // Build response
     const isImage = processed.fileType === "image" && !!processed.imageData;
+    const isPdfImages = processed.fileType === "pdf" && !!processed.pageImages?.length;
     const dataUrl = processed.imageData?.dataUrl || null;
+    const dataUrls = processed.pageImages?.map(p => p.dataUrl) || null;
     const textContent = processed.textContent || null;
+
+    // Strip pageImages from processed to avoid duplicating large data in response
+    const { pageImages: _, ...processedMeta } = processed;
 
     return Response.json({
       url: `/api/upload/temp/${tempFilename}`,
@@ -114,9 +119,11 @@ export async function POST(req: Request) {
       type: fileType,
       size: file.size,
       isImage,
+      isPdfImages,
       dataUrl,
+      dataUrls,
       textContent,
-      processed,
+      processed: processedMeta,
     });
   } catch (error) {
     console.error("Upload error:", error);

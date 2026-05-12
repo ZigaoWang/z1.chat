@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["mupdf"],
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",

@@ -506,6 +506,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               url: f.dataUrl,
             });
             displayImages.push(f.dataUrl);
+          } else if (f.isPdfImages && f.dataUrls?.length && modelSupportsVision) {
+            displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
           } else {
             displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
             if (f.textContent) {
@@ -519,6 +521,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       }
 
       pendingAttachments.current = { images: displayImages, files: displayFiles };
+
+      // Collect PDF page images to pass via body (not stored in message history)
+      const pdfPageImages: string[] = [];
+      for (const f of files) {
+        if (f.isPdfImages && f.dataUrls?.length && modelSupportsVision) {
+          pdfPageImages.push(...f.dataUrls);
+        }
+      }
 
       let fullText = text;
       if (fileContentBlocks.length > 0) {
@@ -536,6 +546,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             attachments: (displayImages.length > 0 || displayFiles.length > 0)
               ? { images: displayImages, files: displayFiles }
               : undefined,
+            pdfPageImages: pdfPageImages.length > 0 ? pdfPageImages : undefined,
           },
         }
       );
@@ -1399,6 +1410,18 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
             <p className="flex-1 text-sm text-amber-700 dark:text-amber-400">
               {currentModel.name || selectedModel.split("/").pop()} {t("chat.visionWarning")}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* PDF vision warning */}
+      {files.some(f => f.isPdfImages && f.dataUrls?.length) && currentModel && !currentModel.supportsVision && (
+        <div className="shrink-0 px-4">
+          <div className="mx-auto max-w-3xl flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+            <p className="flex-1 text-sm text-amber-700 dark:text-amber-400">
+              {t("chat.pdfVisionWarning", { model: currentModel.name || selectedModel.split("/").pop() || selectedModel })}
             </p>
           </div>
         </div>
