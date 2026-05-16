@@ -188,7 +188,8 @@ export async function POST(req: Request) {
     let assistantParentId: string | null = null;
     let assistantBranchIndex = 0;
 
-    if (userContent && !regenerate) {
+    const hasAttachments = attachments && (attachments.images?.length > 0 || attachments.files?.length > 0);
+    if ((userContent || hasAttachments) && !regenerate) {
       // Compute branchIndex: count existing siblings with same parentId
       let userBranchIndex = 0;
       if (resolvedParentId) {
