@@ -27,6 +27,7 @@ export async function processImage(
   // HEIC/HEIF are already converted to JPEG by the upload route before reaching here
   try {
     const preview = await sharp(buffer)
+      .rotate()
       .resize(MAX_PREVIEW_DIMENSION, MAX_PREVIEW_DIMENSION, {
         fit: "inside",
         withoutEnlargement: true,

@@ -71,6 +71,7 @@ export async function POST(req: Request) {
     if (HEIC_EXTENSIONS.has(originalExt)) {
       try {
         buffer = await convertHeicToJpeg(buffer);
+        buffer = await sharp(buffer).rotate().toBuffer();
         fileName = file.name.replace(/\.[^.]+$/, ".jpg");
         fileType = "image/jpeg";
         console.log(`[upload] Converted HEIC → JPEG (${(buffer.length / 1024).toFixed(0)}KB)`);
@@ -79,12 +80,22 @@ export async function POST(req: Request) {
       }
     } else if (SHARP_CONVERT.has(originalExt)) {
       try {
-        buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+        buffer = await sharp(buffer).rotate().jpeg({ quality: 90 }).toBuffer();
         fileName = file.name.replace(/\.[^.]+$/, ".jpg");
         fileType = "image/jpeg";
         console.log(`[upload] Converted ${originalExt.toUpperCase()} → JPEG (${(buffer.length / 1024).toFixed(0)}KB)`);
       } catch (err) {
         console.error(`[upload] Failed to convert ${originalExt}:`, err);
+      }
+    }
+
+    // Normalize EXIF orientation for standard image uploads (JPEG/PNG from mobile cameras)
+    const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (IMAGE_TYPES.has(fileType) && !HEIC_EXTENSIONS.has(originalExt) && !SHARP_CONVERT.has(originalExt)) {
+      try {
+        buffer = await sharp(buffer).rotate().toBuffer();
+      } catch {
+        // Non-fatal: proceed with original buffer
       }
     }
 
