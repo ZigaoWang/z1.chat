@@ -412,9 +412,9 @@ export default function ArtifactPreview({
   return (
     <div className="flex h-full w-full flex-col bg-background overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 border-b border-border/40 overflow-hidden">
-        <div className="flex items-center gap-1 px-2 h-11 min-w-0 overflow-hidden">
-          {/* Title */}
+      <div className="shrink-0 border-b border-border/40">
+        {/* Row 1: title + actions */}
+        <div className="flex items-center gap-1 px-2 h-11 min-w-0">
           <span className="text-sm font-medium truncate min-w-0 shrink px-1">{title}</span>
           {numVersions > 1 && onLoadVersion ? (
             <div className="relative shrink-0">
@@ -437,40 +437,39 @@ export default function ArtifactPreview({
           ) : (
             <span className="text-[10px] text-muted-foreground/30 tabular-nums shrink-0">v{version || 1}</span>
           )}
-
           <div className="flex-1 min-w-0" />
-
-          {/* Tabs */}
-          <div className="flex items-center rounded-md bg-muted/50 p-0.5 shrink-0">
-            <button onClick={() => setTab("preview")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-              Preview
-            </button>
+          {/* Tabs: desktop inline */}
+          <div className="hidden sm:flex items-center rounded-md bg-muted/50 p-0.5 shrink-0">
+            <button onClick={() => setTab("preview")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>Preview</button>
             {type !== "document" && (
-              <button onClick={() => setTab("code")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "code" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-                Code
-              </button>
+              <button onClick={() => setTab("code")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "code" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>Code</button>
             )}
-
           </div>
-
-          {/* Actions — only essential buttons visible, rest hidden on narrow */}
+          {/* Actions */}
           <div className="flex items-center shrink-0">
             <IconBtn onClick={handleCopy} title="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
-            <div className="hidden sm:flex items-center">
-              {type === "document" ? (
-                <div className="relative" ref={downloadBtnRef}>
-                  <IconBtn onClick={handleDownload} title="Download" disabled={pdfLoading}>
-                    {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                  </IconBtn>
-                  {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onMd={handleDownloadMd} />}
-                </div>
-              ) : (
-                <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
-              )}
-              {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
-              {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
-            </div>
+            {type === "document" ? (
+              <div className="relative" ref={downloadBtnRef}>
+                <IconBtn onClick={handleDownload} title="Download" disabled={pdfLoading}>
+                  {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                </IconBtn>
+                {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onMd={handleDownloadMd} />}
+              </div>
+            ) : (
+              <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+            )}
+            {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
+            {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
             <IconBtn onClick={onClose} title="Close"><X className="h-3.5 w-3.5" /></IconBtn>
+          </div>
+        </div>
+        {/* Tabs: mobile row 2 */}
+        <div className="flex items-center px-3 pb-2 sm:hidden">
+          <div className="flex items-center rounded-md bg-muted/50 p-0.5 w-full">
+            <button onClick={() => setTab("preview")} className={`flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${tab === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60"}`}>Preview</button>
+            {type !== "document" && (
+              <button onClick={() => setTab("code")} className={`flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${tab === "code" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60"}`}>Code</button>
+            )}
           </div>
         </div>
       </div>

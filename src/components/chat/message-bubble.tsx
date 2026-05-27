@@ -479,8 +479,8 @@ function MessageBubble({
     const displayContent = content.replace(/<attached_file\s[^>]*>[\s\S]*?<\/attached_file>\s*/g, "").replace(/<attached_file\s[^>]*\/>\s*/g, "").trim();
 
     return (
-      <div className="group flex justify-end px-4 py-2 animate-bubble-in">
-        <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
+      <div className="group flex justify-end px-3 sm:px-4 py-2 animate-bubble-in">
+        <div className="max-w-[88%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
               {files.map((file, i) => {
@@ -572,7 +572,7 @@ function MessageBubble({
   const hasAnyContent = displayContent.length > 0 || (toolInvocations && toolInvocations.length > 0) || (segments && segments.length > 0);
 
   return (
-    <div className="group px-4 py-2 animate-message-in">
+    <div className="group px-3 sm:px-4 py-2 animate-message-in">
       <div className="mx-auto max-w-3xl">
         {/* Thinking/reasoning block — only show top-level when segments don't include reasoning */}
         {thinking && !hasReasoningSegments && (
