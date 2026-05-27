@@ -1004,22 +1004,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
   }, [onCollapseSidebar, sidebarOpen]);
 
-  const handleArtifactContentChange = useCallback(async (content: string) => {
-    if (!artifactPanel?.id) return;
-    try {
-      const res = await fetch(`/api/artifacts/${artifactPanel.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setArtifactPanel(updated);
-      }
-    } catch (err) {
-      console.error("Failed to save artifact:", err);
-    }
-  }, [artifactPanel?.id]);
 
   const handleLoadVersion = useCallback(async (targetVersion: number) => {
     if (!artifactPanel?.id) return;
@@ -1467,7 +1451,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             artifact={artifactPanel}
             streaming={artifactStreaming}
             onClose={handleCloseArtifact}
-            onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
             onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
           />
         </div>
@@ -1489,7 +1472,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               artifact={artifactPanel}
               streaming={artifactStreaming}
               onClose={handleCloseArtifact}
-              onContentChange={artifactPanel.id ? handleArtifactContentChange : undefined}
               onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
               totalVersions={artifactPanel.version}
             />

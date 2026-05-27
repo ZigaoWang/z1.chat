@@ -243,13 +243,12 @@ interface ArtifactPreviewProps {
   artifact: ArtifactData;
   streaming?: boolean;
   onClose: () => void;
-  onContentChange?: (content: string) => void;
   onLoadVersion?: (version: number) => void;
   totalVersions?: number;
 }
 
 export default function ArtifactPreview({
-  artifact, streaming, onClose, onContentChange, onLoadVersion, totalVersions,
+  artifact, streaming, onClose, onLoadVersion, totalVersions,
 }: ArtifactPreviewProps) {
   const { type, title, content, language, version } = artifact;
 
@@ -257,8 +256,6 @@ export default function ArtifactPreview({
   const [copied, setCopied] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
   const [versionOpen, setVersionOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(() => doHighlight(content, getHighlightLang(type, language)));
@@ -267,7 +264,6 @@ export default function ArtifactPreview({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const downloadBtnRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevContentRef = useRef(content);
   const prevStreamingRef = useRef(streaming);
@@ -282,12 +278,6 @@ export default function ArtifactPreview({
     else if (!streaming && prevStreamingRef.current) setTab("preview");
     prevStreamingRef.current = streaming;
   }, [streaming, type]);
-
-  // Sync edit content
-  useEffect(() => {
-    if (!editing && content !== prevContentRef.current) setEditContent(content);
-    prevContentRef.current = content;
-  }, [content, editing]);
 
   // Syntax highlighting
   useEffect(() => {
@@ -361,25 +351,12 @@ export default function ArtifactPreview({
     if (w) { const h = wrapForPreview(content, type); w.document.open(); w.document.write(h); w.document.close(); }
   }, [content, type, canOpenNew]);
 
-  const handleEditChange = useCallback((val: string) => {
-    setEditContent(val);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => onContentChange?.(val), 1500);
-  }, [onContentChange]);
-
   // Code display: highlighted when ready, escaped raw as fallback during streaming
   const codeHtml = useMemo(() => (streaming && !highlighted) ? escapeHtml(content) : highlighted, [streaming, highlighted, content]);
 
   // --- Render ---
 
   const renderContent = () => {
-    // Edit mode
-    if (editing) return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <textarea value={editContent} onChange={(e) => handleEditChange(e.target.value)} className="flex-1 w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed font-mono outline-none" spellCheck={type === "document"} />
-      </div>
-    );
-
     // Code tab (not available for documents)
     if (tab === "code" && type !== "document") return (
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
@@ -465,19 +442,15 @@ export default function ArtifactPreview({
 
           {/* Tabs */}
           <div className="flex items-center rounded-md bg-muted/50 p-0.5 shrink-0">
-            <button onClick={() => { setTab("preview"); setEditing(false); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "preview" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+            <button onClick={() => setTab("preview")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
               Preview
             </button>
             {type !== "document" && (
-              <button onClick={() => { setTab("code"); setEditing(false); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "code" && !editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
+              <button onClick={() => setTab("code")} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${tab === "code" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
                 Code
               </button>
             )}
-            {!streaming && onContentChange && (
-              <button onClick={() => { setEditing(!editing); if (!editing) setTab("preview"); }} className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${editing ? "bg-background text-foreground shadow-sm" : "text-muted-foreground/60 hover:text-foreground"}`}>
-                Edit
-              </button>
-            )}
+
           </div>
 
           {/* Actions — only essential buttons visible, rest hidden on narrow */}
