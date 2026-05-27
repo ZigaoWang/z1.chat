@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   X, ExternalLink, Copy, Check,
-  RefreshCw, Download, ChevronDown, FileText, FileDown, Printer, Loader2,
+  RefreshCw, Download, ChevronDown, FileText, FileDown, Loader2,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
@@ -196,11 +196,10 @@ function IconBtn({ onClick, title, children, className, disabled }: { onClick: (
 
 // --- Download menu (fixed position to escape overflow-hidden) ---
 
-function DownloadMenu({ btnRef, onClose, onPdf, onPrint, onMd }: {
+function DownloadMenu({ btnRef, onClose, onPdf, onMd }: {
   btnRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onPdf: () => void;
-  onPrint: () => void;
   onMd: () => void;
 }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -223,9 +222,6 @@ function DownloadMenu({ btnRef, onClose, onPdf, onPrint, onMd }: {
         </button>
         <button onClick={onMd} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
           <FileText className="h-3.5 w-3.5 text-muted-foreground" />Markdown
-        </button>
-        <button onClick={onPrint} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
-          <Printer className="h-3.5 w-3.5 text-muted-foreground" />Print
         </button>
       </div>
     </>
@@ -348,12 +344,6 @@ export default function ArtifactPreview({
     } finally {
       setPdfLoading(false);
     }
-  }, [content, title]);
-
-  const handlePrint = useCallback(async () => {
-    setDownloadOpen(false);
-    const { printMarkdown } = await import("@/lib/pdf-export");
-    await printMarkdown(content, title);
   }, [content, title]);
 
   const handleDownloadMd = useCallback(() => {
@@ -499,7 +489,7 @@ export default function ArtifactPreview({
                   <IconBtn onClick={handleDownload} title="Download" disabled={pdfLoading}>
                     {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                   </IconBtn>
-                  {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onPrint={handlePrint} onMd={handleDownloadMd} />}
+                  {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onMd={handleDownloadMd} />}
                 </div>
               ) : (
                 <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
