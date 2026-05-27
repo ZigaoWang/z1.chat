@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   X, ExternalLink, Copy, Check,
-  RefreshCw, Download, ChevronDown,
+  RefreshCw, Download, ChevronDown, FileText, FileDown, Printer, Loader2,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
@@ -186,11 +186,49 @@ function MermaidPreview({ code }: { code: string }) {
 
 // --- Icon button helper ---
 
-function IconBtn({ onClick, title, children, className }: { onClick: () => void; title: string; children: React.ReactNode; className?: string }) {
+function IconBtn({ onClick, title, children, className, disabled }: { onClick: () => void; title: string; children: React.ReactNode; className?: string; disabled?: boolean }) {
   return (
-    <button onClick={onClick} title={title} className={`flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground ${className || ""}`}>
+    <button onClick={onClick} title={title} disabled={disabled} className={`flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed ${className || ""}`}>
       {children}
     </button>
+  );
+}
+
+// --- Download menu (fixed position to escape overflow-hidden) ---
+
+function DownloadMenu({ btnRef, onClose, onPdf, onPrint, onMd }: {
+  btnRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onPdf: () => void;
+  onPrint: () => void;
+  onMd: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, [btnRef]);
+
+  if (!pos) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60]" onClick={onClose} />
+      <div className="fixed z-[61] min-w-[140px] rounded-md border border-border bg-popover shadow-md py-0.5" style={{ top: pos.top, right: pos.right }}>
+        <button onClick={onPdf} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
+          <FileDown className="h-3.5 w-3.5 text-muted-foreground" />PDF
+        </button>
+        <button onClick={onMd} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" />Markdown
+        </button>
+        <button onClick={onPrint} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
+          <Printer className="h-3.5 w-3.5 text-muted-foreground" />Print
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -221,6 +259,8 @@ export default function ArtifactPreview({
 
   const [tab, setTab] = useState<"preview" | "code">(streaming && type !== "document" ? "code" : "preview");
   const [copied, setCopied] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [iframeKey, setIframeKey] = useState(0);
@@ -229,6 +269,7 @@ export default function ArtifactPreview({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const downloadBtnRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -285,14 +326,44 @@ export default function ArtifactPreview({
     setTimeout(() => setCopied(false), 2000);
   }, [content]);
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
+    if (type === "document") {
+      setDownloadOpen(!downloadOpen);
+      return;
+    }
     const ext = getDownloadExtension(type, language);
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     Object.assign(document.createElement("a"), { href: url, download: `${slug}${ext}` }).click();
     URL.revokeObjectURL(url);
-  }, [content, type, language, title]);
+  }, [content, type, language, title, downloadOpen]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setDownloadOpen(false);
+    setPdfLoading(true);
+    try {
+      const { exportToPdf } = await import("@/lib/pdf-export");
+      await exportToPdf(content, title);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [content, title]);
+
+  const handlePrint = useCallback(async () => {
+    setDownloadOpen(false);
+    const { printMarkdown } = await import("@/lib/pdf-export");
+    await printMarkdown(content, title);
+  }, [content, title]);
+
+  const handleDownloadMd = useCallback(() => {
+    setDownloadOpen(false);
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    Object.assign(document.createElement("a"), { href: url, download: `${slug}.md` }).click();
+    URL.revokeObjectURL(url);
+  }, [content, title]);
 
   const handleOpenNew = useCallback(() => {
     if (!canOpenNew) return;
@@ -423,7 +494,16 @@ export default function ArtifactPreview({
           <div className="flex items-center shrink-0">
             <IconBtn onClick={handleCopy} title="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</IconBtn>
             <div className="hidden sm:flex items-center">
-              <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+              {type === "document" ? (
+                <div className="relative" ref={downloadBtnRef}>
+                  <IconBtn onClick={handleDownload} title="Download" disabled={pdfLoading}>
+                    {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  </IconBtn>
+                  {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onPrint={handlePrint} onMd={handleDownloadMd} />}
+                </div>
+              ) : (
+                <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+              )}
               {!streaming && canOpenNew && <IconBtn onClick={handleOpenNew} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></IconBtn>}
               {!streaming && tab === "preview" && canOpenNew && <IconBtn onClick={() => setIframeKey(k => k + 1)} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></IconBtn>}
             </div>

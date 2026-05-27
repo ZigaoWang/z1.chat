@@ -727,7 +727,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     }
 
     if (!isLoading) {
-      setArtifactStreaming(false);
+      if (!artifactPanel || artifactPanel.id) {
+        setArtifactStreaming(false);
+      }
       streamedArtifactContent.current = {};
       return;
     }
