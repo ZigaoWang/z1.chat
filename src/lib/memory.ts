@@ -121,34 +121,34 @@ export async function extractMemories(
 
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `You extract durable information about a user from conversations. Identify NEW information worth remembering that is NOT already captured in their memory document.
+      system: `You extract durable facts about a user from conversations. Only save what was explicitly stated — never infer, expand, or add context not present in the conversation.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
 Their current memory document:
 ${currentDoc || "(empty)"}
 
-What to extract:
+What to extract (only if explicitly stated):
 - Identity: name, age, location, school, job, roles
 - Projects: what they're building, tech stack, status, goals
 - Skills & interests: languages, tools, hobbies, activities
 - People & relationships: collaborators, teachers, teams
 - Preferences: communication style, tools, workflows
-- Plans & timelines: upcoming events, deadlines, applications (convert relative dates to absolute)
+- Plans & timelines: upcoming events, deadlines (convert relative dates to absolute)
 - Achievements: awards, scores, milestones
-- Context that would help future conversations be more relevant
 
 What NOT to extract:
-- Things already in the document (even if phrased differently)
-- Transient conversation context (debugging steps, temporary questions)
-- Things the user merely asked about but don't reflect who they are
+- Anything already in the document
+- Transient context (debugging steps, temporary questions, test actions)
+- Things the user asked about but didn't claim as their own (asking about a product ≠ owning it, wanting it, or having plans for it)
+- Casual mentions without clear intent ("I was listening to X" is not worth saving)
+- Content of artifacts or documents the AI created
+- Anything you are inferring or extrapolating — only save what was directly said
 - Vague observations without substance
 
-Output format:
-- Write in third person, concise but complete sentences
-- Include specific details (names, dates, numbers, links) — these matter
-- Group related facts together if multiple are found
-- If nothing new is worth remembering, return exactly: NONE
+CRITICAL: Copy facts verbatim from what was said. Do NOT add details, use cases, or context that weren't explicitly stated.
+
+Output format: third person, concise sentences. If nothing new is worth saving, return exactly: NONE
 
 Output only the new information to append. No bullets, no markdown, no explanation.`,
       messages: [
@@ -307,7 +307,7 @@ CRITICAL RULES:
 3. Merge true duplicates only. If two facts add different details about the same topic, combine them into one richer sentence — don't delete either.
 4. Only remove information that is explicitly contradicted by newer information in the same document.
 5. The output should be LONGER and MORE DETAILED than a flat list — paragraphs carry more information than bullet points.
-6. Do NOT add information that isn't in the input.
+6. ABSOLUTE PROHIBITION: Do NOT add ANY information not present verbatim in the input. No inferences ("likely X model"), no expansions ("for travel and late-night use"), no assumed context, no details you think might be true. Every word in the output must trace back to a word in the input.
 7. Do NOT add meta-commentary about the document.
 8. Output the document directly. No markdown fences, no preamble, no "Here's the reorganized document:".`;
 }
@@ -319,7 +319,7 @@ export async function getRelevantMemories(userId: string): Promise<string> {
     const doc = await getMemoryDocument(userId);
     if (!doc) return "";
 
-    const trimmed = doc.length > 4000 ? doc.slice(0, 4000) + "\n..." : doc;
+    const trimmed = doc.length > 2000 ? doc.slice(0, 2000) + "\n..." : doc;
 
     return `\n\nAbout this user (from previous conversations):\n${trimmed}\n\nUse this knowledge naturally. Don't announce that you remember things. Don't repeatedly reference the same facts. Only mention stored context when directly relevant to what the user is asking about.`;
   } catch (error) {
