@@ -121,36 +121,24 @@ export async function extractMemories(
 
     const { text } = await trackedGenerateText({
       model: openrouter(MEMORY_MODEL),
-      system: `You extract durable facts about a user from conversations. Only save what was explicitly stated — never infer, expand, or add context not present in the conversation.
+      system: `You extract durable facts about a user from conversations to build their long-term memory profile. Only record what was explicitly stated — never infer, assume, or embellish.
 
 Current date: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
 
-Their current memory document:
+Existing memory document:
 ${currentDoc || "(empty)"}
 
-What to extract (only if explicitly stated):
-- Identity: name, age, location, school, job, roles
-- Projects: what they're building, tech stack, status, goals
-- Skills & interests: languages, tools, hobbies, activities
-- People & relationships: collaborators, teachers, teams
-- Preferences: communication style, tools, workflows
-- Plans & timelines: upcoming events, deadlines (convert relative dates to absolute)
-- Achievements: awards, scores, milestones
+SAVE: identity, projects, skills, tools, preferences, relationships, plans, deadlines, achievements — only when explicitly stated by the user.
 
-What NOT to extract:
+DO NOT SAVE:
 - Anything already in the document
-- Transient context (debugging steps, temporary questions, test actions)
-- Things the user asked about but didn't claim as their own (asking about a product ≠ owning it, wanting it, or having plans for it)
-- Casual mentions without clear intent ("I was listening to X" is not worth saving)
-- Content of artifacts or documents the AI created
-- Anything you are inferring or extrapolating — only save what was directly said
-- Vague observations without substance
+- Temporary context (debugging steps, one-off questions, test actions)
+- Content of artifacts or documents the AI generated
+- Anything inferred or extrapolated beyond what was literally said
 
-CRITICAL: Copy facts verbatim from what was said. Do NOT add details, use cases, or context that weren't explicitly stated.
+If nothing new is worth saving, return exactly: NONE
 
-Output format: third person, concise sentences. If nothing new is worth saving, return exactly: NONE
-
-Output only the new information to append. No bullets, no markdown, no explanation.`,
+Output only the new facts in third-person prose. No bullets, no markdown, no explanation.`,
       messages: [
         {
           role: "user",
@@ -307,7 +295,7 @@ CRITICAL RULES:
 3. Merge true duplicates only. If two facts add different details about the same topic, combine them into one richer sentence — don't delete either.
 4. Only remove information that is explicitly contradicted by newer information in the same document.
 5. The output should be LONGER and MORE DETAILED than a flat list — paragraphs carry more information than bullet points.
-6. ABSOLUTE PROHIBITION: Do NOT add ANY information not present verbatim in the input. No inferences ("likely X model"), no expansions ("for travel and late-night use"), no assumed context, no details you think might be true. Every word in the output must trace back to a word in the input.
+6. NEVER ADD information not present in the input. No inferences, no expansions, no assumed context. Every claim in the output must be traceable to a claim in the input.
 7. Do NOT add meta-commentary about the document.
 8. Output the document directly. No markdown fences, no preamble, no "Here's the reorganized document:".`;
 }
