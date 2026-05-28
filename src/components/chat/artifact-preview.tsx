@@ -170,7 +170,7 @@ function MermaidPreview({ code }: { code: string }) {
       try {
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose", flowchart: { htmlLabels: true } });
-        const sanitized = code.replace(/<\/?[a-z][^>]*>/gi, "");
+        const sanitized = code.replace(/<\/?(script|iframe|object|embed|link|style|form|input|button)[^>]*>/gi, "");
         const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, sanitized);
         if (id === renderIdRef.current) setSvg(rendered);
       } catch (err) {
