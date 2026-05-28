@@ -153,8 +153,7 @@ export default function ChatInput({
             placeholder={editing ? t("chat.editMessage") : placeholder}
             disabled={disabled}
             rows={1}
-            className="block w-full resize-none bg-transparent px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 disabled:opacity-50"
-            style={{ maxHeight: "240px" }}
+            className="block w-full resize-none overflow-hidden bg-transparent px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 disabled:opacity-50"
           />
 
           {/* Action bar below textarea */}
