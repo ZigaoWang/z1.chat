@@ -53,6 +53,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const [editingState, setEditingState] = useState<EditingState | null>(null);
   const [viewingOldBranch, setViewingOldBranch] = useState(false);
   const [artifactPanel, setArtifactPanel] = useState<ArtifactData | null>(null);
+  const [artifactClosing, setArtifactClosing] = useState(false);
   const [artifactStreaming, setArtifactStreaming] = useState(false);
   const [wasInterrupted, setWasInterrupted] = useState(false);
   const [artifactWidth, setArtifactWidth] = useState(50);
@@ -60,6 +61,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const savedInputRef = useRef("");
   const sidebarWasOpen = useRef(false);
   const artifactDragging = useRef(false);
+  const lastArtifactRef = useRef<ArtifactData | null>(null);
+  if (artifactPanel) lastArtifactRef.current = artifactPanel;
   const outerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
   const initialLoadDone = useRef(false);
@@ -1029,12 +1032,14 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   }, [artifactPanel?.id, artifactPanel?.version]);
 
   const handleCloseArtifact = useCallback(() => {
-    setArtifactPanel(null);
-    setArtifactStreaming(false);
-    artifactOpenedRef.current = false;
-    if (sidebarWasOpen.current) {
-      onOpenSidebar();
-    }
+    setArtifactClosing(true);
+    if (sidebarWasOpen.current) onOpenSidebar();
+    setTimeout(() => {
+      setArtifactPanel(null);
+      setArtifactClosing(false);
+      setArtifactStreaming(false);
+      artifactOpenedRef.current = false;
+    }, 250);
   }, [onOpenSidebar]);
 
   const handleArtifactDragStart = useCallback((e: React.MouseEvent) => {
@@ -1168,8 +1173,8 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   return (
     <div ref={outerRef} className="flex h-full flex-1 relative overflow-hidden">
     <div
-      style={artifactPanel ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)' } : undefined}
-      className={`relative flex h-full flex-col bg-background ${artifactPanel ? "max-lg:flex-1" : "flex-1"}`}
+      style={(artifactPanel || artifactClosing) ? { width: `${100 - artifactWidth}%`, transition: isDraggingArtifact ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)' } : undefined}
+      className={`relative flex h-full flex-col bg-background ${(artifactPanel || artifactClosing) ? "max-lg:flex-1" : "flex-1"}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -1195,19 +1200,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           {!sidebarOpen && (
             <>
               <Tooltip>
-                <TooltipTrigger
-                  onClick={onToggleSidebar}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
+                <TooltipTrigger render={<button onClick={onToggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" />}>
                   <PanelLeft className="h-4 w-4" />
                 </TooltipTrigger>
                 <TooltipContent side="bottom">{t("chat.openSidebar")}</TooltipContent>
               </Tooltip>
               <Tooltip>
-                <TooltipTrigger
-                  onClick={handleNewChat}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
+                <TooltipTrigger render={<button onClick={handleNewChat} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" />}>
                   <Plus className="h-4 w-4" />
                 </TooltipTrigger>
                 <TooltipContent side="bottom">{t("sidebar.newChat")}</TooltipContent>
@@ -1223,7 +1222,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
 
       {/* Messages or Empty State */}
       {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 -mt-16">
+        <div className="flex flex-1 flex-col items-center justify-center px-4">
           <div className="w-full max-w-2xl">
             <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight text-foreground">
               {greeting}
@@ -1443,15 +1442,15 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     </div>
 
     {/* Artifact Preview Panel */}
-    {artifactPanel && (
+    {(artifactPanel || artifactClosing) && (
       <>
-        {/* Mobile: full-screen overlay — ArtifactPreview has its own header */}
-        <div className="fixed inset-0 z-50 flex flex-col bg-background lg:hidden">
+        {/* Mobile: full-screen overlay */}
+        <div className={`fixed inset-0 z-50 flex flex-col bg-background lg:hidden transition-transform duration-250 ease-out ${artifactClosing ? "translate-x-full" : "translate-x-0"}`}>
           <ArtifactPreview
-            artifact={artifactPanel}
+            artifact={lastArtifactRef.current!}
             streaming={artifactStreaming}
             onClose={handleCloseArtifact}
-            onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
+            onLoadVersion={lastArtifactRef.current?.id ? handleLoadVersion : undefined}
           />
         </div>
 
@@ -1467,13 +1466,21 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
             <div className={`h-full w-full transition-colors ${isDraggingArtifact ? "bg-primary/40" : "bg-border/30 hover:bg-primary/25"}`} />
           </div>
-          <div style={{ width: `${artifactWidth}%` }} className="h-full min-w-0 overflow-hidden">
+          <div
+            style={{
+              width: `${artifactWidth}%`,
+              transition: isDraggingArtifact ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out, transform 0.25s ease-out',
+              opacity: artifactClosing ? 0 : 1,
+              transform: artifactClosing ? 'translateX(16px)' : 'translateX(0)',
+            }}
+            className="h-full min-w-0 overflow-hidden"
+          >
             <ArtifactPreview
-              artifact={artifactPanel}
+              artifact={lastArtifactRef.current!}
               streaming={artifactStreaming}
               onClose={handleCloseArtifact}
-              onLoadVersion={artifactPanel.id ? handleLoadVersion : undefined}
-              totalVersions={artifactPanel.version}
+              onLoadVersion={lastArtifactRef.current?.id ? handleLoadVersion : undefined}
+              totalVersions={lastArtifactRef.current?.version}
             />
           </div>
         </div>

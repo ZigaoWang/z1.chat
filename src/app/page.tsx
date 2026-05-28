@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import ChatView from "@/components/chat/chat-view";
 import OnboardingFlow from "@/components/onboarding/onboarding-flow";
@@ -40,6 +40,32 @@ function AppSkeleton() {
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarOpenRef = useRef(true);
+  const sidebarBeforeMobile = useRef<boolean | null>(null);
+
+  const setSidebar = useCallback((val: boolean) => {
+    sidebarOpenRef.current = val;
+    setSidebarOpen(val);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 1024;
+      if (isMobile && sidebarBeforeMobile.current === null) {
+        sidebarBeforeMobile.current = sidebarOpenRef.current;
+        setSidebar(false);
+      } else if (!isMobile && sidebarBeforeMobile.current !== null) {
+        setSidebar(sidebarBeforeMobile.current);
+        sidebarBeforeMobile.current = null;
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    if (window.innerWidth < 1024) {
+      sidebarBeforeMobile.current = true;
+      setSidebar(false);
+    }
+    return () => window.removeEventListener("resize", handleResize);
+  }, [setSidebar]);
   const { createConversation } = useConversations();
   const { user, isLoading: authLoading, refresh: refreshAuth } = useAuth();
   const { creditBalance } = useCredits();
@@ -63,13 +89,13 @@ export default function Home() {
       // Cmd/Ctrl + B: Toggle sidebar
       if (mod && e.key === "b") {
         e.preventDefault();
-        setSidebarOpen((prev) => !prev);
+        setSidebar(!sidebarOpenRef.current);
       }
 
       // Cmd/Ctrl + Shift + S: Toggle sidebar (alternative)
       if (mod && e.shiftKey && e.key === "s") {
         e.preventDefault();
-        setSidebarOpen((prev) => !prev);
+        setSidebar(!sidebarOpenRef.current);
       }
 
       // Cmd/Ctrl + N: New chat
@@ -99,18 +125,11 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [createConversation]);
-
-  // On mobile, default sidebar closed
-  useEffect(() => {
-    if (window.innerWidth < 1024) {
-      setSidebarOpen(false);
-    }
-  }, []);
+  }, [createConversation, setSidebar]);
 
   const toggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
-  }, []);
+    setSidebar(!sidebarOpenRef.current);
+  }, [setSidebar]);
 
   if (!user && authLoading) {
     return <AppSkeleton />;
@@ -137,8 +156,8 @@ export default function Home() {
       <ChatView
         sidebarOpen={sidebarOpen}
         onToggleSidebar={toggleSidebar}
-        onCollapseSidebar={() => setSidebarOpen(false)}
-        onOpenSidebar={() => setSidebarOpen(true)}
+        onCollapseSidebar={() => setSidebar(false)}
+        onOpenSidebar={() => setSidebar(true)}
       />
 
       {/* Shortcuts help modal */}

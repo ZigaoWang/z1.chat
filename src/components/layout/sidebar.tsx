@@ -291,7 +291,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const sidebarStyle = mounted
     ? isOpen
       ? { width }
-      : undefined // closed: let CSS classes handle it
+      : undefined
     : undefined;
 
   return (
@@ -299,7 +299,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div
         style={sidebarStyle}
         className={[
-          "fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200 ease-out lg:relative",
+          "fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-[transform,width] duration-200 ease-out lg:relative",
           // Mobile: always keep a width so -translate-x-full moves it fully off-screen
           !isOpen ? "w-[250px]" : "",
           // When open on desktop with mounted, inline style sets width; otherwise fallback
