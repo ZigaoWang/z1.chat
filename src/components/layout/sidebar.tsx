@@ -214,10 +214,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     if (deletingId === conv.id) {
       return (
-        <div key={conv.id} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground">
-          <span className="flex-1 truncate text-destructive">{t("sidebar.deleteChat")}</span>
-          <button onClick={() => confirmDelete(conv.id)} className="rounded p-0.5 text-destructive hover:bg-destructive/10"><Check className="h-3.5 w-3.5" /></button>
-          <button onClick={() => setDeletingId(null)} className="rounded p-0.5 text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+        <div key={conv.id} className="relative group">
+          <div className={`w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 bg-destructive/5`}>
+            <span className="flex-1 truncate text-sm text-destructive">{t("sidebar.deleteChat")}</span>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button onClick={() => confirmDelete(conv.id)} className="flex h-6 w-6 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"><Check className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setDeletingId(null)} className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          </div>
         </div>
       );
     }
