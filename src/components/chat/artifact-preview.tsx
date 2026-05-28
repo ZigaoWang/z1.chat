@@ -169,8 +169,9 @@ function MermaidPreview({ code }: { code: string }) {
     const timer = setTimeout(async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
-        const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, code);
+        mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose", flowchart: { htmlLabels: true } });
+        const sanitized = code.replace(/<\/?[a-z][^>]*>/gi, "");
+        const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, sanitized);
         if (id === renderIdRef.current) setSvg(rendered);
       } catch (err) {
         if (id === renderIdRef.current) setError(err instanceof Error ? err.message : "Render failed");
@@ -181,7 +182,7 @@ function MermaidPreview({ code }: { code: string }) {
 
   if (error) return <div className="flex items-center justify-center h-full p-8 text-sm text-destructive/60"><pre className="whitespace-pre-wrap">{error}</pre></div>;
   if (!svg) return <div className="flex items-center justify-center h-full p-8"><div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /></div>;
-  return <div className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg) }} />;
+  return <div className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 // --- Icon button helper ---
@@ -378,10 +379,8 @@ export default function ArtifactPreview({
 
     // Preview: document — live markdown
     if (type === "document") return (
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto px-4 py-6 sm:px-6">
-        <div className="max-w-prose mx-auto">
-          <MarkdownRenderer content={content} />
-        </div>
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 h-0 overflow-y-auto px-6 py-6 sm:px-10">
+        <MarkdownRenderer content={content} />
       </div>
     );
 
