@@ -290,7 +290,7 @@ function MermaidPreview({ code }: { code: string }) {
       <div
         ref={contentRef}
         data-mermaid-container=""
-        className="origin-top-left will-change-transform p-8"
+        className="origin-top-left p-8"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
       <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-border/50 bg-background/80 backdrop-blur-sm p-0.5 shadow-sm">
