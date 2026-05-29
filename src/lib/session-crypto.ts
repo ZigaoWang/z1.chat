@@ -13,7 +13,7 @@ async function getSecretKey() {
     ["deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: new TextEncoder().encode("session") },
+    { name: "HKDF", hash: "SHA-256", salt: new TextEncoder().encode("z1.chat-session-v1"), info: new TextEncoder().encode("session-enc") },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
