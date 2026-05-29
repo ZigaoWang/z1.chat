@@ -49,6 +49,7 @@ export const zh: Record<TranslationKey, string> = {
   "chat.goodMorning": "早上好，{name}",
   "chat.goodAfternoon": "下午好，{name}",
   "chat.goodEvening": "晚上好，{name}",
+  "chat.helpSubtitle": "今天我能帮你什么？",
   "chat.placeholder": "随便问点什么...",
   "chat.editingMessage": "编辑消息",
   "chat.cancel": "取消",

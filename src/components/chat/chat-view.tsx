@@ -1255,7 +1255,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           <div className="w-full max-w-3xl flex flex-col gap-6">
             <div className="flex flex-col gap-1.5 px-3 md:px-4">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">{greeting}</h1>
-              <p className="text-base text-muted-foreground/60">What can I help you with today?</p>
+              <p className="text-base text-muted-foreground/60">{t("chat.helpSubtitle")}</p>
             </div>
             <ChatInput
               value={input}

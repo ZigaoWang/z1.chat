@@ -47,6 +47,7 @@ export const en = {
   "chat.goodMorning": "Good morning, {name}",
   "chat.goodAfternoon": "Good afternoon, {name}",
   "chat.goodEvening": "Good evening, {name}",
+  "chat.helpSubtitle": "What can I help you with today?",
   "chat.placeholder": "Ask me anything...",
   "chat.editingMessage": "Editing message",
   "chat.cancel": "Cancel",
