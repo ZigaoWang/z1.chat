@@ -132,7 +132,7 @@ export async function verifyEmailCode(userId: string, code: string) {
     throw new Error("Too many attempts");
   }
 
-  if (verification.code !== code) {
+  if (!crypto.timingSafeEqual(Buffer.from(verification.code), Buffer.from(code))) {
     throw new Error("Invalid code");
   }
 
