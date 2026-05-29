@@ -1253,7 +1253,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       ) : messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-3 md:px-4 pb-16">
           <div className="w-full max-w-3xl flex flex-col gap-6">
-            <div className="flex flex-col gap-1.5 px-3 md:px-4">
+            <div className="flex flex-col gap-1.5 px-4 md:px-5">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">{greeting}</h1>
               <p className="text-base text-muted-foreground/60">{t("chat.helpSubtitle")}</p>
             </div>
