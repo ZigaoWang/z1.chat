@@ -144,22 +144,22 @@ export default function ChatInput({
         <div className={`border border-border/60 bg-background shadow-sm transition-all duration-200 focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 focus-within:shadow-md ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
           {/* File previews */}
           {files.length > 0 && !editing && (
-            <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+            <div className="flex flex-wrap gap-2 px-3.5 pt-3">
               {files.map((file, i) => (
                 file.textContent ? (
-                  <div key={i} className="relative flex flex-col gap-1 rounded-lg border border-border/40 bg-muted/20 p-2 w-[180px]">
+                  <div key={i} className="relative flex flex-col gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-2.5 w-[180px]">
                     <p className="text-[11px] leading-tight text-muted-foreground/70 line-clamp-6 whitespace-pre-wrap break-words">{file.textContent.slice(0, 200)}</p>
                     <span className="inline-flex w-fit rounded border border-border/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wide">Pasted</span>
-                    <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="absolute top-1 right-1 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground hover:bg-muted"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted border border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/80"><X className="h-3 w-3" /></button>
                   </div>
                 ) : (
-                  <div key={i} className={`flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground ${file.uploading ? "animate-pulse" : ""}`}>
+                  <div key={i} className={`relative flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm text-muted-foreground ${file.uploading ? "animate-pulse" : ""}`}>
                     {file.uploading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : file.isImage ? ((file.dataUrl || file.url) ? <img src={file.dataUrl || file.url} alt={file.name} className="h-7 w-7 rounded object-cover" /> : <ImageIcon className="h-3.5 w-3.5" />) : <FileText className="h-3.5 w-3.5" />}
-                    <span className="max-w-[100px] truncate">{file.name}</span>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : file.isImage ? ((file.dataUrl || file.url) ? <img src={file.dataUrl || file.url} alt={file.name} className="h-9 w-9 rounded-md object-cover" /> : <ImageIcon className="h-4 w-4" />) : <FileText className="h-4 w-4 text-muted-foreground/50" />}
+                    <span className="max-w-[140px] truncate text-[13px]">{file.name}</span>
                     {!file.uploading && (
-                      <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="ml-0.5 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground"><X className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted border border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/80"><X className="h-3 w-3" /></button>
                     )}
                   </div>
                 )
