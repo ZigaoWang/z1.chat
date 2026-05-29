@@ -105,6 +105,22 @@ export default function ChatInput({
       onFilesChange([...files, ...placeholders]);
       const uploaded = await uploadFiles(pastedFiles);
       onFilesChange([...files.filter(x => !x.uploading), ...uploaded]);
+      return;
+    }
+
+    // Long text paste → convert to file chip
+    const pastedText = e.clipboardData?.getData("text/plain");
+    if (pastedText && pastedText.length > 500) {
+      e.preventDefault();
+      const pastedFile: UploadedFile = {
+        url: "",
+        name: "Pasted text",
+        type: "text/plain",
+        size: pastedText.length,
+        isImage: false,
+        textContent: pastedText,
+      };
+      onFilesChange([...files, pastedFile]);
     }
   }, [files, onFilesChange]);
 
@@ -130,15 +146,23 @@ export default function ChatInput({
           {files.length > 0 && !editing && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
               {files.map((file, i) => (
-                <div key={i} className={`flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground ${file.uploading ? "animate-pulse" : ""}`}>
-                  {file.uploading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : file.isImage ? ((file.dataUrl || file.url) ? <img src={file.dataUrl || file.url} alt={file.name} className="h-7 w-7 rounded object-cover" /> : <ImageIcon className="h-3.5 w-3.5" />) : <FileText className="h-3.5 w-3.5" />}
-                  <span className="max-w-[100px] truncate">{file.name}</span>
-                  {!file.uploading && (
-                    <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="ml-0.5 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground"><X className="h-3 w-3" /></button>
-                  )}
-                </div>
+                file.textContent ? (
+                  <div key={i} className="relative flex flex-col gap-1 rounded-lg border border-border/40 bg-muted/20 p-2 w-[180px]">
+                    <p className="text-[11px] leading-tight text-muted-foreground/70 line-clamp-6 whitespace-pre-wrap break-words">{file.textContent.slice(0, 200)}</p>
+                    <span className="inline-flex w-fit rounded border border-border/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wide">Pasted</span>
+                    <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="absolute top-1 right-1 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground hover:bg-muted"><X className="h-3 w-3" /></button>
+                  </div>
+                ) : (
+                  <div key={i} className={`flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/30 px-2 py-1 text-xs text-muted-foreground ${file.uploading ? "animate-pulse" : ""}`}>
+                    {file.uploading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : file.isImage ? ((file.dataUrl || file.url) ? <img src={file.dataUrl || file.url} alt={file.name} className="h-7 w-7 rounded object-cover" /> : <ImageIcon className="h-3.5 w-3.5" />) : <FileText className="h-3.5 w-3.5" />}
+                    <span className="max-w-[100px] truncate">{file.name}</span>
+                    {!file.uploading && (
+                      <button type="button" onClick={() => onFilesChange(files.filter((_, j) => j !== i))} className="ml-0.5 rounded-full p-0.5 text-muted-foreground/30 hover:text-foreground"><X className="h-3 w-3" /></button>
+                    )}
+                  </div>
+                )
               ))}
             </div>
           )}
