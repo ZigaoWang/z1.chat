@@ -9,6 +9,9 @@ import { eq, and, desc, sql, lt } from "drizzle-orm";
 import { createSession, deleteSession } from "./session";
 import { verifySession } from "./dal";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
+import disposableDomains from "disposable-email-domains";
+
+const disposableDomainSet = new Set<string>(disposableDomains);
 
 export const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -27,6 +30,11 @@ const signInSchema = z.object({
 
 export async function signUp(name: string, email: string, password: string) {
   const validated = signUpSchema.parse({ name, email, password });
+
+  const domain = validated.email.toLowerCase().split("@")[1];
+  if (disposableDomainSet.has(domain)) {
+    throw new Error("Disposable email addresses are not allowed");
+  }
 
   const existing = await db.query.users.findFirst({
     where: eq(users.email, validated.email.toLowerCase()),
