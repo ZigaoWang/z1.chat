@@ -74,6 +74,11 @@ export async function sendEmailVerificationCode(userId: string, email: string) {
   const code = String(crypto.randomInt(100000, 1000000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+  await db
+    .update(emailVerificationCodes)
+    .set({ used: true })
+    .where(and(eq(emailVerificationCodes.userId, userId), eq(emailVerificationCodes.used, false)));
+
   await db.insert(emailVerificationCodes).values({
     userId,
     code,
