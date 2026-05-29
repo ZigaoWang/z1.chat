@@ -374,12 +374,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {user?.email}
                 </div>
                 <ThemeToggle />
-                <button
-                  onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
+                <div className="flex items-center gap-1.5 px-2 py-1.5">
                   <Languages className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <span>{locale === "en" ? "中文" : "English"}</span>
-                </button>
+                  <div className="flex flex-1 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
+                    <button
+                      onClick={() => setLocale("en")}
+                      className={`flex-1 rounded px-2 py-1 text-xs text-center ${
+                        locale === "en" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >EN</button>
+                    <button
+                      onClick={() => setLocale("zh")}
+                      className={`flex-1 rounded px-2 py-1 text-xs text-center ${
+                        locale === "zh" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >中文</button>
+                  </div>
+                </div>
                 <Link href="/settings#credits"
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground/60" />

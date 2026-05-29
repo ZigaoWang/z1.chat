@@ -14,23 +14,30 @@ export default function ThemeToggle() {
 
   if (!mounted) return null;
 
-  const next = () => {
-    if (theme === "light") setTheme("dark");
-    else if (theme === "dark") setTheme("system");
-    else setTheme("light");
-  };
-
-  const Icon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
-  const label = theme === "dark" ? t("settings.dark") : theme === "light" ? t("settings.light") : t("settings.system");
+  const options = [
+    { value: "light", icon: Sun },
+    { value: "dark", icon: Moon },
+    { value: "system", icon: Monitor },
+  ] as const;
 
   return (
-    <button
-      onClick={next}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50"
-      title={label}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      <span>{label}</span>
-    </button>
+    <div className="flex items-center gap-1.5 px-2 py-1.5">
+      <Sun className="h-3.5 w-3.5 text-muted-foreground/60" />
+      <div className="flex flex-1 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setTheme(opt.value)}
+            className={`flex-1 flex items-center justify-center gap-1 rounded px-2 py-1 text-xs ${
+              theme === opt.value
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <opt.icon className="h-3 w-3" />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
