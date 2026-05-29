@@ -482,7 +482,7 @@ function MessageBubble({
 
     return (
       <div className="group flex justify-end px-3 sm:px-4 py-2 animate-bubble-in">
-        <div className="max-w-[88%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end overflow-hidden">
+        <div className="max-w-[88%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
               {files.map((file, i) => {
@@ -521,19 +521,23 @@ function MessageBubble({
               ? lines.slice(0, LINE_LIMIT).join("\n").slice(0, CHAR_LIMIT)
               : displayContent;
 
+            const toggleExpand = () => setExpandedMessages((prev) => {
+              const next = new Set(prev);
+              if (isExpanded) next.delete(contentId);
+              else next.add(contentId);
+              return next;
+            });
+
             return (
-              <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5">
-                <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                  {visibleContent}{shouldCollapse && "…"}
-                </p>
+              <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5 max-w-full">
+                <div className={isExpanded ? "max-h-[60vh] overflow-y-auto" : ""}>
+                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    {visibleContent}{shouldCollapse && "…"}
+                  </p>
+                </div>
                 {isLong && (
                   <button
-                    onClick={() => setExpandedMessages((prev) => {
-                      const next = new Set(prev);
-                      if (isExpanded) next.delete(contentId);
-                      else next.add(contentId);
-                      return next;
-                    })}
+                    onClick={toggleExpand}
                     className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground"
                   >
                     {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
