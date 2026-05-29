@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import Sidebar from "@/components/layout/sidebar";
 import ChatView from "@/components/chat/chat-view";
 import OnboardingFlow from "@/components/onboarding/onboarding-flow";
@@ -9,6 +10,43 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
 import { useI18n } from "@/hooks/use-i18n";
 import { Skeleton } from "@/components/ui/skeleton";
+import { APP_NAME } from "@/lib/constants";
+
+function LandingPage() {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <main className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{APP_NAME}</h1>
+        {/* TAGLINE — edit this */}
+        <p className="mt-4 text-lg font-medium text-foreground/80">The last AI app you&apos;ll ever need.</p>
+        {/* SUBTEXT — edit this */}
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          Pay-as-you-go access to every major model. No subscriptions, no lock-in.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/signup"
+            className="inline-flex h-9 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors"
+          >
+            Get started
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-5 text-sm font-medium hover:bg-muted/50 transition-colors"
+          >
+            Sign in
+          </Link>
+        </div>
+      </main>
+      <footer className="py-6 text-center text-xs text-muted-foreground/50">
+        {APP_NAME} · Engineered by{" "}
+        <a href="https://zigao.wang" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+          Zigao Wang
+        </a>
+      </footer>
+    </div>
+  );
+}
 
 function AppSkeleton() {
   return (
@@ -135,7 +173,7 @@ export default function Home() {
     return <AppSkeleton />;
   }
 
-  if (!user) return null;
+  if (!user) return <LandingPage />;
 
   if (showOnboarding) {
     return (
