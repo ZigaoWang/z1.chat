@@ -1,5 +1,6 @@
 import "server-only";
 
+import crypto from "crypto";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
@@ -70,7 +71,7 @@ export async function signUp(name: string, email: string, password: string) {
 }
 
 export async function sendEmailVerificationCode(userId: string, email: string) {
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = String(crypto.randomInt(100000, 1000000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await db.insert(emailVerificationCodes).values({
