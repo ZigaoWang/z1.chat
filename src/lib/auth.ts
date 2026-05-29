@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, emailVerificationCodes, creditTransactions, passwordResetTokens } from "./db/schema";
+import { users, emailVerificationCodes, creditTransactions, passwordResetTokens, sessions } from "./db/schema";
 import { eq, and, desc, sql, lt } from "drizzle-orm";
 import { createSession, deleteSession } from "./session";
 import { verifySession } from "./dal";
@@ -217,6 +217,9 @@ export async function resetPassword(token: string, newPassword: string) {
       .update(users)
       .set({ passwordHash, updatedAt: new Date() })
       .where(eq(users.id, record.userId));
+    await tx
+      .delete(sessions)
+      .where(eq(sessions.userId, record.userId));
   });
 }
 
