@@ -2,7 +2,10 @@ import "server-only";
 
 import { db } from "./db";
 import { rateLimitHits } from "./db/schema";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
+
+const CLEANUP_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+const CLEANUP_PROBABILITY = 0.01; // ~1% of requests trigger cleanup
 
 export class RateLimitError extends Error {
   constructor(public retryAfterSeconds?: number) {
@@ -30,4 +33,9 @@ export async function checkRateLimit(key: string, max: number, windowMs: number)
   }
 
   await db.insert(rateLimitHits).values({ key });
+
+  if (Math.random() < CLEANUP_PROBABILITY) {
+    const cutoff = new Date(Date.now() - CLEANUP_MAX_AGE_MS);
+    db.delete(rateLimitHits).where(lt(rateLimitHits.createdAt, cutoff)).execute();
+  }
 }
