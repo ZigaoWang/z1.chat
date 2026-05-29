@@ -111,6 +111,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [editTitle, setEditTitle] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number; rectTop: number } | null>(null);
+  const [menuReady, setMenuReady] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [mounted, setMounted] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +120,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const footerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpenId || !menuPos || !menuRef.current) return;
+    const h = menuRef.current.offsetHeight;
+    const below = window.innerHeight - menuPos.rectTop - 24 >= h;
+    setMenuPos(p => p ? { ...p, top: below ? menuPos.rectTop + 26 : menuPos.rectTop - h - 2 } : p);
+    setMenuReady(true);
+  }, [menuOpenId]);
 
   // Load saved width after mount to avoid hydration mismatch
   useEffect(() => {
@@ -256,34 +266,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <span
             className="shrink-0 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === conv.id ? null : conv.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (menuOpenId === conv.id) { setMenuOpenId(null); return; }
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setMenuReady(false);
+              setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right, rectTop: rect.top });
+              setMenuOpenId(conv.id);
+            }}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </span>
         </button>
 
-        {menuOpenId === conv.id && (
-          <div ref={menuRef} className="absolute right-1 top-full z-20 mt-0.5 w-38 rounded-lg border border-border bg-popover py-1 shadow-lg">
-            <button
-              onClick={() => { setMenuOpenId(null); regenerateTitle(conv.id); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> {t("sidebar.generateTitle")}
-            </button>
-            <button
-              onClick={() => { setMenuOpenId(null); setEditingId(conv.id); setEditTitle(conv.title || ""); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-            >
-              <Pencil className="h-3.5 w-3.5" /> {t("sidebar.rename")}
-            </button>
-            <button
-              onClick={() => { setMenuOpenId(null); setDeletingId(conv.id); }}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("sidebar.delete")}
-            </button>
-          </div>
-        )}
+        {menuOpenId === conv.id && menuPos && null}
       </div>
     );
   };
@@ -428,6 +424,29 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {isOpen && (
         <div className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[2px] lg:hidden" onClick={onClose} />
+      )}
+
+      {menuOpenId && menuPos && (
+        <div ref={menuRef} style={{ top: menuPos.top, right: menuPos.right, visibility: menuReady ? "visible" : "hidden" }} className="fixed z-50 w-38 rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <button
+            onClick={() => { setMenuOpenId(null); regenerateTitle(menuOpenId); }}
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> {t("sidebar.generateTitle")}
+          </button>
+          <button
+            onClick={() => { const id = menuOpenId; setMenuOpenId(null); setEditingId(id); setEditTitle(conversations.find(c => c.id === id)?.title || ""); }}
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" /> {t("sidebar.rename")}
+          </button>
+          <button
+            onClick={() => { const id = menuOpenId; setMenuOpenId(null); setDeletingId(id); }}
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> {t("sidebar.delete")}
+          </button>
+        </div>
       )}
     </>
   );
