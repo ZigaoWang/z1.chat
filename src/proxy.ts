@@ -6,6 +6,8 @@ const PUBLIC_PATHS = new Set([
   "/signup",
   "/verify-email",
   "/invite",
+  "/forgot-password",
+  "/reset-password",
 ]);
 
 function isPublicPath(pathname: string): boolean {

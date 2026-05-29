@@ -4,11 +4,11 @@ import crypto from "crypto";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, emailVerificationCodes, creditTransactions } from "./db/schema";
+import { users, emailVerificationCodes, creditTransactions, passwordResetTokens } from "./db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createSession, deleteSession } from "./session";
 import { verifySession } from "./dal";
-import { sendVerificationEmail } from "./email";
+import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 
 export const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -158,6 +158,49 @@ export async function signIn(email: string, password: string) {
 
 export async function signOut() {
   await deleteSession();
+}
+
+export async function requestPasswordReset(email: string) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email.toLowerCase()),
+  });
+
+  // Always return success to prevent email enumeration
+  if (!user || !user.emailVerified) return;
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await db.insert(passwordResetTokens).values({ userId: user.id, tokenHash, expiresAt });
+  await sendPasswordResetEmail(user.email!, rawToken);
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  if (!token || token.length !== 64) throw new Error("Invalid token");
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const record = await db.query.passwordResetTokens.findFirst({
+    where: eq(passwordResetTokens.tokenHash, tokenHash),
+  });
+
+  if (!record || record.used || record.expiresAt < new Date()) {
+    throw new Error("Invalid or expired reset link");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, record.id));
+    await tx
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, record.userId));
+  });
 }
 
 export async function getCurrentUserId(): Promise<string> {

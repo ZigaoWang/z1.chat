@@ -39,6 +39,23 @@ async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<
   }
 }
 
+export async function sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
+  const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://z1.chat"}/reset-password?token=${token}`;
+  return sendEmail({
+    to,
+    subject: "Reset your z1.chat password",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 24px;">Reset your password</h2>
+        <p style="color: #555; font-size: 15px; line-height: 1.5; margin: 0 0 24px;">Click the button below to reset your z1.chat password. This link expires in 1 hour.</p>
+        <a href="${resetUrl}" style="display: inline-block; background: #18181b; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500;">Reset password</a>
+        <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 24px 0 0;">If you didn't request a password reset, you can ignore this email.</p>
+      </div>
+    `,
+    text: `Reset your z1.chat password: ${resetUrl}\n\nThis link expires in 1 hour.`,
+  });
+}
+
 export async function sendVerificationEmail(to: string, code: string): Promise<boolean> {
   return sendEmail({
     to,
