@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff, GripVertical } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -273,21 +273,17 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         className={cn(
           "group flex items-center rounded-md",
           isActive ? "bg-muted" : "hover:bg-muted/50",
-          dragId === conv.id && "opacity-50",
-          dragOverId === conv.id && "ring-1 ring-primary/30"
+          pinned && "cursor-grab active:cursor-grabbing",
+          dragId === conv.id && "opacity-40",
+          dragOverId === conv.id && "border-t-2 border-primary/40"
         )}
       >
-        {pinned && (
-          <span className="shrink-0 flex items-center justify-center w-5 cursor-grab text-muted-foreground/30 group-hover:text-muted-foreground/60">
-            <GripVertical className="h-3 w-3" />
-          </span>
-        )}
         <button
           onClick={() => {
             setActiveId(conv.id);
             if (window.innerWidth < 1024) onClose();
           }}
-          className={cn("min-w-0 flex-1 py-1.5 text-left", pinned ? "pr-1" : "px-2")}
+          className="min-w-0 flex-1 px-2 py-1.5 text-left"
         >
           <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
         </button>
