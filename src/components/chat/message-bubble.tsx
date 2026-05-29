@@ -510,21 +510,22 @@ function MessageBubble({
           )}
 
           {displayContent && (() => {
-            const LINE_LIMIT = 12;
-            const CHAR_LIMIT = 600;
-            const isLong = displayContent.length > CHAR_LIMIT || displayContent.split("\n").length > LINE_LIMIT;
+            const LINE_LIMIT = 10;
+            const CHAR_LIMIT = 500;
+            const lines = displayContent.split("\n");
+            const isLong = displayContent.length > CHAR_LIMIT || lines.length > LINE_LIMIT;
             const contentId = content.slice(0, 50);
             const isExpanded = expandedMessages.has(contentId);
             const shouldCollapse = isLong && !isExpanded;
+            const visibleContent = shouldCollapse
+              ? lines.slice(0, LINE_LIMIT).join("\n").slice(0, CHAR_LIMIT)
+              : displayContent;
 
             return (
-              <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5 overflow-hidden">
-                <div className={shouldCollapse ? "max-h-[10rem] overflow-hidden relative" : ""}>
-                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">{displayContent}</p>
-                  {shouldCollapse && (
-                    <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-user-bubble to-transparent" />
-                  )}
-                </div>
+              <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5">
+                <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                  {visibleContent}{shouldCollapse && "…"}
+                </p>
                 {isLong && (
                   <button
                     onClick={() => setExpandedMessages((prev) => {
