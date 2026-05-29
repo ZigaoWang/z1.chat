@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   X, ExternalLink, Copy, Check,
-  RefreshCw, Download, ChevronDown, FileText, FileDown, Loader2,
+  RefreshCw, Download, ChevronDown, FileText, FileDown, Loader2, Image as ImageIcon, FileCode2,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
@@ -157,6 +157,15 @@ function escapeHtml(text: string): string {
 
 // --- Mermaid ---
 
+const MERMAID_DANGEROUS_TAGS = /<\/?(script|iframe|object|embed|link|style|form|input|button)[^>]*>/gi;
+
+const MERMAID_DISPLAY_CONFIG = {
+  startOnLoad: false,
+  theme: "default" as const,
+  securityLevel: "loose" as const,
+  flowchart: { htmlLabels: true },
+};
+
 function MermaidPreview({ code }: { code: string }) {
   const [svg, setSvg] = useState("");
   const [error, setError] = useState("");
@@ -169,8 +178,8 @@ function MermaidPreview({ code }: { code: string }) {
     const timer = setTimeout(async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose", flowchart: { htmlLabels: true } });
-        const sanitized = code.replace(/<\/?(script|iframe|object|embed|link|style|form|input|button)[^>]*>/gi, "");
+        mermaid.initialize(MERMAID_DISPLAY_CONFIG);
+        const sanitized = code.replace(MERMAID_DANGEROUS_TAGS, "");
         const { svg: rendered } = await mermaid.render(`mermaid-${Date.now()}`, sanitized);
         if (id === renderIdRef.current) setSvg(rendered);
       } catch (err) {
@@ -182,7 +191,7 @@ function MermaidPreview({ code }: { code: string }) {
 
   if (error) return <div className="flex items-center justify-center h-full p-8 text-sm text-destructive/60"><pre className="whitespace-pre-wrap">{error}</pre></div>;
   if (!svg) return <div className="flex items-center justify-center h-full p-8"><div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /></div>;
-  return <div className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div data-mermaid-container="" className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 // --- Icon button helper ---
@@ -223,6 +232,38 @@ function DownloadMenu({ btnRef, onClose, onPdf, onMd }: {
         </button>
         <button onClick={onMd} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
           <FileText className="h-3.5 w-3.5 text-muted-foreground" />Markdown
+        </button>
+      </div>
+    </>
+  );
+}
+
+function DiagramDownloadMenu({ btnRef, onClose, onPng, onSvg }: {
+  btnRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onPng: () => void;
+  onSvg: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, [btnRef]);
+
+  if (!pos) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60]" onClick={onClose} />
+      <div className="fixed z-[61] min-w-[140px] rounded-md border border-border bg-popover shadow-md py-0.5" style={{ top: pos.top, right: pos.right }}>
+        <button onClick={onPng} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
+          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />PNG
+        </button>
+        <button onClick={onSvg} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-muted transition-colors text-foreground">
+          <FileCode2 className="h-3.5 w-3.5 text-muted-foreground" />SVG
         </button>
       </div>
     </>
@@ -313,18 +354,19 @@ export default function ArtifactPreview({
     setTimeout(() => setCopied(false), 2000);
   }, [content]);
 
-  const handleDownload = useCallback(async () => {
-    if (type === "document") {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "artifact";
+
+  const handleDownload = useCallback(() => {
+    if (type === "document" || type === "mermaid") {
       setDownloadOpen(!downloadOpen);
       return;
     }
     const ext = getDownloadExtension(type, language);
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     Object.assign(document.createElement("a"), { href: url, download: `${slug}${ext}` }).click();
     URL.revokeObjectURL(url);
-  }, [content, type, language, title, downloadOpen]);
+  }, [content, type, language, slug, downloadOpen]);
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloadOpen(false);
@@ -339,12 +381,77 @@ export default function ArtifactPreview({
 
   const handleDownloadMd = useCallback(() => {
     setDownloadOpen(false);
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     Object.assign(document.createElement("a"), { href: url, download: `${slug}.md` }).click();
     URL.revokeObjectURL(url);
-  }, [content, title]);
+  }, [content, slug]);
+
+  const handleDownloadPng = useCallback(async () => {
+    setDownloadOpen(false);
+    try {
+      const mermaid = (await import("mermaid")).default;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "default",
+        securityLevel: "loose",
+        flowchart: { htmlLabels: false },
+        themeVariables: { primaryTextColor: "#333", secondaryTextColor: "#333", tertiaryTextColor: "#333" },
+      });
+      const sanitized = content.replace(MERMAID_DANGEROUS_TAGS, "");
+      const { svg: exportSvg } = await mermaid.render(`mermaid-png-${Date.now()}`, sanitized);
+      mermaid.initialize(MERMAID_DISPLAY_CONFIG);
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(exportSvg, "image/svg+xml");
+      const svgNode = doc.querySelector("svg")!;
+      const viewBox = svgNode.getAttribute("viewBox")?.split(" ").map(Number);
+      const w = viewBox?.[2] || 800;
+      const h = viewBox?.[3] || 600;
+      svgNode.setAttribute("width", String(w));
+      svgNode.setAttribute("height", String(h));
+      svgNode.removeAttribute("style");
+
+      const serialized = new XMLSerializer().serializeToString(svgNode);
+      const withVisibleText = serialized
+        .replace(/<text /g, '<text fill="#333" ')
+        .replace(/<tspan /g, '<tspan fill="#333" ');
+
+      const scale = 2;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, w * scale, h * scale);
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          Object.assign(document.createElement("a"), { href: url, download: `${slug}.png` }).click();
+          URL.revokeObjectURL(url);
+        }, "image/png");
+      };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(withVisibleText);
+    } catch (e) {
+      console.error("PNG export failed:", e);
+    }
+  }, [slug, content]);
+
+  const handleDownloadSvg = useCallback(() => {
+    setDownloadOpen(false);
+    const svgEl = document.querySelector("[data-mermaid-container] svg") as SVGSVGElement | null;
+    if (!svgEl) return;
+    const blob = new Blob(
+      [new XMLSerializer().serializeToString(svgEl)],
+      { type: "image/svg+xml;charset=utf-8" },
+    );
+    const url = URL.createObjectURL(blob);
+    Object.assign(document.createElement("a"), { href: url, download: `${slug}.svg` }).click();
+    URL.revokeObjectURL(url);
+  }, [slug]);
 
   const handleOpenNew = useCallback(() => {
     if (!canOpenNew) return;
@@ -453,6 +560,11 @@ export default function ArtifactPreview({
                   {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                 </IconBtn>
                 {downloadOpen && <DownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPdf={handleDownloadPdf} onMd={handleDownloadMd} />}
+              </div>
+            ) : type === "mermaid" ? (
+              <div className="relative" ref={downloadBtnRef}>
+                <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
+                {downloadOpen && <DiagramDownloadMenu btnRef={downloadBtnRef} onClose={() => setDownloadOpen(false)} onPng={handleDownloadPng} onSvg={handleDownloadSvg} />}
               </div>
             ) : (
               <IconBtn onClick={handleDownload} title="Download"><Download className="h-3.5 w-3.5" /></IconBtn>
