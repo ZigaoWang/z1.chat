@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   X, ExternalLink, Copy, Check,
   RefreshCw, Download, ChevronDown, FileText, FileDown, Loader2, Image as ImageIcon, FileCode2,
+  ZoomIn, ZoomOut, Maximize2,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
@@ -171,6 +172,12 @@ function MermaidPreview({ code }: { code: string }) {
   const [error, setError] = useState("");
   const renderIdRef = useRef(0);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const transform = useRef({ x: 0, y: 0, scale: 1 });
+  const dragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+
   useEffect(() => {
     if (!code.trim()) return;
     const id = ++renderIdRef.current;
@@ -189,9 +196,116 @@ function MermaidPreview({ code }: { code: string }) {
     return () => clearTimeout(timer);
   }, [code]);
 
+  const applyTransform = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const { x, y, scale } = transform.current;
+    el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+    const { x, y, scale } = transform.current;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.min(5, Math.max(0.25, scale * delta));
+    const ratio = newScale / scale;
+    transform.current = {
+      x: cursorX - (cursorX - x) * ratio,
+      y: cursorY - (cursorY - y) * ratio,
+      scale: newScale,
+    };
+    applyTransform();
+  }, [applyTransform]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    dragging.current = true;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    transform.current.x += dx;
+    transform.current.y += dy;
+    applyTransform();
+  }, [applyTransform]);
+
+  const handlePointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  const resetView = useCallback(() => {
+    transform.current = { x: 0, y: 0, scale: 1 };
+    applyTransform();
+  }, [applyTransform]);
+
+  const zoomIn = useCallback(() => {
+    const { x, y, scale } = transform.current;
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const newScale = Math.min(5, scale * 1.3);
+    const ratio = newScale / scale;
+    transform.current = { x: cx - (cx - x) * ratio, y: cy - (cy - y) * ratio, scale: newScale };
+    applyTransform();
+  }, [applyTransform]);
+
+  const zoomOut = useCallback(() => {
+    const { x, y, scale } = transform.current;
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const newScale = Math.max(0.25, scale / 1.3);
+    const ratio = newScale / scale;
+    transform.current = { x: cx - (cx - x) * ratio, y: cy - (cy - y) * ratio, scale: newScale };
+    applyTransform();
+  }, [applyTransform]);
+
   if (error) return <div className="flex items-center justify-center h-full p-8 text-sm text-destructive/60"><pre className="whitespace-pre-wrap">{error}</pre></div>;
   if (!svg) return <div className="flex items-center justify-center h-full p-8"><div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/50 animate-spin" /></div>;
-  return <div data-mermaid-container="" className="flex items-center justify-center min-h-full p-8" dangerouslySetInnerHTML={{ __html: svg }} />;
+
+  return (
+    <div
+      ref={containerRef}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onDoubleClick={resetView}
+      className="relative h-full w-full overflow-hidden cursor-grab active:cursor-grabbing select-none"
+    >
+      <div
+        ref={contentRef}
+        data-mermaid-container=""
+        className="origin-top-left will-change-transform p-8"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-border/50 bg-background/80 backdrop-blur-sm p-0.5 shadow-sm">
+        <button onClick={zoomOut} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
+          <ZoomOut className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={resetView} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={zoomIn} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
+          <ZoomIn className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // --- Icon button helper ---
@@ -504,7 +618,7 @@ export default function ArtifactPreview({
     switch (type) {
       case "html": return <iframe key={iframeKey} ref={iframeRef} srcDoc={wrapForPreview(content, "html")} sandbox="allow-scripts allow-forms allow-popups allow-modals" className="flex-1 w-full bg-white" title="Preview" />;
       case "svg": return <iframe key={iframeKey} srcDoc={wrapForPreview(content, "svg")} sandbox="allow-scripts" className="flex-1 w-full bg-white" title="Preview" />;
-      case "mermaid": return <div className="flex-1 h-0 overflow-auto bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
+      case "mermaid": return <div className="flex-1 h-0 bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
       default: return (
         <div className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
           <div className="p-4 overflow-x-auto">
