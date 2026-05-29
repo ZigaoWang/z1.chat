@@ -41,7 +41,10 @@ export function verifySign(params: Record<string, string>): boolean {
   const receivedSign = params.sign;
   if (!receivedSign) return false;
   const expectedSign = generateSign(params);
-  return receivedSign.toLowerCase() === expectedSign.toLowerCase();
+  const a = Buffer.from(receivedSign.toLowerCase());
+  const b = Buffer.from(expectedSign.toLowerCase());
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 /**
