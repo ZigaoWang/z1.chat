@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, Shield, CreditCard, ChevronUp } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -87,7 +87,7 @@ function TypewriterTitle({ text, isActive }: { text: string; isActive: boolean }
   }, [text]);
 
   return (
-    <span className={`block truncate text-sm leading-tight ${isActive ? "font-medium" : "text-foreground/75"}`}>
+    <span className={`block truncate text-[13px] leading-tight ${isActive ? "font-medium text-foreground" : "text-foreground/70"}`}>
       {display || "New conversation"}
     </span>
   );
@@ -110,24 +110,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number; rectTop: number } | null>(null);
-  const [menuReady, setMenuReady] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [mounted, setMounted] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const footerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpenId || !menuPos || !menuRef.current) return;
-    const h = menuRef.current.offsetHeight;
-    const below = window.innerHeight - menuPos.rectTop - 24 >= h;
-    setMenuPos(p => p ? { ...p, top: below ? menuPos.rectTop + 26 : menuPos.rectTop - h - 2 } : p);
-    setMenuReady(true);
-  }, [menuOpenId]);
 
   // Load saved width after mount to avoid hydration mismatch
   useEffect(() => {
@@ -149,17 +137,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       return () => { if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); };
     }
   }, [deletingId]);
-
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenId(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpenId]);
 
   // Resize drag handlers
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -226,12 +203,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     if (deletingId === conv.id) {
       return (
-        <div key={conv.id} className="relative group">
-          <div className={`w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 bg-destructive/5`}>
-            <span className="flex-1 truncate text-sm text-destructive">{t("sidebar.deleteChat")}</span>
+        <div key={conv.id}>
+          <div className="flex items-center justify-between gap-1.5 rounded-md px-2 py-1.5 bg-destructive/5">
+            <span className="flex-1 truncate text-[13px] text-destructive">{t("sidebar.deleteChat")}</span>
             <div className="flex items-center gap-0.5 shrink-0">
-              <button onClick={() => confirmDelete(conv.id)} className="flex h-6 w-6 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"><Check className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setDeletingId(null)} className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>
+              <button onClick={() => confirmDelete(conv.id)} className="flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10"><Check className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setDeletingId(null)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </div>
@@ -243,43 +220,54 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div key={conv.id} className="flex items-center gap-1 px-1 py-0.5">
           <input ref={editInputRef} value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-            className="flex-1 min-w-0 rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border focus:ring-ring/50" />
-          <button onClick={saveEdit} className="shrink-0 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"><Check className="h-3 w-3" /></button>
-          <button onClick={() => setEditingId(null)} className="shrink-0 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"><X className="h-3 w-3" /></button>
+            className="flex-1 min-w-0 rounded-md bg-background px-2 py-1 text-[13px] outline-none ring-1 ring-border focus:ring-foreground/20" />
+          <button onClick={saveEdit} className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground"><Check className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setEditingId(null)} className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
         </div>
       );
     }
 
     return (
-      <div key={conv.id} className="relative group">
-          <button
+      <div key={conv.id} className={cn(
+        "group flex items-center rounded-md",
+        isActive ? "bg-muted" : "hover:bg-muted/50"
+      )}>
+        <button
           onClick={() => {
             setActiveId(conv.id);
             if (window.innerWidth < 1024) onClose();
           }}
-          className={`w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
-            isActive ? "bg-muted" : "hover:bg-muted/50"
-          }`}
+          className="min-w-0 flex-1 px-2 py-1.5 text-left"
         >
-          <div className="min-w-0 flex-1">
-            <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
-          </div>
-          <span
-            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (menuOpenId === conv.id) { setMenuOpenId(null); return; }
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setMenuReady(false);
-              setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right, rectTop: rect.top });
-              setMenuOpenId(conv.id);
-            }}
+          <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
+        </button>
+        <Popover>
+          <PopoverTrigger
+            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-foreground/5 hover:text-foreground mr-0.5 opacity-0 group-hover:opacity-100 data-[popup-open]:opacity-100 transition-opacity duration-100"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
-          </span>
-        </button>
-
-        {menuOpenId === conv.id && menuPos && null}
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" sideOffset={4} className="w-[160px] p-1 gap-0 !duration-0">
+            <button
+              onClick={() => { regenerateTitle(conv.id); }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground/80 hover:bg-muted"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-muted-foreground/60" /> {t("sidebar.generateTitle")}
+            </button>
+            <button
+              onClick={() => { setEditingId(conv.id); setEditTitle(conv.title || ""); }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground/80 hover:bg-muted"
+            >
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" /> {t("sidebar.rename")}
+            </button>
+            <button
+              onClick={() => { setDeletingId(conv.id); }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-destructive hover:bg-destructive/5"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("sidebar.delete")}
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
     );
   };
@@ -297,7 +285,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div
         style={sidebarStyle}
         className={[
-          "fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-[transform,width] duration-200 ease-out lg:relative",
+          "fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-border/40 transition-[transform,width] duration-200 ease-out lg:relative",
           // Mobile: always keep a width so -translate-x-full moves it fully off-screen
           !isOpen ? "w-[250px]" : "",
           // When open on desktop with mounted, inline style sets width; otherwise fallback
@@ -308,7 +296,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           !isOpen ? "lg:w-0 lg:overflow-hidden" : "",
         ].filter(Boolean).join(" ")}
       >
-        <div className="flex h-11 shrink-0 items-center justify-between px-2.5 border-b border-sidebar-border/50">
+        <div className="flex h-11 shrink-0 items-center justify-between px-2.5 border-b border-border/40">
           <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
           <div className="flex items-center gap-0.5">
             <Tooltip>
@@ -316,14 +304,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 createConversation();
                 if (window.innerWidth < 1024) onClose();
               }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
                 <Plus className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">{t("sidebar.newChat")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
                 <PanelLeftClose className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent side="bottom">{t("sidebar.closeSidebar")}</TooltipContent>
@@ -331,20 +319,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
 
-        <div className="px-2 py-1.5">
+        <div className="px-2.5 py-1.5">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("sidebar.search")}
-              className="h-9 w-full rounded-lg border-0 bg-muted/50 pl-8 pr-3 text-[13px] outline-none placeholder:text-muted-foreground/40 focus:bg-muted/70 focus:ring-1 focus:ring-ring/20 transition-all" />
+              className="h-7 w-full rounded-md bg-transparent pl-7 pr-3 text-[13px] outline-none placeholder:text-muted-foreground/40 focus:bg-muted/50" />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-thin">
           {isLoading && conversations.length === 0 ? (
-            <div className="space-y-1.5 px-1 pt-2">
+            <div className="space-y-1 px-0.5 pt-2">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-9 rounded-lg bg-muted/40 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+                <div key={i} className="h-8 rounded-md bg-muted/30 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
               ))}
             </div>
           ) : conversations.length === 0 ? (
@@ -353,11 +341,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="mt-1.5 text-xs text-muted-foreground/40">{searchQuery ? t("sidebar.noResults") : t("sidebar.noConversations")}</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {grouped.map((group) => (
                 <div key={group.label}>
                   <div className="px-2 pb-1">
-                    <span className="text-[10.5px] font-medium text-muted-foreground/50 uppercase tracking-wider">{group.label}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wide">{group.label}</span>
                   </div>
                   <div className="space-y-px">
                     {group.conversations.map(renderConversation)}
@@ -368,9 +356,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2" ref={footerRef}>
+        <div className="shrink-0 border-t border-border/40 px-2 py-1.5" ref={footerRef}>
           <Popover>
-            <PopoverTrigger className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted/50 transition-colors text-left">
+            <PopoverTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-foreground/5 text-left transition-colors duration-100">
               <span className="flex-1 truncate font-medium text-foreground/80">{user?.name || user?.email}</span>
               <span className={cn(
                 "tabular-nums text-xs text-muted-foreground/50 shrink-0",
@@ -381,13 +369,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </span>
               <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
             </PopoverTrigger>
-            <PopoverContent side="top" align="center" sideOffset={8} className="p-1 gap-0" style={{ width: width - 16 }}>
-                <div className="px-2 py-1.5 text-xs text-muted-foreground/50 border-b border-border/50 mb-1.5">
+            <PopoverContent side="top" align="center" sideOffset={8} className="p-1 gap-0 !duration-0" style={{ width: width - 16 }}>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground/50 border-b border-border/50 mb-1">
                   {user?.email}
                 </div>
                 <ThemeToggle />
                 <Link href="/settings#credits"
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground/60" />
                   <span className="flex-1">{t("sidebar.balance")}</span>
                   <span className={cn(
@@ -399,14 +387,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </span>
                 </Link>
                 <Link href="/settings"
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                   <Settings className="h-3.5 w-3.5 text-muted-foreground/60" />
                   {t("sidebar.settings")}
                 </Link>
                 <div className="border-t border-border/50 mt-0.5 pt-0.5">
                   <button
                     onClick={signOut}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                     <LogOut className="h-3.5 w-3.5 text-muted-foreground/60" />
                     {t("sidebar.signOut")}
                   </button>
@@ -424,29 +412,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {isOpen && (
         <div className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[2px] lg:hidden" onClick={onClose} />
-      )}
-
-      {menuOpenId && menuPos && (
-        <div ref={menuRef} style={{ top: menuPos.top, right: menuPos.right, visibility: menuReady ? "visible" : "hidden" }} className="fixed z-50 w-38 rounded-lg border border-border bg-popover py-1 shadow-lg">
-          <button
-            onClick={() => { setMenuOpenId(null); regenerateTitle(menuOpenId); }}
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-          >
-            <Sparkles className="h-3.5 w-3.5" /> {t("sidebar.generateTitle")}
-          </button>
-          <button
-            onClick={() => { const id = menuOpenId; setMenuOpenId(null); setEditingId(id); setEditTitle(conversations.find(c => c.id === id)?.title || ""); }}
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" /> {t("sidebar.rename")}
-          </button>
-          <button
-            onClick={() => { const id = menuOpenId; setMenuOpenId(null); setDeletingId(id); }}
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> {t("sidebar.delete")}
-          </button>
-        </div>
       )}
     </>
   );
