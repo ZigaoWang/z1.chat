@@ -547,3 +547,14 @@ export interface OnboardingState {
   sidebarTooltipSeen?: boolean;
   firstMessageSent?: boolean;
 }
+
+// Rate Limit Hits
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: text("key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("rate_limit_hits_key_created_idx").on(table.key, table.createdAt)]
+);

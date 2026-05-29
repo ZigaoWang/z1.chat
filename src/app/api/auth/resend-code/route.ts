@@ -1,9 +1,15 @@
+import { NextRequest } from "next/server";
 import { sendEmailVerificationCode } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, emailVerificationCodes } from "@/lib/db/schema";
 import { eq, gt, and } from "drizzle-orm";
+import { checkRateLimit, RateLimitError } from "@/lib/rate-limit";
 
-export async function POST(req: Request) {
+function getIP(req: NextRequest): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+}
+
+export async function POST(req: NextRequest) {
   try {
     const { userId } = await req.json();
     if (!userId) {
@@ -17,7 +23,13 @@ export async function POST(req: Request) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Rate limit: 60s between sends
+    const ip = getIP(req);
+    const email = user.email.toLowerCase();
+
+    await checkRateLimit(`resend:ip:${ip}`, 10, 60 * 60 * 1000);
+    await checkRateLimit(`resend:email:${email}`, 5, 60 * 60 * 1000);
+
+    // 60-second cooldown per email
     const recent = await db.query.emailVerificationCodes.findFirst({
       where: and(
         eq(emailVerificationCodes.userId, userId),
@@ -34,6 +46,9 @@ export async function POST(req: Request) {
     await sendEmailVerificationCode(userId, user.email);
     return Response.json({ success: true });
   } catch (error) {
+    if (error instanceof RateLimitError) {
+      return Response.json({ error: "Too many requests" }, { status: 429 });
+    }
     const message = error instanceof Error ? error.message : "Failed to resend code";
     return Response.json({ error: message }, { status: 500 });
   }
