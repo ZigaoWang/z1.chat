@@ -11,9 +11,9 @@ function getIP(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await req.json();
-    if (!userId) {
-      return Response.json({ error: "Missing userId" }, { status: 400 });
+    const { userId, email } = await req.json();
+    if (!userId || !email || typeof email !== "string") {
+      return Response.json({ error: "Missing userId or email" }, { status: 400 });
     }
 
     const user = await db.query.users.findFirst({
@@ -23,11 +23,15 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
+    if (user.email.toLowerCase() !== email.toLowerCase()) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
     const ip = getIP(req);
-    const email = user.email.toLowerCase();
+    const normalizedEmail = user.email.toLowerCase();
 
     await checkRateLimit(`resend:ip:${ip}`, 10, 60 * 60 * 1000);
-    await checkRateLimit(`resend:email:${email}`, 5, 60 * 60 * 1000);
+    await checkRateLimit(`resend:email:${normalizedEmail}`, 5, 60 * 60 * 1000);
 
     // 60-second cooldown per email
     const recent = await db.query.emailVerificationCodes.findFirst({
