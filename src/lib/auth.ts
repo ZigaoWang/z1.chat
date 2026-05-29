@@ -184,6 +184,11 @@ export async function requestPasswordReset(email: string) {
   const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+  await db
+    .update(passwordResetTokens)
+    .set({ used: true })
+    .where(and(eq(passwordResetTokens.userId, user.id), eq(passwordResetTokens.used, false)));
+
   await db.insert(passwordResetTokens).values({ userId: user.id, tokenHash, expiresAt });
   await sendPasswordResetEmail(user.email!, rawToken);
 }
