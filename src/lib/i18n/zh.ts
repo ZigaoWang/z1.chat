@@ -249,6 +249,8 @@ export const zh: Record<TranslationKey, string> = {
   "common.edit": "编辑",
   "common.regenerate": "重新生成",
   "common.dismiss": "关闭",
+  "common.showMore": "展开更多",
+  "common.showLess": "收起",
 
   // Upload
   "upload.attachFile": "添加附件",

@@ -247,6 +247,8 @@ export const en = {
   "common.edit": "Edit",
   "common.regenerate": "Regenerate",
   "common.dismiss": "Dismiss",
+  "common.showMore": "Show more",
+  "common.showLess": "Show less",
 
   // Upload
   "upload.attachFile": "Attach file",

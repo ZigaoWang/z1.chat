@@ -4,6 +4,7 @@ import { memo, useState, useCallback, useEffect, useRef } from "react";
 import {
   RotateCcw,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -464,6 +465,7 @@ function MessageBubble({
   isLast, onRegenerate, onEdit, onOpenArtifact, onOpenArtifactById, interrupted, segments, versionCount, currentVersion, onVersionChange,
 }: MessageBubbleProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const { copied, copy } = useCopy();
   const { t } = useI18n();
 
@@ -480,7 +482,7 @@ function MessageBubble({
 
     return (
       <div className="group flex justify-end px-3 sm:px-4 py-2 animate-bubble-in">
-        <div className="max-w-[88%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end">
+        <div className="max-w-[88%] sm:max-w-[80%] lg:max-w-[65%] flex flex-col items-end overflow-hidden">
           {hasFiles && (
             <div className="flex flex-wrap justify-end gap-1.5 mb-1.5">
               {files.map((file, i) => {
@@ -507,11 +509,39 @@ function MessageBubble({
             </div>
           )}
 
-          {displayContent && (
-            <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5">
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{displayContent}</p>
-            </div>
-          )}
+          {displayContent && (() => {
+            const LINE_LIMIT = 12;
+            const CHAR_LIMIT = 600;
+            const isLong = displayContent.length > CHAR_LIMIT || displayContent.split("\n").length > LINE_LIMIT;
+            const contentId = content.slice(0, 50);
+            const isExpanded = expandedMessages.has(contentId);
+            const shouldCollapse = isLong && !isExpanded;
+
+            return (
+              <div className="rounded-2xl rounded-br-sm bg-user-bubble px-3.5 py-2.5 overflow-hidden">
+                <div className={shouldCollapse ? "max-h-[10rem] overflow-hidden relative" : ""}>
+                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">{displayContent}</p>
+                  {shouldCollapse && (
+                    <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-user-bubble to-transparent" />
+                  )}
+                </div>
+                {isLong && (
+                  <button
+                    onClick={() => setExpandedMessages((prev) => {
+                      const next = new Set(prev);
+                      if (isExpanded) next.delete(contentId);
+                      else next.add(contentId);
+                      return next;
+                    })}
+                    className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground"
+                  >
+                    {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    {isExpanded ? t("common.showLess") : t("common.showMore")}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {/* Actions */}
           <div className="flex justify-end items-center gap-1 mt-0.5 h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             {hasVersions && onVersionChange && currentVersion !== undefined && (
