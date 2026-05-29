@@ -26,7 +26,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={next}
-      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50 transition-colors hover:bg-muted/50 hover:text-foreground"
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-muted/50"
       title={label}
     >
       <Icon className="h-3.5 w-3.5" />

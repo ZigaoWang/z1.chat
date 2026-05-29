@@ -117,6 +117,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const footerRef = useRef<HTMLDivElement>(null);
 
   // Load saved width after mount to avoid hydration mismatch
   useEffect(() => {
@@ -371,7 +372,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2" ref={(el) => { if (el) el.style.setProperty("--footer-w", el.offsetWidth + "px"); }}>
+        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2" ref={footerRef}>
           <Popover>
             <PopoverTrigger className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted/50 transition-colors text-left">
               <span className="flex-1 truncate font-medium text-foreground/80">{user?.name || user?.email}</span>
@@ -384,8 +385,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </span>
               <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
             </PopoverTrigger>
-            <PopoverContent side="top" align="start" sideOffset={8} className="p-1 gap-0" style={{ width: "var(--footer-w)" }}>
-                <div className="px-2 py-1 text-xs text-muted-foreground/50 border-b border-border/50 mb-0.5">
+            <PopoverContent side="top" align="center" sideOffset={8} className="p-1 gap-0" style={{ width: width - 16 }}>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground/50 border-b border-border/50 mb-1.5">
                   {user?.email}
                 </div>
                 <ThemeToggle />
