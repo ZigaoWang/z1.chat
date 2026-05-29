@@ -41,8 +41,10 @@ export default function ChatInput({
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    // Grow naturally, cap at 240px
-    ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`;
+    const maxH = 240;
+    const h = Math.min(ta.scrollHeight, maxH);
+    ta.style.height = `${h}px`;
+    ta.style.overflowY = ta.scrollHeight > maxH ? "auto" : "hidden";
   }, [value]);
 
   useEffect(() => { if (!isLoading) textareaRef.current?.focus(); }, [isLoading]);
@@ -153,7 +155,7 @@ export default function ChatInput({
             placeholder={editing ? t("chat.editMessage") : placeholder}
             disabled={disabled}
             rows={1}
-            className="block w-full resize-none overflow-hidden bg-transparent px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 disabled:opacity-50"
+            className="block w-full resize-none bg-transparent px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 disabled:opacity-50"
           />
 
           {/* Action bar below textarea */}
