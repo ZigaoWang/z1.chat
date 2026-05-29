@@ -137,6 +137,8 @@ export async function signIn(email: string, password: string) {
   });
 
   if (!user || !user.passwordHash) {
+    // Constant-time: prevent email enumeration via response timing
+    await bcrypt.compare(validated.password, "$2b$12$invalidhashpadding000000000000000000000000000000000000000");
     throw new Error("Invalid email or password");
   }
 
