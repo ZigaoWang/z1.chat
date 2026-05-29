@@ -513,11 +513,11 @@ function MessageBubble({
             </div>
           )}
           {/* Actions */}
-          <div className={`flex justify-end items-center gap-1 mt-0.5 ${hasVersions ? "min-h-[1.75rem]" : "h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150"}`}>
+          <div className="flex justify-end items-center gap-1 mt-0.5 h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
-            <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+            <div className="flex items-center gap-0.5">
               {onRegenerate && !isStreaming && (
                 <button onClick={onRegenerate} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.regenerate")}><RotateCcw className="h-3.5 w-3.5" /></button>
               )}
@@ -731,11 +731,11 @@ function MessageBubble({
 
         {/* Actions */}
         {!isStreaming && content.length > 0 && (
-          <div className={`flex items-center gap-1 mt-1 ${hasVersions ? "min-h-[1.75rem]" : "h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150"}`}>
+          <div className="flex items-center gap-1 mt-1 h-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             {hasVersions && onVersionChange && currentVersion !== undefined && (
               <VersionNav current={currentVersion} total={versionCount!} onChange={onVersionChange} />
             )}
-            <div className={`flex items-center gap-0.5 ${hasVersions ? "opacity-0 group-hover:opacity-100 transition-opacity" : ""}`}>
+            <div className="flex items-center gap-0.5">
               <button onClick={() => copy(content)} className="p-1 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50" title={t("common.copy")}>
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
