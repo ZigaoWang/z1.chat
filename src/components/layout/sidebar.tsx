@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff, GripVertical } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -100,8 +100,11 @@ const STORAGE_KEY = "z1:sidebar-width";
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const {
-    conversations, activeId, setActiveId, createConversation,
-    deleteConversation, renameConversation, regenerateTitle, searchQuery, setSearchQuery, isLoading,
+    conversations, pinnedConversations, unpinnedConversations,
+    activeId, setActiveId, createConversation,
+    deleteConversation, renameConversation, regenerateTitle,
+    pinConversation, unpinConversation, reorderPinned,
+    searchQuery, setSearchQuery, isLoading,
   } = useConversations();
   const { user, signOut } = useAuth();
   const { creditBalance, isZero, isLow, isCritical } = useCredits();
@@ -112,6 +115,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [mounted, setMounted] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDragging = useRef(false);
@@ -139,7 +144,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, [deletingId]);
 
   // Resize drag handlers
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
     document.body.style.cursor = "col-resize";
@@ -176,13 +181,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     document.addEventListener("mouseup", handleUp);
   }, [onClose]);
 
-  const grouped = useMemo(() => groupConversationsByDate(conversations, {
+  const grouped = useMemo(() => groupConversationsByDate(unpinnedConversations, {
     today: t("sidebar.today"),
     yesterday: t("sidebar.yesterday"),
     prev7: t("sidebar.prev7"),
     prev30: t("sidebar.prev30"),
     older: t("sidebar.older"),
-  }), [conversations, t]);
+  }), [unpinnedConversations, t]);
 
   const saveEdit = async () => {
     if (editingId && editTitle.trim()) {
@@ -198,7 +203,37 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     toast.success(t("sidebar.deleted"));
   }, [deleteConversation, t]);
 
-  const renderConversation = (conv: Conversation) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== dragId) setDragOverId(id);
+  }, [dragId]);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    const ids = pinnedConversations.map((c) => c.id);
+    const fromIdx = ids.indexOf(dragId);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx < 0 || toIdx < 0) { setDragId(null); setDragOverId(null); return; }
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, dragId);
+    reorderPinned(ids);
+    setDragId(null);
+    setDragOverId(null);
+  }, [dragId, pinnedConversations, reorderPinned]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragId(null);
+    setDragOverId(null);
+  }, []);
+
+  const renderConversation = (conv: Conversation, { pinned }: { pinned: boolean }) => {
     const isActive = activeId === conv.id;
 
     if (deletingId === conv.id) {
@@ -228,16 +263,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
 
     return (
-      <div key={conv.id} className={cn(
-        "group flex items-center rounded-md",
-        isActive ? "bg-muted" : "hover:bg-muted/50"
-      )}>
+      <div
+        key={conv.id}
+        draggable={pinned}
+        onDragStart={pinned ? (e) => handleDragStart(e, conv.id) : undefined}
+        onDragOver={pinned ? (e) => handleDragOver(e, conv.id) : undefined}
+        onDrop={pinned ? (e) => handleDrop(e, conv.id) : undefined}
+        onDragEnd={pinned ? handleDragEnd : undefined}
+        className={cn(
+          "group flex items-center rounded-md",
+          isActive ? "bg-muted" : "hover:bg-muted/50",
+          dragId === conv.id && "opacity-50",
+          dragOverId === conv.id && "ring-1 ring-primary/30"
+        )}
+      >
+        {pinned && (
+          <span className="shrink-0 flex items-center justify-center w-5 cursor-grab text-muted-foreground/30 group-hover:text-muted-foreground/60">
+            <GripVertical className="h-3 w-3" />
+          </span>
+        )}
         <button
           onClick={() => {
             setActiveId(conv.id);
             if (window.innerWidth < 1024) onClose();
           }}
-          className="min-w-0 flex-1 px-2 py-1.5 text-left"
+          className={cn("min-w-0 flex-1 py-1.5 text-left", pinned ? "pr-1" : "px-2")}
         >
           <TypewriterTitle text={conv.title || t("sidebar.newConversation")} isActive={isActive} />
         </button>
@@ -260,6 +310,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" /> {t("sidebar.rename")}
             </button>
+            {pinned ? (
+              <button
+                onClick={() => { unpinConversation(conv.id); }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground/80 hover:bg-muted"
+              >
+                <PinOff className="h-3.5 w-3.5 text-muted-foreground/60" /> {t("sidebar.unpin")}
+              </button>
+            ) : (
+              <button
+                onClick={() => { pinConversation(conv.id); }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground/80 hover:bg-muted"
+              >
+                <Pin className="h-3.5 w-3.5 text-muted-foreground/60" /> {t("sidebar.pin")}
+              </button>
+            )}
             <button
               onClick={() => { setDeletingId(conv.id); }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-destructive hover:bg-destructive/5"
@@ -342,13 +407,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           ) : (
             <div className="space-y-3">
+              {pinnedConversations.length > 0 && (
+                <div>
+                  <div className="px-2 pb-1">
+                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wide">{t("sidebar.pinned")}</span>
+                  </div>
+                  <div className="space-y-px">
+                    {pinnedConversations.map((c) => renderConversation(c, { pinned: true }))}
+                  </div>
+                </div>
+              )}
               {grouped.map((group) => (
                 <div key={group.label}>
                   <div className="px-2 pb-1">
                     <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wide">{group.label}</span>
                   </div>
                   <div className="space-y-px">
-                    {group.conversations.map(renderConversation)}
+                    {group.conversations.map((c) => renderConversation(c, { pinned: false }))}
                   </div>
                 </div>
               ))}
@@ -422,7 +497,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Resize handle — hidden on mobile where sidebar is an overlay */}
         <div
-          onMouseDown={handleDragStart}
+          onMouseDown={handleResizeStart}
           className="hidden lg:block absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
         />
       </div>

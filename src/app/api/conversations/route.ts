@@ -71,6 +71,7 @@ export async function GET(req: Request) {
         compactionSummary: conversations.compactionSummary,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
+        pinOrder: conversations.pinOrder,
       })
       .from(conversations)
       .where(where!)

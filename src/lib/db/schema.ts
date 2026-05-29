@@ -76,6 +76,7 @@ export const conversations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    pinOrder: integer("pin_order"),
   },
   (table) => [
     index("conversations_user_id_idx").on(table.userId),

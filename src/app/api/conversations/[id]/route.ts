@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 }
 
-// PATCH /api/conversations/:id — rename or regenerate title
+// PATCH /api/conversations/:id — rename, regenerate title, or pin/unpin
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
@@ -47,6 +47,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (body.generateTitle) {
       const title = await regenerateConversationTitle(id, userId);
       return Response.json({ ...conv, title });
+    }
+
+    // Pin/unpin
+    if ("pinOrder" in body) {
+      const pinOrder = body.pinOrder === null ? null : Number(body.pinOrder);
+      const [updated] = await db
+        .update(conversations)
+        .set({ pinOrder })
+        .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+        .returning();
+      return Response.json(updated);
     }
 
     // Manual rename
