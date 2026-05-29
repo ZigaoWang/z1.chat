@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -105,7 +105,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   } = useConversations();
   const { user, signOut } = useAuth();
   const { creditBalance, isZero, isLow, isCritical } = useCredits();
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -374,6 +374,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {user?.email}
                 </div>
                 <ThemeToggle />
+                <button
+                  onClick={() => setLocale(locale === "en" ? "zh" : "en")}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
+                  <Languages className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span>{locale === "en" ? "中文" : "English"}</span>
+                </button>
                 <Link href="/settings#credits"
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground/60" />
