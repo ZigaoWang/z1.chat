@@ -56,6 +56,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   const [artifactClosing, setArtifactClosing] = useState(false);
   const [artifactStreaming, setArtifactStreaming] = useState(false);
   const [wasInterrupted, setWasInterrupted] = useState(false);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [artifactWidth, setArtifactWidth] = useState(50);
   const [isDraggingArtifact, setIsDraggingArtifact] = useState(false);
   const savedInputRef = useRef("");
@@ -205,6 +206,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setArtifactPanel(null);
     setArtifactStreaming(false);
     sidebarWasOpen.current = false;
+    if (activeId) setIsMessagesLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -403,8 +405,9 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
           } else {
             setMessages([]);
           }
+          setIsMessagesLoading(false);
         })
-        .catch(console.error);
+        .catch((e) => { console.error(e); setIsMessagesLoading(false); });
     } else if (!activeId) {
       setMessages([]);
       messageModelMap.current.clear();
@@ -1221,7 +1224,33 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       {isZero && <FreeModeBanner />}
 
       {/* Messages or Empty State */}
-      {messages.length === 0 ? (
+      {isMessagesLoading ? (
+        <div className="flex flex-1 flex-col gap-6 px-4 py-6 overflow-hidden">
+          <div className="mx-auto w-full max-w-3xl flex flex-col gap-6">
+            {/* User message skeleton */}
+            <div className="flex justify-end">
+              <div className="h-9 w-48 rounded-2xl bg-muted animate-pulse" />
+            </div>
+            {/* Assistant message skeleton */}
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+              <div className="h-4 w-full rounded bg-muted animate-pulse" />
+              <div className="h-4 w-5/6 rounded bg-muted animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
+            </div>
+            {/* User message skeleton */}
+            <div className="flex justify-end">
+              <div className="h-9 w-64 rounded-2xl bg-muted animate-pulse" />
+            </div>
+            {/* Assistant message skeleton */}
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-full rounded bg-muted animate-pulse" />
+              <div className="h-4 w-4/5 rounded bg-muted animate-pulse" />
+              <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ) : messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-4">
           <div className="w-full max-w-2xl">
             <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight text-foreground">
