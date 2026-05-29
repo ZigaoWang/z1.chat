@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, Shield, CreditCard } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, Shield, CreditCard, ChevronUp } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
 import { useI18n } from "@/hooks/use-i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ThemeToggle from "./theme-toggle";
 import { formatCNY } from "@/lib/currency";
 import { cn } from "@/lib/utils";
@@ -370,49 +371,51 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2 space-y-0.5">
-          {user && (
-            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs">
-              <span className="flex-1 truncate text-sm font-medium text-foreground/80">{user.name || user.email}</span>
-              <Tooltip>
-                <TooltipTrigger
-                  onClick={signOut}
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <LogOut className="h-3 w-3" />
-                </TooltipTrigger>
-                <TooltipContent side="top">{t("sidebar.signOut")}</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
-          <Link href="/settings#credits"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground transition-colors">
-            <CreditCard className="h-3.5 w-3.5" />
-            <span className="flex-1">{t("sidebar.balance")}</span>
-            <span className={cn(
-              "tabular-nums",
-              isCritical && "text-amber-500",
-              isZero && "text-red-500/70"
-            )}>
-              {formatCNY(creditBalance)}
-            </span>
-            {isLow && !isZero && (
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-            )}
-          </Link>
-          <div className="flex items-center gap-0.5 px-1">
-            <ThemeToggle />
-            <Link href="/settings"
-              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
-              <Settings className="h-3.5 w-3.5" /> {t("sidebar.settings")}
-            </Link>
-            {user?.role === "admin" && (
-              <Link href="/admin"
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50 hover:bg-muted/50 hover:text-foreground transition-colors">
-                <Shield className="h-3.5 w-3.5" /> {t("sidebar.admin")}
-              </Link>
-            )}
-          </div>
+        <div className="shrink-0 border-t border-sidebar-border/40 px-2 py-2" ref={(el) => { if (el) el.style.setProperty("--footer-w", el.offsetWidth + "px"); }}>
+          <Popover>
+            <PopoverTrigger className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted/50 transition-colors text-left">
+              <span className="flex-1 truncate font-medium text-foreground/80">{user?.name || user?.email}</span>
+              <span className={cn(
+                "tabular-nums text-xs text-muted-foreground/50 shrink-0",
+                isCritical && "text-amber-500",
+                isZero && "text-red-500/70"
+              )}>
+                {formatCNY(creditBalance)}
+              </span>
+              <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" sideOffset={8} className="p-1 gap-0" style={{ width: "var(--footer-w)" }}>
+                <div className="px-2 py-1 text-xs text-muted-foreground/50 border-b border-border/50 mb-0.5">
+                  {user?.email}
+                </div>
+                <ThemeToggle />
+                <Link href="/settings#credits"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="flex-1">{t("sidebar.balance")}</span>
+                  <span className={cn(
+                    "tabular-nums text-xs text-muted-foreground/60",
+                    isCritical && "text-amber-500",
+                    isZero && "text-red-500/70"
+                  )}>
+                    {formatCNY(creditBalance)}
+                  </span>
+                </Link>
+                <Link href="/settings"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                  <Settings className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  {t("sidebar.settings")}
+                </Link>
+                <div className="border-t border-border/50 mt-0.5 pt-0.5">
+                  <button
+                    onClick={signOut}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 transition-colors">
+                    <LogOut className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    {t("sidebar.signOut")}
+                  </button>
+                </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Resize handle — hidden on mobile where sidebar is an overlay */}
