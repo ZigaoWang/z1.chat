@@ -5,7 +5,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { users, emailVerificationCodes, creditTransactions, passwordResetTokens } from "./db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, lt } from "drizzle-orm";
 import { createSession, deleteSession } from "./session";
 import { verifySession } from "./dal";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
@@ -108,14 +108,21 @@ export async function verifyEmailCode(userId: string, code: string) {
     throw new Error("Code expired");
   }
 
-  if (verification.attempts >= 5) {
+  // Atomic increment — rejects if already at 5 attempts (prevents race condition)
+  const [updated] = await db
+    .update(emailVerificationCodes)
+    .set({ attempts: sql`${emailVerificationCodes.attempts} + 1` })
+    .where(
+      and(
+        eq(emailVerificationCodes.id, verification.id),
+        lt(emailVerificationCodes.attempts, 5),
+      )
+    )
+    .returning({ attempts: emailVerificationCodes.attempts });
+
+  if (!updated) {
     throw new Error("Too many attempts");
   }
-
-  await db
-    .update(emailVerificationCodes)
-    .set({ attempts: verification.attempts + 1 })
-    .where(eq(emailVerificationCodes.id, verification.id));
 
   if (verification.code !== code) {
     throw new Error("Invalid code");
