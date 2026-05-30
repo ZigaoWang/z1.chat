@@ -618,7 +618,7 @@ export default function ArtifactPreview({
     switch (type) {
       case "html": return <iframe key={iframeKey} ref={iframeRef} srcDoc={wrapForPreview(content, "html")} sandbox="allow-scripts allow-forms allow-popups allow-modals" className="flex-1 w-full bg-white" title="Preview" />;
       case "svg": return <iframe key={iframeKey} srcDoc={wrapForPreview(content, "svg")} sandbox="allow-scripts" className="flex-1 w-full bg-white" title="Preview" />;
-      case "mermaid": return <div className="flex-1 h-0 bg-white dark:bg-card"><MermaidPreview code={content} /></div>;
+      case "mermaid": return <div className="flex-1 h-0 bg-white"><MermaidPreview code={content} /></div>;
       default: return (
         <div className="flex-1 h-0 overflow-y-auto overflow-x-hidden">
           <div className="p-4 overflow-x-auto">
