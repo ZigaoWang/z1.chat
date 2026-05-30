@@ -110,6 +110,7 @@ export const zh: Record<TranslationKey, string> = {
   "sidebar.pinned": "置顶",
   "sidebar.signOut": "退出登录",
   "sidebar.settings": "设置",
+  "sidebar.legal": "法律信息",
   "sidebar.admin": "管理后台",
 
   // Settings

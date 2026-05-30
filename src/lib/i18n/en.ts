@@ -108,6 +108,7 @@ export const en = {
   "sidebar.pinned": "Pinned",
   "sidebar.signOut": "Sign out",
   "sidebar.settings": "Settings",
+  "sidebar.legal": "Legal",
   "sidebar.admin": "Admin",
 
   // Settings

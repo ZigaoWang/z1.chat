@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff, Info } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -485,6 +485,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
                   <Settings className="h-3.5 w-3.5 text-muted-foreground/60" />
                   {t("sidebar.settings")}
+                </Link>
+                <Link href="/legal"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted/50">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  {t("sidebar.legal")}
                 </Link>
                 <div className="border-t border-border/50 mt-0.5 pt-0.5">
                   <button
