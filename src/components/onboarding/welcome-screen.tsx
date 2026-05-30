@@ -1,62 +1,40 @@
 "use client";
 
-import { Brain, Search, Coins } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { formatCNY } from "@/lib/currency";
+import { Gift, ArrowRight } from "lucide-react";
 
-interface WelcomeScreenProps {
+interface CreditsScreenProps {
   creditBalance: number;
   onContinue: () => void;
 }
 
-export default function WelcomeScreen({ creditBalance, onContinue }: WelcomeScreenProps) {
+export default function CreditsScreen({ creditBalance, onContinue }: CreditsScreenProps) {
   const { t } = useI18n();
 
-  const cards = [
-    { icon: Brain, title: t("onboarding.card1Title"), desc: t("onboarding.card1Desc") },
-    { icon: Search, title: t("onboarding.card2Title"), desc: t("onboarding.card2Desc") },
-    { icon: Coins, title: t("onboarding.card3Title"), desc: t("onboarding.card3Desc") },
-  ];
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md px-6 text-center">
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t("onboarding.welcome")}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("onboarding.subtitle")}
-        </p>
-
-        <div className="mt-8 grid gap-3">
-          {cards.map((card) => (
-            <div
-              key={card.title}
-              className="flex items-start gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-left"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <card.icon className="h-4.5 w-4.5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">{card.title}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{card.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background animate-fade-in">
+      <div className="w-full max-w-xs px-6 text-center">
+        <Gift className="mx-auto mb-6 h-8 w-8 text-primary" />
+        <h2 className="text-xl font-semibold tracking-tight">{t("onboarding.freeCredits")}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{t("onboarding.freeCreditsDesc")}</p>
         {creditBalance > 0 && (
-          <div className="mt-6 rounded-lg bg-primary/5 px-4 py-3">
-            <p className="text-xs text-muted-foreground">{t("onboarding.startingBalance")}</p>
-            <p className="mt-0.5 text-xl font-bold text-primary">{formatCNY(creditBalance)}</p>
-          </div>
+          <p className="mt-1 text-xs text-muted-foreground/60">{formatCNY(creditBalance)} · {t("onboarding.payg")}</p>
         )}
-
         <button
-          onClick={onContinue}
-          className="mt-6 flex h-10 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors"
+          onClick={async () => {
+            try {
+              await fetch("/api/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ onboardingCompleted: true }),
+              });
+            } catch { /* continue */ }
+            onContinue();
+          }}
+          className="mt-8 flex h-10 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors"
         >
-          {t("onboarding.getStarted")}
+          {t("onboarding.startChatting")}<ArrowRight className="ml-1.5 h-4 w-4" />
         </button>
       </div>
     </div>

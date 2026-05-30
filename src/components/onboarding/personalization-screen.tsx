@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
+import { ACCENT_PRESETS, applyAccentHue } from "@/components/accent-color-provider";
+import { useTheme } from "next-themes";
 
-interface PersonalizationScreenProps {
+interface ThemeScreenProps {
+  accentHue: number;
+  onAccentChange: (hue: number) => void;
   onSave: () => void;
   onSkip: () => void;
 }
 
-export default function PersonalizationScreen({ onSave, onSkip }: PersonalizationScreenProps) {
+export default function ThemeScreen({ accentHue, onAccentChange, onSave, onSkip }: ThemeScreenProps) {
   const { t } = useI18n();
-  const [style, setStyle] = useState<"concise" | "balanced" | "detailed">("balanced");
+  const { setTheme, theme } = useTheme();
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => { applyAccentHue(accentHue); }, [accentHue]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -20,15 +26,10 @@ export default function PersonalizationScreen({ onSave, onSkip }: Personalizatio
       await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          preferences: { responseStyle: style },
-          onboardingCompleted: true,
-        }),
+        body: JSON.stringify({ preferences: { accentColor: accentHue, theme: theme ?? "system" } }),
       });
-      onSave();
-    } catch {
-      onSave();
-    }
+    } catch { /* continue */ }
+    onSave();
   };
 
   const handleSkip = async () => {
@@ -36,45 +37,54 @@ export default function PersonalizationScreen({ onSave, onSkip }: Personalizatio
       await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ onboardingCompleted: true }),
+        body: JSON.stringify({ preferences: {} }),
       });
-    } catch {
-      // continue anyway
-    }
+    } catch { /* continue */ }
     onSkip();
   };
 
-  const styleOptions: { value: "concise" | "balanced" | "detailed"; label: string; desc: string }[] = [
-    { value: "concise", label: t("onboarding.concise"), desc: t("settings.concise") },
-    { value: "balanced", label: t("onboarding.balanced"), desc: t("settings.balanced") },
-    { value: "detailed", label: t("onboarding.detailed"), desc: t("settings.detailed") },
-  ];
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-sm px-6">
-        <div className="text-center">
-          <h2 className="text-xl font-bold tracking-tight">{t("onboarding.personalize")}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background animate-fade-in">
+      <div className="w-full max-w-xs px-6">
+        <div className="text-center mb-8">
+          <h2 className="text-xl font-semibold tracking-tight">{t("onboarding.personalize")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t("onboarding.personalizeDesc")}</p>
         </div>
 
-        <div className="mt-6">
-          <label className="text-sm font-medium">{t("onboarding.chooseStyle")}</label>
-          <div className="mt-2 flex flex-col gap-2">
-            {styleOptions.map((opt) => (
+        {/* Theme */}
+        <div className="mb-6">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("settings.theme")}</label>
+          <div className="mt-2 flex gap-2">
+            {(["light", "dark", "system"] as const).map((t_) => (
               <button
-                key={opt.value}
-                onClick={() => setStyle(opt.value)}
-                className={`rounded-xl border px-4 py-3 text-left transition-colors ${
-                  style === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:bg-muted/50"
+                key={t_}
+                onClick={() => setTheme(t_)}
+                className={`flex-1 h-9 rounded-lg border text-sm font-medium transition-colors ${
+                  theme === t_ ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted/50"
                 }`}
               >
-                <span className={`text-sm font-medium ${style === opt.value ? "text-primary" : ""}`}>
-                  {opt.label}
-                </span>
+                {t_ === "light" ? t("settings.light") : t_ === "dark" ? t("settings.dark") : t("settings.system")}
               </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Accent color */}
+        <div className="mb-8">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("onboarding.chooseAccent")}</label>
+          <div className="mt-2 flex items-center gap-2.5">
+            {ACCENT_PRESETS.map((preset) => (
+              <button
+                key={preset.hue}
+                onClick={() => onAccentChange(preset.hue)}
+                className="h-7 w-7 rounded-full transition-transform hover:scale-110 flex-1"
+                style={{
+                  background: `oklch(0.45 0.18 ${preset.hue})`,
+                  outline: accentHue === preset.hue ? `2px solid oklch(0.45 0.18 ${preset.hue})` : "none",
+                  outlineOffset: "2px",
+                }}
+                title={preset.name}
+              />
             ))}
           </div>
         </div>
@@ -82,11 +92,10 @@ export default function PersonalizationScreen({ onSave, onSkip }: Personalizatio
         <button
           onClick={handleSave}
           disabled={saving}
-          className="mt-6 flex h-10 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("onboarding.save")}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><span>{t("onboarding.getStarted")}</span><ArrowRight className="ml-1.5 h-4 w-4" /></>}
         </button>
-
         <button
           onClick={handleSkip}
           className="mt-2 flex w-full items-center justify-center py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
