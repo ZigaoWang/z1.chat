@@ -447,17 +447,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <ThemeToggle />
                 <div className="flex items-center gap-1.5 px-2 py-1.5">
                   <Languages className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <div className="flex flex-1 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
+                  <div className="relative flex flex-1 items-center rounded-md bg-muted/50 p-0.5">
+                    <div
+                      className="absolute left-0.5 top-0.5 bottom-0.5 rounded bg-background shadow-sm transition-transform duration-200 ease-in-out"
+                      style={{
+                        width: "calc((100% - 4px) / 2)",
+                        transform: `translateX(${locale === "zh" ? "100%" : "0%"})`,
+                      }}
+                    />
                     <button
                       onClick={() => setLocale("en")}
-                      className={`flex-1 rounded h-6 text-xs text-center ${
-                        locale === "en" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      className={`relative flex-1 rounded h-6 text-xs text-center transition-colors duration-200 ${
+                        locale === "en" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >EN</button>
                     <button
                       onClick={() => setLocale("zh")}
-                      className={`flex-1 rounded h-6 text-xs text-center ${
-                        locale === "zh" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      className={`relative flex-1 rounded h-6 text-xs text-center transition-colors duration-200 ${
+                        locale === "zh" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >中文</button>
                   </div>
