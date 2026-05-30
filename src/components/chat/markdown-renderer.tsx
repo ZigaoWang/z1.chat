@@ -37,22 +37,22 @@ function CodeBlock({
 
   return (
     <div className="group/code relative my-3 overflow-hidden rounded-lg border border-border/40 bg-card">
-      <div className="flex items-center justify-between border-b border-border/40 px-3 py-1.5 bg-muted/30">
-        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+      <div className="flex items-center justify-between border-b border-border/40 px-3 py-1 bg-muted/30">
+        <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wide">
           {language || "code"}
         </span>
         <div className="flex items-center gap-1">
           {showPreview && (
             <button
               onClick={() => onOpenArtifact!(codeRef.current?.textContent || "", language)}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors hover:text-foreground hover:bg-muted"
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/40 transition-colors hover:text-foreground hover:bg-muted"
             >
               <Eye className="h-3 w-3" />{t("common.preview")}
             </button>
           )}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/40 transition-colors sm:opacity-0 sm:group-hover/code:opacity-100 hover:text-foreground hover:bg-muted"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/40 transition-colors sm:opacity-0 sm:group-hover/code:opacity-100 hover:text-foreground hover:bg-muted"
           >
             {copied ? (
               <><Check className="h-3 w-3 text-emerald-500" /><span className="text-emerald-500">{t("common.copied")}</span></>
@@ -62,9 +62,9 @@ function CodeBlock({
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto px-4 py-3">
-        <pre>
-          <code ref={codeRef} className={`text-[13px] leading-relaxed font-mono ${className || ""}`}>
+      <div className="overflow-x-auto scrollbar-thin px-3 py-0.5">
+        <pre className="m-0">
+          <code ref={codeRef} className={`text-[13px] leading-normal font-mono ${className || ""}`}>
             {children}
           </code>
         </pre>
