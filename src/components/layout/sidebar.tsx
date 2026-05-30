@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday, subDays, isAfter } from "date-fns";
-import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff, Info } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Check, X, MessageSquare, PanelLeftClose, Settings, MoreHorizontal, Sparkles, LogOut, CreditCard, ChevronUp, Languages, Pin, PinOff, Info, Palette } from "lucide-react";
 import { useConversations, type Conversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -10,6 +10,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ThemeToggle from "./theme-toggle";
+import { ACCENT_PRESETS, DEFAULT_HUE, applyAccentHue } from "@/components/accent-color-provider";
 import { formatCNY } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
@@ -117,6 +118,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [accentHue, setAccentHue] = useState(DEFAULT_HUE);
   const editInputRef = useRef<HTMLInputElement>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDragging = useRef(false);
@@ -130,6 +132,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       if (n >= MIN_WIDTH && n <= MAX_WIDTH) setWidth(n);
     }
     setMounted(true);
+    fetch("/api/settings").then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.preferences?.accentColor) setAccentHue(data.preferences.accentColor);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -445,6 +450,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {user?.email}
                 </div>
                 <ThemeToggle />
+                <div className="flex items-center gap-1.5 px-2 py-1.5">
+                  <Palette className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                  <div className="flex flex-1 items-center justify-between">
+                    {ACCENT_PRESETS.map((preset) => (
+                      <button
+                        key={preset.hue}
+                        onClick={() => {
+                          setAccentHue(preset.hue);
+                          applyAccentHue(preset.hue);
+                          fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: preset.hue }) }).catch(() => {});
+                        }}
+                        className="h-5 w-5 rounded-full transition-transform hover:scale-110"
+                        style={{ background: `oklch(0.45 0.18 ${preset.hue})`, outline: accentHue === preset.hue ? `2px solid oklch(0.45 0.18 ${preset.hue})` : "none", outlineOffset: "2px" }}
+                        title={preset.name}
+                      />
+                    ))}
+                  </div>
+                </div>
                 <div className="flex items-center gap-1.5 px-2 py-1.5">
                   <Languages className="h-3.5 w-3.5 text-muted-foreground/60" />
                   <div className="relative flex flex-1 items-center rounded-md bg-muted/50 p-0.5">
