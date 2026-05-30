@@ -219,8 +219,8 @@ export default function ChatInput({
               }}
               disabled={editing ? !isEditChanged : !canSubmit}
               className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 active:scale-95 ${
-                isLoading && !editing ? "bg-foreground text-background hover:bg-foreground/80" :
-                (editing ? isEditChanged : hasContent) ? "bg-foreground text-background hover:bg-foreground/80" :
+                isLoading && !editing ? "bg-primary text-primary-foreground hover:bg-primary/90" :
+                (editing ? isEditChanged : hasContent) ? "bg-primary text-primary-foreground hover:bg-primary/90" :
                 "bg-muted text-muted-foreground/30"
               } disabled:opacity-10`}
             >

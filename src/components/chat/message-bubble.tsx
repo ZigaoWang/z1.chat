@@ -618,9 +618,9 @@ function MessageBubble({
         {isStreaming && !hasAnyContent && !thinking && (
           <div className="flex items-center gap-1.5 py-1">
             <div className="flex gap-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
             </div>
           </div>
         )}
@@ -684,9 +684,9 @@ function MessageBubble({
             {/* Trailing dots — shows the AI is still working after tools/text */}
             {isStreaming && !isThinking && (
               <div className="flex items-center gap-1 mt-4 py-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_infinite]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-foreground/15 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/30 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
               </div>
             )}
           </>
