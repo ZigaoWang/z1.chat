@@ -336,4 +336,10 @@ export const zh: Record<TranslationKey, string> = {
   "suggestion.codeTitle": "简单解释",
   "suggestion.website": "分析这个 CSV 文件，找出最有趣的规律",
   "suggestion.websiteTitle": "分析数据",
+
+  // Legal
+  "legal.privacy": "隐私政策",
+  "legal.terms": "服务条款",
+  "legal.agreePrefix": "注册即表示您同意我们的",
+  "legal.agreeAnd": "和",
 };

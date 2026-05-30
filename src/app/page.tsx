@@ -39,6 +39,15 @@ function LandingPage() {
         </div>
       </main>
       <footer className="py-6 text-center text-xs text-muted-foreground/50">
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <Link href="/legal/privacy" className="hover:text-muted-foreground transition-colors">
+            Privacy Policy
+          </Link>
+          <span>·</span>
+          <Link href="/legal/terms" className="hover:text-muted-foreground transition-colors">
+            Terms of Service
+          </Link>
+        </div>
         {APP_NAME} · Engineered by{" "}
         <a href="https://zigao.wang" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           Zigao Wang

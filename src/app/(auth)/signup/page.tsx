@@ -130,6 +130,17 @@ export default function SignupPage() {
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.signUp")}
         </button>
+
+        <p className="text-center text-[11px] text-muted-foreground/50 leading-relaxed">
+          {t("legal.agreePrefix")}{" "}
+          <Link href="/legal/terms" className="underline hover:text-muted-foreground transition-colors">
+            {t("legal.terms")}
+          </Link>
+          {" "}{t("legal.agreeAnd")}{" "}
+          <Link href="/legal/privacy" className="underline hover:text-muted-foreground transition-colors">
+            {t("legal.privacy")}
+          </Link>
+        </p>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">

@@ -334,6 +334,12 @@ export const en = {
   "suggestion.codeTitle": "Explain simply",
   "suggestion.website": "Analyze this CSV and find the most interesting patterns",
   "suggestion.websiteTitle": "Analyze data",
+
+  // Legal
+  "legal.privacy": "Privacy Policy",
+  "legal.terms": "Terms of Service",
+  "legal.agreePrefix": "By signing up, you agree to our",
+  "legal.agreeAnd": "and",
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -188,6 +188,17 @@ export default function SettingsPage() {
             <CreditsTab settings={settings} recentOrders={recentOrders} />
           )}
         </div>
+
+        {/* Legal links */}
+        <div className="mt-12 pt-6 border-t border-border/40 flex items-center gap-3 text-xs text-muted-foreground/50">
+          <Link href="/legal/privacy" className="hover:text-muted-foreground transition-colors">
+            {t("legal.privacy")}
+          </Link>
+          <span>·</span>
+          <Link href="/legal/terms" className="hover:text-muted-foreground transition-colors">
+            {t("legal.terms")}
+          </Link>
+        </div>
       </div>
     </div>
   );
