@@ -412,8 +412,6 @@ function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }:
           : wasStopped
           ? t("artifact.stopped")
           : (ti.toolName === "create_artifact" ? typeLabel : ti.toolName === "update_artifact" ? t("artifact.rewrote") : t("artifact.edited"));
-        const version = result?.version;
-
         return (
           <button
             key={ti.toolCallId}
@@ -428,7 +426,6 @@ function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }:
             )}
             <span className="font-medium text-foreground/70 truncate">{displayTitle}</span>
             <span className="text-muted-foreground/40 shrink-0">{isRunning ? `${actionLabel}...` : actionLabel}</span>
-            {version && version > 1 && <span className="text-[10px] text-muted-foreground/30 tabular-nums">v{version}</span>}
           </button>
         );
       })}
@@ -439,21 +436,11 @@ function ArtifactToolCards({ invocations, onOpenArtifactById, parentStreaming }:
 function VersionNav({ current, total, onChange }: { current: number; total: number; onChange: (i: number) => void }) {
   return (
     <div className="inline-flex items-center">
-      <button
-        onClick={() => onChange(current - 1)}
-        disabled={current === 0}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
-      >
+      <button onClick={() => onChange(current - 1)} disabled={current === 0} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none">
         <ChevronLeft className="h-4 w-4" />
       </button>
-      <span className="text-xs tabular-nums text-muted-foreground/60 select-none">
-        {current + 1}&thinsp;/&thinsp;{total}
-      </span>
-      <button
-        onClick={() => onChange(current + 1)}
-        disabled={current === total - 1}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none"
-      >
+      <span className="text-xs tabular-nums text-muted-foreground/60 select-none">{current + 1}&thinsp;/&thinsp;{total}</span>
+      <button onClick={() => onChange(current + 1)} disabled={current === total - 1} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none">
         <ChevronRight className="h-4 w-4" />
       </button>
     </div>

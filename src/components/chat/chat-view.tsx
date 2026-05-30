@@ -1011,29 +1011,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
   }, [onCollapseSidebar, sidebarOpen]);
 
 
-  const handleLoadVersion = useCallback(async (targetVersion: number) => {
-    if (!artifactPanel?.id) return;
-    if (targetVersion === artifactPanel.version) return;
-    try {
-      const res = await fetch(`/api/artifacts/${artifactPanel.id}/versions`);
-      if (!res.ok) return;
-      const versions = await res.json();
-      const target = versions.find((v: { version: number }) => v.version === targetVersion);
-      if (!target) return;
-      const patchRes = await fetch(`/api/artifacts/${artifactPanel.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: target.content, restoreVersion: targetVersion }),
-      });
-      if (patchRes.ok) {
-        const updated = await patchRes.json();
-        setArtifactPanel(updated);
-      }
-    } catch (err) {
-      console.error("Failed to load version:", err);
-    }
-  }, [artifactPanel?.id, artifactPanel?.version]);
-
   const handleCloseArtifact = useCallback(() => {
     setArtifactClosing(true);
     if (sidebarWasOpen.current) onOpenSidebar();
@@ -1480,7 +1457,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
             artifact={lastArtifactRef.current!}
             streaming={artifactStreaming}
             onClose={handleCloseArtifact}
-            onLoadVersion={lastArtifactRef.current?.id ? handleLoadVersion : undefined}
           />
         </div>
 
@@ -1509,8 +1485,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               artifact={lastArtifactRef.current!}
               streaming={artifactStreaming}
               onClose={handleCloseArtifact}
-              onLoadVersion={lastArtifactRef.current?.id ? handleLoadVersion : undefined}
-              totalVersions={lastArtifactRef.current?.version}
             />
           </div>
         </div>

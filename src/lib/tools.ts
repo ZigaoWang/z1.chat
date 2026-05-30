@@ -6,7 +6,7 @@ import { join, basename } from "path";
 import { tmpdir } from "os";
 import sharp from "sharp";
 import { db } from "./db";
-import { artifacts, artifactVersions } from "./db/schema";
+import { artifacts } from "./db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 /** Strip markdown code fences that models sometimes wrap artifact content in */
@@ -371,7 +371,7 @@ export function getTools(sandboxManager?: SandboxManager, artifactCtx?: Artifact
             content: cleanContent,
             language: language || null,
           }).returning();
-          return { id: artifact.id, type, title, version: 1 };
+          return { id: artifact.id, type, title };
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[create_artifact] Error:", msg);
@@ -401,20 +401,11 @@ export function getTools(sandboxManager?: SandboxManager, artifactCtx?: Artifact
             return { error: `Artifact "${identifier}" not found` };
           }
 
-          // Save current version for undo
-          await db.insert(artifactVersions).values({
-            artifactId: existing.id,
-            version: existing.version,
-            content: existing.content,
-          });
-
-          // Update with new content
-          const newVersion = existing.version + 1;
           await db.update(artifacts)
-            .set({ content: cleanContent, version: newVersion, updatedAt: new Date() })
+            .set({ content: cleanContent, updatedAt: new Date() })
             .where(eq(artifacts.id, existing.id));
 
-          return { id: existing.id, title: existing.title, version: newVersion };
+          return { id: existing.id, title: existing.title };
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[update_artifact] Error:", msg);

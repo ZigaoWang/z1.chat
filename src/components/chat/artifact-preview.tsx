@@ -392,28 +392,24 @@ export interface ArtifactData {
   title: string;
   content: string;
   language?: string | null;
-  version?: number;
 }
 
 interface ArtifactPreviewProps {
   artifact: ArtifactData;
   streaming?: boolean;
   onClose: () => void;
-  onLoadVersion?: (version: number) => void;
-  totalVersions?: number;
 }
 
 export default function ArtifactPreview({
-  artifact, streaming, onClose, onLoadVersion, totalVersions,
+  artifact, streaming, onClose,
 }: ArtifactPreviewProps) {
-  const { type, title, content, language, version } = artifact;
+  const { type, title, content, language } = artifact;
 
   const [tab, setTab] = useState<"preview" | "code">(streaming && type !== "document" ? "code" : "preview");
   const [copied, setCopied] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
-  const [versionOpen, setVersionOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(() => doHighlight(content, getHighlightLang(type, language)));
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -426,8 +422,6 @@ export default function ArtifactPreview({
 
   const hLang = useMemo(() => getHighlightLang(type, language), [type, language]);
   const canOpenNew = type === "html" || type === "svg";
-  const numVersions = totalVersions || version || 1;
-
   // Tab switching
   useEffect(() => {
     if (streaming && !prevStreamingRef.current && type !== "document") setTab("code");
@@ -636,27 +630,6 @@ export default function ArtifactPreview({
         {/* Row 1: title + actions */}
         <div className="flex items-center gap-1 px-2 h-11 min-w-0">
           <span className="text-sm font-medium truncate min-w-0 shrink px-1">{title}</span>
-          {numVersions > 1 && onLoadVersion ? (
-            <div className="relative shrink-0">
-              <button onClick={() => setVersionOpen(!versionOpen)} className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors">
-                v{version}<ChevronDown className="h-2.5 w-2.5" />
-              </button>
-              {versionOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setVersionOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-50 min-w-[72px] rounded-md border border-border bg-popover shadow-md py-0.5">
-                    {Array.from({ length: numVersions }, (_, i) => i + 1).reverse().map((v) => (
-                      <button key={v} onClick={() => { onLoadVersion(v); setVersionOpen(false); }} className={`w-full px-2.5 py-1 text-left text-[11px] hover:bg-muted transition-colors ${v === version ? "text-foreground font-medium" : "text-muted-foreground"}`}>
-                        v{v}{v === version ? " (latest)" : ""}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <span className="text-[10px] text-muted-foreground/30 tabular-nums shrink-0">v{version || 1}</span>
-          )}
           <div className="flex-1 min-w-0" />
           {/* Tabs: desktop inline */}
           <div className="hidden sm:flex items-center rounded-md bg-muted/50 p-0.5 shrink-0">

@@ -333,7 +333,6 @@ export const artifacts = pgTable(
     title: text("title").notNull(),
     content: text("content").notNull(),
     language: text("language"), // for code: 'python', 'typescript', etc.
-    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -347,24 +346,6 @@ export const artifacts = pgTable(
   ]
 );
 
-// Artifact Versions (for undo)
-export const artifactVersions = pgTable(
-  "artifact_versions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    artifactId: uuid("artifact_id")
-      .notNull()
-      .references(() => artifacts.id, { onDelete: "cascade" }),
-    version: integer("version").notNull(),
-    content: text("content").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    index("artifact_versions_artifact_id_idx").on(table.artifactId),
-  ]
-);
 
 // System Settings (key-value store for admin-configurable settings)
 export const systemSettings = pgTable("system_settings", {
@@ -491,7 +472,7 @@ export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
   }),
 }));
 
-export const artifactsRelations = relations(artifacts, ({ one, many }) => ({
+export const artifactsRelations = relations(artifacts, ({ one }) => ({
   conversation: one(conversations, {
     fields: [artifacts.conversationId],
     references: [conversations.id],
@@ -499,14 +480,6 @@ export const artifactsRelations = relations(artifacts, ({ one, many }) => ({
   user: one(users, {
     fields: [artifacts.userId],
     references: [users.id],
-  }),
-  versions: many(artifactVersions),
-}));
-
-export const artifactVersionsRelations = relations(artifactVersions, ({ one }) => ({
-  artifact: one(artifacts, {
-    fields: [artifactVersions.artifactId],
-    references: [artifacts.id],
   }),
 }));
 
@@ -531,7 +504,6 @@ export type Session = typeof sessions.$inferSelect;
 export type UsageLog = typeof usageLogs.$inferSelect;
 export type InviteToken = typeof inviteTokens.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
-export type ArtifactVersion = typeof artifactVersions.$inferSelect;
 export type PaymentOrder = typeof paymentOrders.$inferSelect;
 export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
 
