@@ -509,6 +509,7 @@ export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";
+  accentColor?: number;
   defaultModel: string | null;
   responseStyle: "concise" | "balanced" | "detailed";
   language: string | null;

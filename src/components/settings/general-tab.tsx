@@ -6,12 +6,15 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { useI18n } from "@/hooks/use-i18n";
 
+import { ACCENT_PRESETS, DEFAULT_HUE, applyAccentHue } from "@/components/accent-color-provider";
+
 interface UserSettings {
   name: string | null;
   email: string | null;
   creditBalance: number;
   preferences: {
     theme: "light" | "dark" | "system";
+    accentColor?: number;
     defaultModel: string | null;
     responseStyle: "concise" | "balanced" | "detailed";
     language: string | null;
@@ -41,7 +44,7 @@ export default function GeneralTab({ settings, setSettings }: {
   }, [settings?.preferences?.customInstructions]);
 
   const updatePreference = useCallback(
-    async (key: string, value: string | null) => {
+    async (key: string, value: string | number | null) => {
       try {
         const res = await fetch("/api/settings", {
           method: "PATCH",
@@ -105,6 +108,28 @@ export default function GeneralTab({ settings, setSettings }: {
               {opt.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Accent Color */}
+      <div>
+        <h3 className="text-sm font-medium mb-3">Accent color</h3>
+        <div className="flex gap-2">
+          {ACCENT_PRESETS.map((preset) => {
+            const active = (settings?.preferences?.accentColor ?? DEFAULT_HUE) === preset.hue;
+            return (
+              <button
+                key={preset.hue}
+                title={preset.name}
+                onClick={() => {
+                  applyAccentHue(preset.hue);
+                  updatePreference("accentColor", preset.hue);
+                }}
+                className={`h-7 w-7 rounded-full transition-all ring-offset-2 ring-offset-background ${active ? "ring-2 ring-primary scale-110" : "hover:scale-105"}`}
+                style={{ background: `oklch(0.55 0.2 ${preset.hue})` }}
+              />
+            );
+          })}
         </div>
       </div>
 
