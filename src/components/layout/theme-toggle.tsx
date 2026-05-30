@@ -28,7 +28,7 @@ export default function ThemeToggle() {
           <button
             key={opt.value}
             onClick={() => setTheme(opt.value)}
-            className={`flex-1 flex items-center justify-center gap-1 rounded px-2 py-1 text-xs ${
+            className={`flex-1 flex items-center justify-center gap-1 rounded h-6 text-xs ${
               theme === opt.value
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"

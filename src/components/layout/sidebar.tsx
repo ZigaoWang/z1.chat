@@ -450,13 +450,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <div className="flex flex-1 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
                     <button
                       onClick={() => setLocale("en")}
-                      className={`flex-1 rounded px-2 py-1 text-xs text-center ${
+                      className={`flex-1 rounded h-6 text-xs text-center ${
                         locale === "en" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >EN</button>
                     <button
                       onClick={() => setLocale("zh")}
-                      className={`flex-1 rounded px-2 py-1 text-xs text-center ${
+                      className={`flex-1 rounded h-6 text-xs text-center ${
                         locale === "zh" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >中文</button>
