@@ -125,7 +125,7 @@ export default function ChatInput({
   }, [files, onFilesChange]);
 
   const canSubmit = !disabled && (isLoading || hasContent);
-  const isEditChanged = editing ? value.trim() !== editing.originalContent && value.trim().length > 0 : false;
+  const isEditChanged = editing ? (value.trim() !== editing.originalContent && value.trim().length > 0) || files.length > 0 : false;
 
   return (
     <div className="shrink-0 bg-background px-3 md:px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
@@ -143,7 +143,7 @@ export default function ChatInput({
 
         <div className={`border border-border/60 bg-background shadow-sm transition-all duration-200 focus-within:border-border focus-within:ring-2 focus-within:ring-ring/10 focus-within:shadow-md ${editing ? "rounded-b-2xl" : "rounded-2xl"}`}>
           {/* File previews */}
-          {files.length > 0 && !editing && (
+          {files.length > 0 && (
             <div className="flex flex-wrap gap-2 px-3.5 pt-3">
               {files.map((file, i) => (
                 file.textContent ? (
@@ -185,13 +185,20 @@ export default function ChatInput({
           {/* Action bar below textarea */}
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             {editing ? (
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                className="px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
-              >
-                {t("chat.cancel")}
-              </button>
+              <div className="flex items-center gap-1">
+                <FileUpload
+                  onFilesUploaded={(f) => onFilesChange([...files.filter(x => !x.uploading), ...f])}
+                  onUploadStart={(placeholders) => onFilesChange([...files, ...placeholders])}
+                  disabled={disabled || isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className="px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  {t("chat.cancel")}
+                </button>
+              </div>
             ) : (
               <div className="flex items-center justify-center">
                 <FileUpload

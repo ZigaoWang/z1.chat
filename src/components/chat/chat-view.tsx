@@ -18,6 +18,7 @@ import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from
 import type { MessageSegment } from "./chat-messages";
 import { useI18n } from "@/hooks/use-i18n";
 import { useAuth } from "@/hooks/use-auth";
+import WelcomeChat from "@/components/onboarding/welcome-chat";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -45,6 +46,13 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     if (hour < 17) return t("chat.goodAfternoon", { name });
     return t("chat.goodEvening", { name });
   }, [t, user?.name]);
+
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    const key = `hasChatted:${user.id}`;
+    if (!localStorage.getItem(key)) setShowWelcomeGuide(true);
+  }, [user]);
 
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -496,6 +504,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       if ((!text && !hasFiles) || isLoading || viewingOldBranch || stillUploading) return;
       setChatError(null);
       setWasInterrupted(false);
+      if (showWelcomeGuide && user) {
+        localStorage.setItem(`hasChatted:${user.id}`, "1");
+        setShowWelcomeGuide(false);
+      }
 
       const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
       const displayImages: string[] = [];
@@ -562,7 +574,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         }
       );
     },
-    [input, isLoading, viewingOldBranch, files, sendMessage, currentModel]
+    [input, isLoading, viewingOldBranch, files, sendMessage, currentModel, showWelcomeGuide, user]
   );
 
   useEffect(() => {
@@ -938,7 +950,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     if (!editingState) return;
     const { messageIndex } = editingState;
     const newContent = input.trim();
-    if (!newContent || newContent === editingState.originalContent) {
+    if (!newContent && files.length === 0) {
       setInput(savedInputRef.current);
       setEditingState(null);
       return;
@@ -964,6 +976,30 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       const existing = prev[key] || [];
       return { ...prev, [key]: [...existing, branch] };
     });
+
+    const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
+    const displayImages: string[] = [];
+    const displayFiles: { name: string; type: string; url: string; size?: number }[] = [];
+    const fileContentBlocks: string[] = [];
+    for (const f of files) {
+      if (f.isImage && f.dataUrl) {
+        const mediaType = f.dataUrl.match(/^data:([^;]+);/)?.[1] || "image/jpeg";
+        fileParts.push({ type: "file" as const, mediaType, url: f.dataUrl });
+        displayImages.push(f.dataUrl);
+      } else {
+        displayFiles.push({ name: f.name, type: f.type, url: f.url, size: f.size });
+        if (f.textContent) {
+          fileContentBlocks.push(`<attached_file name="${f.name}" url="${f.url}" sandbox_path="/home/user/${f.name}">\n${f.textContent}\n</attached_file>`);
+        } else {
+          fileContentBlocks.push(`<attached_file name="${f.name}" url="${f.url}" sandbox_path="/home/user/${f.name}" />`);
+        }
+      }
+    }
+    pendingAttachments.current = { images: displayImages, files: displayFiles };
+    setFiles([]);
+
+    const fullText = fileContentBlocks.length > 0 ? `${fileContentBlocks.join("\n\n")}\n\n${newContent}` : newContent;
+
     pendingEditTransfer.current = { oldId: editedMsg.id, messageIndex };
     const truncated = messages.slice(0, messageIndex);
     setMessages(truncated);
@@ -971,17 +1007,20 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     setInput("");
     const editParentId = messageIndex > 0 ? messages[messageIndex - 1].id : null;
     sendMessage(
-      { text: newContent },
+      { text: fullText, files: fileParts },
       {
         body: {
           conversationId: conversationIdRef.current,
           model: selectedModelRef.current,
           parentId: editParentId,
           editedMessageId: editedMsg.id,
+          attachments: (displayImages.length > 0 || displayFiles.length > 0)
+            ? { images: displayImages, files: displayFiles }
+            : undefined,
         },
       }
     );
-  }, [editingState, input, messages, setMessages, sendMessage, getMessageContent, getToolInvocations, messageAttachments]);
+  }, [editingState, input, files, messages, setMessages, sendMessage, getMessageContent, getToolInvocations, messageAttachments]);
 
   const handleCancelEdit = useCallback(() => {
     setInput(savedInputRef.current);
@@ -1234,6 +1273,10 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">{greeting}</h1>
               <p className="text-base text-muted-foreground/60">{t("chat.helpSubtitle")}</p>
             </div>
+            {showWelcomeGuide && (
+              <WelcomeChat onSend={(text) => handleSendMessage(text)} onDismiss={() => setShowWelcomeGuide(false)} />
+            )}
+            <div id="tour-chat-input">
             <ChatInput
               value={input}
               onChange={setInput}
@@ -1249,6 +1292,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               onCancelEdit={handleCancelEdit}
               onSubmitEdit={handleSubmitEdit}
             />
+            </div>
           </div>
         </div>
       ) : (
