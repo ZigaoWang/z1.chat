@@ -18,7 +18,6 @@ import ArtifactPreview, { extractArtifacts, isArtifact, type ArtifactData } from
 import type { MessageSegment } from "./chat-messages";
 import { useI18n } from "@/hooks/use-i18n";
 import { useAuth } from "@/hooks/use-auth";
-import WelcomeChat from "@/components/onboarding/welcome-chat";
 
 interface ChatViewProps {
   sidebarOpen: boolean;
@@ -47,14 +46,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
     return t("chat.goodEvening", { name });
   }, [t, user?.name]);
 
-  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
-  useEffect(() => {
-    if (!user) return;
-    const key = `hasChatted:${user.id}`;
-    if (!localStorage.getItem(key)) setShowWelcomeGuide(true);
-  }, [user]);
-
-  const [input, setInput] = useState("");
+const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -504,12 +496,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
       if ((!text && !hasFiles) || isLoading || viewingOldBranch || stillUploading) return;
       setChatError(null);
       setWasInterrupted(false);
-      if (showWelcomeGuide && user) {
-        localStorage.setItem(`hasChatted:${user.id}`, "1");
-        setShowWelcomeGuide(false);
-      }
-
-      const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
+const fileParts: Array<{ type: "file"; mediaType: string; url: string }> = [];
       const displayImages: string[] = [];
       const displayFiles: { name: string; type: string; url: string; size?: number }[] = [];
       const fileContentBlocks: string[] = [];
@@ -574,7 +561,7 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
         }
       );
     },
-    [input, isLoading, viewingOldBranch, files, sendMessage, currentModel, showWelcomeGuide, user]
+    [input, isLoading, viewingOldBranch, files, sendMessage, currentModel, user]
   );
 
   useEffect(() => {
@@ -1273,9 +1260,6 @@ export default function ChatView({ sidebarOpen, onToggleSidebar, onCollapseSideb
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">{greeting}</h1>
               <p className="text-base text-muted-foreground/60">{t("chat.helpSubtitle")}</p>
             </div>
-            {showWelcomeGuide && (
-              <WelcomeChat onSend={(text) => handleSendMessage(text)} onDismiss={() => setShowWelcomeGuide(false)} />
-            )}
             <div id="tour-chat-input">
             <ChatInput
               value={input}
